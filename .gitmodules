@@ -1,0 +1,4 @@
+[submodule "cake"]
+	path = tools/cake
+	url = git@github.com:lewissbaker/cake.git
+	branch = master
