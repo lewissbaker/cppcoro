@@ -1,3 +1,7 @@
+///////////////////////////////////////////////////////////////////////////////
+// Copyright (c) Lewis Baker
+// Licenced under MIT license. See LICENSE.txt for details.
+///////////////////////////////////////////////////////////////////////////////
 #ifndef CPPCORO_SINGLE_CONSUMER_EVENT_HPP_INCLUDED
 #define CPPCORO_SINGLE_CONSUMER_EVENT_HPP_INCLUDED
 
@@ -22,6 +26,12 @@ namespace cppcoro
 	{
 	public:
 
+		/// \brief
+		/// Construct a new event, initialising to either 'set' or 'not set' state.
+		///
+		/// \param initiallySet
+		/// If true then initialises the event to the 'set' state.
+		/// Otherwise, initialised the event to the 'not set' state.
 		single_consumer_event(bool initiallySet = false) noexcept
 			: m_state(initiallySet ? state::set : state::not_set)
 		{}

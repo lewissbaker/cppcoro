@@ -1,3 +1,8 @@
+###############################################################################
+# Copyright Lewis Baker
+# Licenced under MIT license. See LICENSE.txt for details.
+###############################################################################
+
 import cake.path
 
 from cake.tools import compiler, script, env, project

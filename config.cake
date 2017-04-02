@@ -1,8 +1,12 @@
 ##############################################################################
+# Copyright (c) Lewis Baker
+# Licenced under MIT license. See LICENSE.txt for details.
+#
 # cppcoro library
 #
 # This file defines the set of build variants available to be built and
 # their corresponding tools and settings.
+#
 ##############################################################################
 
 import cake.path
