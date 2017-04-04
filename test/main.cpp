@@ -3,6 +3,7 @@
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
 #include <cppcoro/task.hpp>
+#include <cppcoro/lazy_task.hpp>
 #include <cppcoro/single_consumer_event.hpp>
 
 #include <memory>
@@ -321,6 +322,157 @@ void testAwaitWhenReadyDoesntThrowException()
 	assert(ok);
 }
 
+void testLazyTaskDoesntStartUntilAwaited()
+{
+	bool started = false;
+	auto func = [&]() -> cppcoro::lazy_task<>
+	{
+		started = true;
+		co_return;
+	};
+
+	auto t = func();
+	assert(!started);
+
+	[&]() -> cppcoro::task<>
+	{
+		co_await t;
+	}();
+
+	assert(started);
+}
+
+void testAwaitingDefaultConstructedLazyTaskThrowsBrokenPromise()
+{
+	bool ok = false;
+	[&]() -> cppcoro::task<>
+	{
+		cppcoro::lazy_task<> t;
+		try
+		{
+			co_await t;
+			assert(false);
+		}
+		catch (const cppcoro::broken_promise&)
+		{
+			ok = true;
+		}
+		catch (...)
+		{
+			assert(false);
+		}
+	}();
+
+	assert(ok);
+}
+
+void testAwaitingLazyTaskThatCompletesAsynchronously()
+{
+	bool reachedBeforeEvent = false;
+	bool reachedAfterEvent = false;
+	cppcoro::single_consumer_event event;
+	auto f = [&]() -> cppcoro::lazy_task<>
+	{
+		reachedBeforeEvent = true;
+		co_await event;
+		reachedAfterEvent = true;
+	};
+
+	auto t = f();
+
+	assert(!t.is_ready());
+	assert(!reachedBeforeEvent);
+
+	auto t2 = [](cppcoro::lazy_task<>& t) -> cppcoro::task<>
+	{
+		co_await t;
+	}(t);
+
+	assert(!t2.is_ready());
+
+	event.set();
+
+	assert(t.is_ready());
+	assert(t2.is_ready());
+	assert(reachedAfterEvent);
+}
+
+void testLazyTaskNeverAwaitedDestroysCapturedArgs()
+{
+	counter::reset_counts();
+
+	auto f = [](counter c) -> cppcoro::lazy_task<counter>
+	{
+		co_return c;
+	};
+
+	assert(counter::active_count() == 0);
+
+	{
+		auto t = f(counter{});
+		assert(counter::active_count() == 1);
+	}
+
+	assert(counter::active_count() == 0);
+}
+
+void testLazyTaskResultLifetime()
+{
+	counter::reset_counts();
+
+	auto f = []() -> cppcoro::lazy_task<counter>
+	{
+		co_return counter{};
+	};
+
+	{
+		auto t = f();
+		assert(counter::active_count() == 0);
+
+		[](cppcoro::lazy_task<counter>& t) -> cppcoro::task<>
+		{
+			co_await t;
+			assert(t.is_ready());
+			assert(counter::active_count() == 1);
+		}(t);
+
+		assert(counter::active_count() == 1);
+	}
+
+	assert(counter::active_count() == 0);
+}
+
+void testLazyTaskReturnByReference()
+{
+	int value = 3;
+	auto f = [&]() -> cppcoro::lazy_task<int&>
+	{
+		co_return value;
+	};
+
+	auto g = [&]() -> cppcoro::task<>
+	{
+		{
+			decltype(auto) result = co_await f();
+			static_assert(
+				std::is_same<decltype(result), int&>::value,
+				"co_await r-value reference of lazy_task<int&> should result in an int&");
+			assert(&result == &value);
+		}
+		{
+			auto t = f();
+			decltype(auto) result = co_await t;
+			static_assert(
+				std::is_same<decltype(result), int&>::value,
+				"co_await l-value reference of lazy_task<int&> should result in an int&");
+			assert(&result == &value);
+		}
+	};
+
+	auto t = g();
+	assert(t.is_ready());
+}
+
 int main(int argc, char** argv)
 {
 	testAwaitSynchronouslyCompletingVoidFunction();
@@ -332,5 +484,13 @@ int main(int argc, char** argv)
 	testAwaitingBrokenPromiseThrows();
 	testAwaitRethrowsException();
 	testAwaitWhenReadyDoesntThrowException();
+
+	testLazyTaskDoesntStartUntilAwaited();
+	testAwaitingDefaultConstructedLazyTaskThrowsBrokenPromise();
+	testAwaitingLazyTaskThatCompletesAsynchronously();
+	testLazyTaskResultLifetime();
+	testLazyTaskNeverAwaitedDestroysCapturedArgs();
+	testLazyTaskReturnByReference();
+
 	return 0;
 }
