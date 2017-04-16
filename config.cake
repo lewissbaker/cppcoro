@@ -175,7 +175,7 @@ if cake.system.isWindows() or cake.system.isCygwin():
         msvcOptVariant.tools["env"]["RELEASE"] = "optimised"
         compiler = msvcOptVariant.tools["compiler"]
         compiler.debugSymbols = True
-        compiler.useIncrementalLinking = True
+        compiler.useIncrementalLinking = False
         compiler.useFunctionLevelLinking = True
         compiler.optimisation = compiler.FULL_OPTIMISATION
         compiler.runtimeLibraries = 'release-dll'
