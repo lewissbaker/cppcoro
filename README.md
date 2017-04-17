@@ -8,8 +8,8 @@ These include:
   * `lazy_task<T>`
   * `shared_task<T>` (coming - lewissbaker/cppcoro#2)
   * `shared_lazy_task<T>` (coming - lewissbaker/cppcoro#2)
-  * `generator<T>` (coming)
-  * `recursive_generator<T>` (coming)
+  * `generator<T>` (coming - lewissbaker/cppcoro#5)
+  * `recursive_generator<T>` (coming - lewissbaker/cppcoro#6)
   * `async_generator<T>` (coming)
 * Awaitable Types
   * `single_consumer_event`
