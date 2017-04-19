@@ -2,6 +2,10 @@
 // Copyright (c) Lewis Baker
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
+#ifdef NDEBUG
+# undef NDEBUG
+#endif
+
 #include <cppcoro/task.hpp>
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/single_consumer_event.hpp>
