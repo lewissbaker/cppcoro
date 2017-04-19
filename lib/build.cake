@@ -14,6 +14,7 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   ])
 
 sources = script.cwd([
+  'async_mutex.cpp',
   ])
 
 extras = script.cwd([

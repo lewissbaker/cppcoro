@@ -13,7 +13,7 @@ These include:
   * `async_generator<T>` (coming)
 * Awaitable Types
   * `single_consumer_event`
-  * `async_mutex` (coming)
+  * `async_mutex`
   * `async_manual_reset_event` (coming)
 * Functions
   * `when_all()` (coming)
@@ -36,6 +36,7 @@ yielding either a result of type `T` or an exception.
 
 API Overview:
 ```c++
+// <cppcoro/task.hpp>
 namespace cppcoro
 {
   template<typename T = void>
@@ -186,6 +187,7 @@ cppcoro::task<> usage_example()
 
 API Overview:
 ```c++
+// <cppcoro/lazy_task.hpp>
 namespace cppcoro
 {
   template<typename T>
@@ -229,6 +231,7 @@ This can be used to
 
 API Summary:
 ```c++
+// <cppcoro/single_consumer_event.hpp>
 namespace cppcoro
 {
   class single_consumer_event
@@ -260,6 +263,78 @@ void producer()
 {
   value = "foo";
   event.set();
+}
+```
+
+## async_mutex
+
+Provides a simple mutual exclusion abstraction that allows the caller to 'co_await' the mutex
+from within a coroutine to suspend the coroutine until the mutex lock is acquired.
+
+The implementation is lock-free in that a coroutine that awaits the mutex will not
+block the thread but will instead suspend
+
+API Summary:
+```c++
+// <cppcoro/async_mutex.hpp>
+namespace cppcoro
+{
+  class async_mutex_lock_operation;
+
+  class async_mutex
+  {
+  public:
+    async_mutex() noexcept;
+    ~async_mutex();
+
+    async_mutex(const async_mutex&) = delete;
+    async_mutex& operator(const async_mutex&) = delete;
+
+    bool try_lock() noexcept;
+    async_mutex_lock_operation lock_async() noexcept;
+    void unlock();
+  };
+
+  using async_mutex_lock_result = <implementation-defined>;
+
+  class async_mutex_lock_operation
+  {
+  public:
+    bool await_ready() const noexcept;
+    bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+    async_mutex_lock_result await_resume() const noexcept;
+  };
+
+  class async_mutex_lock
+  {
+  public:
+    // Takes ownership of the lock.
+    async_mutex_lock(async_mutex_lock_result lockResult) noexcept;
+    async_mutex_lock(async_mutex& mutex, std::adopt_lock_t) noexcept;
+
+    async_mutex_lock(const async_mutex_lock&) = delete;
+    async_mutex_lock& operator=(const async_mutex_lock&) = delete;
+
+    // Releases the lock by calling unlock() on the mutex.
+    ~async_mutex_lock();
+  };
+}
+```
+
+Example usage:
+```c++
+#include <cppcoro/async_mutex.hpp>
+#include <cppcoro/task.hpp>
+#include <set>
+#include <string>
+
+cppcoro::async_mutex mutex;
+std::set<std::string> values;
+
+cppcoro::task<> add_item(std::string value)
+{
+  cppcoro::async_mutex_lock lock = co_await mutex;
+  values.insert(std::move(value));
 }
 ```
 

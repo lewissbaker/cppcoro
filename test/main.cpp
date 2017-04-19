@@ -5,6 +5,7 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/single_consumer_event.hpp>
+#include <cppcoro/async_mutex.hpp>
 
 #include <memory>
 
@@ -473,6 +474,53 @@ void testLazyTaskReturnByReference()
 	assert(t.is_ready());
 }
 
+void testAsyncMutex()
+{
+	int value = 0;
+	cppcoro::async_mutex mutex;
+	cppcoro::single_consumer_event a;
+	cppcoro::single_consumer_event b;
+	cppcoro::single_consumer_event c;
+	cppcoro::single_consumer_event d;
+
+	auto f = [&](cppcoro::single_consumer_event& e) -> cppcoro::task<>
+	{
+		cppcoro::async_mutex_lock lock = co_await mutex.lock_async();
+		co_await e;
+		++value;
+	};
+
+	auto t1 = f(a);
+	assert(!t1.is_ready());
+	assert(value == 0);
+
+	auto t2 = f(b);
+	auto t3 = f(c);
+
+	a.set();
+
+	assert(value == 1);
+
+	auto t4 = f(d);
+
+	b.set();
+
+	assert(value == 2);
+
+	c.set();
+
+	assert(value == 3);
+
+	d.set();
+
+	assert(value == 4);
+
+	assert(t1.is_ready());
+	assert(t2.is_ready());
+	assert(t3.is_ready());
+	assert(t4.is_ready());
+}
+
 int main(int argc, char** argv)
 {
 	testAwaitSynchronouslyCompletingVoidFunction();
@@ -491,6 +539,8 @@ int main(int argc, char** argv)
 	testLazyTaskResultLifetime();
 	testLazyTaskNeverAwaitedDestroysCapturedArgs();
 	testLazyTaskReturnByReference();
+
+	testAsyncMutex();
 
 	return 0;
 }
