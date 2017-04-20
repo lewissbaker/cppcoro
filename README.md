@@ -342,8 +342,7 @@ cppcoro::task<> add_item(std::string value)
 
 This library makes use of the [Cake build system](https://github.com/lewissbaker/cake) (no, not the [C# one](http://cakebuild.net/)).
 
-This library has been tested with C++ compiler from Visual Studio 2015 Update 3.
-Support for Visual Studio 2017 will be coming soon.
+This library has been tested with C++ compiler from Visual Studio 2015 Update 3 and Visual Studio 2017.
 
 ## Prerequisites
 
@@ -351,7 +350,7 @@ The Cake build-system is implemented in Python and requires Python 2.7 to be ins
 
 Ensure Python 2.7 interpreter is in your PATH and available as 'python'.
 
-Ensure Visual Studio 2015 Update 3 is installed.
+Ensure either Visual Studio 2015 Update 3 or Visual Studio 2017 is installed.
 
 ## Building from the command-line
 
