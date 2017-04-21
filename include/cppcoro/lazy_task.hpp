@@ -285,6 +285,22 @@ namespace cppcoro
 			}
 		}
 
+		lazy_task& operator=(lazy_task&& other) noexcept
+		{
+			if (std::addressof(other) != this)
+			{
+				if (m_coroutine)
+				{
+					m_coroutine.destroy();
+				}
+
+				m_coroutine = other.m_coroutine;
+				other.m_coroutine = nullptr;
+			}
+
+			return *this;
+		}
+
 		/// \brief
 		/// Query if the task result is complete.
 		///

@@ -294,15 +294,21 @@ namespace cppcoro
 		/// another task).
 		~task()
 		{
-			if (m_coroutine)
-			{
-				if (!m_coroutine.promise().is_ready())
-				{
-					std::terminate();
-				}
+			destroy();
+		}
 
-				m_coroutine.destroy();
+		/// Move assignment.
+		task& operator=(task&& other) noexcept
+		{
+			if (std::addressof(other) != this)
+			{
+				destroy();
+
+				m_coroutine = other.m_coroutine;
+				other.m_coroutine = nullptr;
 			}
+
+			return *this;
 		}
 
 		/// \brief
@@ -388,6 +394,19 @@ namespace cppcoro
 		}
 
 	private:
+
+		void destroy() noexcept
+		{
+			if (m_coroutine)
+			{
+				if (!m_coroutine.promise().is_ready())
+				{
+					std::terminate();
+				}
+
+				m_coroutine.destroy();
+			}
+		}
 
 		std::experimental::coroutine_handle<promise_type> m_coroutine;
 
