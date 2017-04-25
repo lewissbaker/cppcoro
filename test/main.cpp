@@ -10,8 +10,10 @@
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/single_consumer_event.hpp>
 #include <cppcoro/async_mutex.hpp>
+#include <cppcoro/shared_task.hpp>
 
 #include <memory>
+#include <string>
 
 #include <cassert>
 
@@ -525,6 +527,250 @@ void testAsyncMutex()
 	assert(t4.is_ready());
 }
 
+void testSharedTaskDefaultConstruction()
+{
+	{
+		cppcoro::shared_task<> t;
+		assert(t.is_ready());
+
+		cppcoro::shared_task<> tCopy = t;
+		assert(t.is_ready());
+	}
+
+	auto task = []() -> cppcoro::task<>
+	{
+		try
+		{
+			co_await cppcoro::shared_task<>{};
+			assert(false);
+		}
+		catch (const cppcoro::broken_promise&)
+		{
+		}
+		catch (...)
+		{
+			assert(false);
+		}
+	}();
+
+	assert(task.is_ready());
+}
+
+void testSharedTaskMultipleWaiters()
+{
+	cppcoro::single_consumer_event event;
+
+	auto sharedTask = [](cppcoro::single_consumer_event& event) -> cppcoro::shared_task<>
+	{
+		co_await event;
+	}(event);
+
+	assert(!sharedTask.is_ready());
+
+	auto consumeTask = [](cppcoro::shared_task<> task) -> cppcoro::task<>
+	{
+		co_await task;
+	};
+
+	auto t1 = consumeTask(sharedTask);
+	auto t2 = consumeTask(sharedTask);
+
+	assert(!t1.is_ready());
+	assert(!t2.is_ready());
+
+	event.set();
+
+	assert(sharedTask.is_ready());
+	assert(t1.is_ready());
+	assert(t2.is_ready());
+
+	auto t3 = consumeTask(sharedTask);
+
+	assert(t3.is_ready());
+}
+
+void testSharedTaskRethrowsUnhandledException()
+{
+	class X {};
+
+	auto throwingTask = []() -> cppcoro::shared_task<>
+	{
+		co_await std::experimental::suspend_never{};
+		throw X{};
+	};
+
+	[&]() -> cppcoro::task<>
+	{
+		auto t = throwingTask();
+		assert(t.is_ready());
+
+		try
+		{
+			co_await t;
+			assert(false);
+		}
+		catch (X)
+		{
+		}
+		catch (...)
+		{
+			assert(false);
+		}
+	}();
+}
+
+void testSharedTaskDestroysValueWhenLastReferenceIsDestroyed()
+{
+	counter::reset_counts();
+
+	{
+		cppcoro::shared_task<counter> tCopy;
+
+		{
+			auto t = []() -> cppcoro::shared_task<counter>
+			{
+				co_return counter{};
+			}();
+
+			assert(t.is_ready());
+
+			tCopy = t;
+
+			assert(tCopy.is_ready());
+		}
+
+		{
+			cppcoro::shared_task<counter> tCopy2 = tCopy;
+
+			assert(tCopy2.is_ready());
+		}
+
+		assert(counter::active_count() == 1);
+	}
+
+	assert(counter::active_count() == 0);
+}
+
+void testAssigningResultFromSharedTaskDoesntMoveResult()
+{
+	auto f = []() -> cppcoro::shared_task<std::string>
+	{
+		co_return "string that is longer than short-string optimisation";
+	};
+
+	auto t = f();
+
+	auto g = [](cppcoro::shared_task<std::string> t) -> cppcoro::task<>
+	{
+		auto x = co_await t;
+		assert(x == "string that is longer than short-string optimisation");
+
+		auto y = co_await std::move(t);
+		assert(y == "string that is longer than short-string optimisation");
+	};
+
+	g(t);
+	g(t);
+}
+
+void testSharedTaskOfReferenceType()
+{
+	const std::string value = "some string value";
+
+	auto f = [&]() -> cppcoro::shared_task<const std::string&>
+	{
+		co_return value;
+	};
+
+	[&]() -> cppcoro::task<>
+	{
+		auto& result = co_await f();
+		assert(&result == &value);
+	}();
+}
+
+void testSharedTaskReturningRValueReferenceMovesIntoPromise()
+{
+	counter::reset_counts();
+
+	auto f = []() -> cppcoro::shared_task<counter>
+	{
+		co_return counter{};
+	};
+
+	assert(counter::active_count() == 0);
+
+	{
+		auto t = f();
+		assert(counter::default_construction_count == 1);
+		assert(counter::copy_construction_count == 0);
+		assert(counter::move_construction_count == 1);
+		assert(counter::destruction_count == 1);
+		assert(counter::active_count() == 1);
+
+		// Moving task doesn't move/copy result.
+		auto t2 = std::move(t);
+		assert(counter::default_construction_count == 1);
+		assert(counter::copy_construction_count == 0);
+		assert(counter::move_construction_count == 1);
+		assert(counter::destruction_count == 1);
+		assert(counter::active_count() == 1);
+	}
+
+	assert(counter::active_count() == 0);
+}
+
+void testSharedTaskEquality()
+{
+	auto f = []() -> cppcoro::shared_task<>
+	{
+		co_return;
+	};
+
+	cppcoro::shared_task<> t0;
+	cppcoro::shared_task<> t1 = t0;
+	cppcoro::shared_task<> t2 = f();
+	cppcoro::shared_task<> t3 = t2;
+	cppcoro::shared_task<> t4 = f();
+	assert(t0 == t0);
+	assert(t0 == t1);
+	assert(t0 != t2);
+	assert(t0 != t3);
+	assert(t0 != t4);
+	assert(t2 == t2);
+	assert(t2 == t3);
+	assert(t2 != t4);
+}
+
+void testMakeSharedTask()
+{
+	cppcoro::single_consumer_event event;
+
+	auto f = [&]() -> cppcoro::task<std::string>
+	{
+		co_await event;
+		co_return "foo";
+	};
+
+	auto t = cppcoro::make_shared_task(f());
+
+	auto consumer = [](cppcoro::shared_task<std::string> task) -> cppcoro::task<>
+	{
+		assert(co_await task == "foo");
+	};
+
+	auto consumerTask0 = consumer(t);
+	auto consumerTask1 = consumer(t);
+
+	assert(!consumerTask0.is_ready());
+	assert(!consumerTask1.is_ready());
+
+	event.set();
+
+	assert(consumerTask0.is_ready());
+	assert(consumerTask1.is_ready());
+}
+
 int main(int argc, char** argv)
 {
 	testAwaitSynchronouslyCompletingVoidFunction();
@@ -545,6 +791,16 @@ int main(int argc, char** argv)
 	testLazyTaskReturnByReference();
 
 	testAsyncMutex();
+
+	testSharedTaskDefaultConstruction();
+	testSharedTaskMultipleWaiters();
+	testSharedTaskRethrowsUnhandledException();
+	testSharedTaskDestroysValueWhenLastReferenceIsDestroyed();
+	testAssigningResultFromSharedTaskDoesntMoveResult();
+	testSharedTaskOfReferenceType();
+	testSharedTaskReturningRValueReferenceMovesIntoPromise();
+	testSharedTaskEquality();
+	testMakeSharedTask();
 
 	return 0;
 }
