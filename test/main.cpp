@@ -480,6 +480,41 @@ void testLazyTaskReturnByReference()
 	assert(t.is_ready());
 }
 
+void testPassingParameterByValueToLazyTaskCallsMoveConstructorOnce()
+{
+	counter::reset_counts();
+
+	auto f = [](counter arg) -> cppcoro::lazy_task<>
+	{
+		co_return;
+	};
+
+	counter c;
+
+	assert(counter::active_count() == 1);
+	assert(counter::default_construction_count == 1);
+	assert(counter::copy_construction_count == 0);
+	assert(counter::move_construction_count == 0);
+	assert(counter::destruction_count == 0);
+
+	{
+		auto t = f(c);
+
+		// Should have called copy-constructor to pass a copy of 'c' into f by value.
+		assert(counter::copy_construction_count == 1);
+		// Inside f it should have move-constructed parameter into coroutine frame variable
+		assert(counter::move_construction_count == 1);
+		// And should have destructed the copy passed to the parameter before returning.
+		assert(counter::destruction_count == 1);
+
+		// Active counts should be the instance 'c' and the instance captured in coroutine frame of 't'.
+		assert(counter::active_count() == 2);
+	}
+
+	assert(counter::active_count() == 1);
+}
+
+
 void testAsyncMutex()
 {
 	int value = 0;
@@ -789,6 +824,12 @@ int main(int argc, char** argv)
 	testLazyTaskResultLifetime();
 	testLazyTaskNeverAwaitedDestroysCapturedArgs();
 	testLazyTaskReturnByReference();
+
+	// NOTE: Test is disabled as MSVC 2017.1 compiler is currently
+	// failing the test as it calls move-constructor twice for the
+	// captured parameter value. Need to check whether this is a
+	// bug or something that is unspecified in standard.
+	//testPassingParameterByValueToLazyTaskCallsMoveConstructorOnce();
 
 	testAsyncMutex();
 
