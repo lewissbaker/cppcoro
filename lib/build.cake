@@ -10,14 +10,25 @@ from cake.tools import compiler, script, env, project
 includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'async_mutex.hpp',
   'broken_promise.hpp',
+  'cancellation_registration.hpp',
+  'cancellation_source.hpp',
+  'cancellation_token.hpp',
   'lazy_task.hpp',
   'shared_task.hpp',
   'single_consumer_event.hpp',
   'task.hpp',
   ])
 
+privateHeaders = script.cwd([
+  'cancellation_state.hpp',
+  ])
+
 sources = script.cwd([
   'async_mutex.cpp',
+  'cancellation_state.cpp',
+  'cancellation_token.cpp',
+  'cancellation_source.cpp',
+  'cancellation_registration.cpp',
   ])
 
 extras = script.cwd([
@@ -43,7 +54,7 @@ vcproj = project.project(
   target=env.expand('${CPPCORO_PROJECT}/cppcoro'),
   items={
     'Include': includes,
-    'Source': sources,
+    'Source': sources + privateHeaders,
     '': extras
   },
   output=lib,
