@@ -40,7 +40,9 @@ namespace cppcoro
 		///
 		/// \param callback
 		/// The callback to be executed when cancellation is requested on the
-		/// the cancellation_token.
+		/// the cancellation_token. Note that callback must not throw an exception
+		/// if called when cancellation is requested otherwise std::terminate()
+		/// will be called.
 		///
 		/// \throw std::bad_alloc
 		/// If registration failed due to insufficient memory available.
