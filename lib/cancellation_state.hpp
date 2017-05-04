@@ -15,6 +15,8 @@ namespace cppcoro
 {
 	namespace detail
 	{
+		struct cancellation_registration_state;
+
 		class cancellation_state
 		{
 		public:
@@ -82,10 +84,6 @@ namespace cppcoro
 
 			bool is_cancellation_notification_complete() const noexcept;
 
-			struct registration_list;
-			struct registration_list_bucket;
-			struct registration_list_chunk;
-
 			static constexpr std::uint64_t cancellation_requested_flag = 1;
 			static constexpr std::uint64_t cancellation_notification_complete_flag = 2;
 			static constexpr std::uint64_t cancellation_source_ref_increment = 4;
@@ -101,7 +99,7 @@ namespace cppcoro
 			// - bits 33-63 - ref-count for cancellation_token/cancellation_registration instances.
 			std::atomic<std::uint64_t> m_state;
 
-			std::atomic<registration_list*> m_registrations;
+			std::atomic<cancellation_registration_state*> m_registrationState;
 
 		};
 	}

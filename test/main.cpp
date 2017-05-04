@@ -18,6 +18,8 @@
 
 #include <memory>
 #include <string>
+#include <chrono>
+#include <iostream>
 
 #include <cassert>
 
@@ -1064,6 +1066,89 @@ void testConcurrentRegistrationAndCancellation()
 	}
 }
 
+void testCancellationRegistrationPerformanceSingleThreaded()
+{
+	cppcoro::cancellation_source s;
+
+	cppcoro::async_mutex m;
+	m.try_lock();
+
+	struct batch
+	{
+		batch(cppcoro::cancellation_token t)
+			: r0(t, [] {})
+			, r1(t, [] {})
+			, r2(t, [] {})
+			, r3(t, [] {})
+			, r4(t, [] {})
+			, r5(t, [] {})
+			, r6(t, [] {})
+			, r7(t, [] {})
+			, r8(t, [] {})
+			, r9(t, [] {})
+		{}
+
+		cppcoro::cancellation_registration r0;
+		cppcoro::cancellation_registration r1;
+		cppcoro::cancellation_registration r2;
+		cppcoro::cancellation_registration r3;
+		cppcoro::cancellation_registration r4;
+		cppcoro::cancellation_registration r5;
+		cppcoro::cancellation_registration r6;
+		cppcoro::cancellation_registration r7;
+		cppcoro::cancellation_registration r8;
+		cppcoro::cancellation_registration r9;
+	};
+
+	auto start = std::chrono::high_resolution_clock::now();
+
+	for (int i = 0; i < 1'000'000; ++i)
+	{
+		cppcoro::cancellation_registration r{ s.token(), [] {} };
+	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+
+	auto time1 = end - start;
+
+	start = end;
+
+	for (int i = 0; i < 1'000'000; ++i)
+	{
+		batch b{ s.token() };
+	}
+
+	end = std::chrono::high_resolution_clock::now();
+
+	auto time2 = end - start;
+
+	start = end;
+
+	for (int i = 0; i < 1'000'000; ++i)
+	{
+		batch b0{ s.token() };
+		batch b1{ s.token() };
+		batch b2{ s.token() };
+		batch b3{ s.token() };
+		batch b4{ s.token() };
+	}
+
+	end = std::chrono::high_resolution_clock::now();
+
+	auto time3 = end - start;
+
+	auto report = [](const char* label, auto time, std::uint64_t count)
+	{
+		auto us = std::chrono::duration_cast<std::chrono::microseconds>(time).count();
+		std::cout << label << " took " << us << "us (" << (1000.0 * us / count) << " ns/item)"
+			<< std::endl;
+	};
+
+	report("Individual", time1, 1'000'000);
+	report("Batch10", time2, 10'000'000);
+	report("Batch50", time3, 50'000'000);
+}
+
 int main(int argc, char** argv)
 {
 	testAwaitSynchronouslyCompletingVoidFunction();
@@ -1110,6 +1195,7 @@ int main(int argc, char** argv)
 	testThrowIfCancellationRequested();
 	testRegisteringManyCallbacks();
 	testConcurrentRegistrationAndCancellation();
+	testCancellationRegistrationPerformanceSingleThreaded();
 
 	return 0;
 }

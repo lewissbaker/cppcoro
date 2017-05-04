@@ -17,6 +17,8 @@ namespace cppcoro
 	namespace detail
 	{
 		class cancellation_state;
+		struct cancellation_registration_list_chunk;
+		struct cancellation_registration_state;
 	}
 
 	class cancellation_registration
@@ -68,12 +70,14 @@ namespace cppcoro
 	private:
 
 		friend class detail::cancellation_state;
+		friend struct detail::cancellation_registration_state;
 
 		void register_callback(cancellation_token&& token);
 
 		detail::cancellation_state* m_state;
 		std::function<void()> m_callback;
-		std::atomic<cancellation_registration*>* m_registrationSlot;
+		detail::cancellation_registration_list_chunk* m_chunk;
+		std::uint32_t m_entryIndex;
 	};
 }
 
