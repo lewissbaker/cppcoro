@@ -18,7 +18,7 @@ These include:
 * Functions
   * `when_all()` (coming)
 * Cancellation
-  * `cancellation_token` (coming)
+  * `cancellation_token`
 
 This library is an experimental library that is exploring the space of high-performance,
 scalable asynchronous programming abstractions that can be built on top of the C++ coroutines
@@ -415,6 +415,145 @@ cppcoro::task<> add_item(std::string value)
 {
   cppcoro::async_mutex_lock lock = co_await mutex;
   values.insert(std::move(value));
+}
+```
+
+## `cancellation_token`
+
+A `cancellation_token` is a value that can be passed to a function that allows the caller to subsequently communicate a request to cancel the operation to that function.
+
+To obtain a `cancellation_token` that is able to be cancelled you must first create a `cancellation_source` object.
+The `cancellation_source::token()` method can be used to manufacture new `cancellation_token` values that are linked to that `cancellation_source` object.
+
+When you want to later request cancellation of an operation you have passed a `cancellation_token` to
+you can call `cancellation_source::request_cancellation()` on an associated `cancellation_source` object.
+
+Functions can respond to a request for cancellation in one of two ways:
+1. Poll for cancellation at regular intervals by calling either `cancellation_token::is_cancellation_requested()` or `cancellation_token::throw_if_cancellation_requested()`.
+2. Register a callback to be executed when cancellation is requested using the `cancellation_registration` class.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class cancellation_source
+  {
+  public:
+    // Construct a new, independently cancellable cancellation source.
+    cancellation_source();
+
+    // Construct a new reference to the same cancellation state.
+    cancellation_source(const cancellation_source& other) noexcept;
+    cancellation_source(cancellation_source&& other) noexcept;
+
+    ~cancellation_source();
+
+    cancellation_source& operator=(const cancellation_source& other) noexcept;
+    cancellation_source& operator=(cancellation_source&& other) noexcept;
+
+    bool is_cancellation_requested() const noexcept;
+    bool can_be_cancelled() const noexcept;
+    void request_cancellation();
+
+    cancellation_token token() const noexcept;
+  };
+
+  class cancellation_token
+  {
+  public:
+    // Construct a token that can't be cancelled.
+    cancellation_token() noexcept;
+
+    cancellation_token(const cancellation_token& other) noexcept;
+    cancellation_token(cancellation_token&& other) noexcept;
+
+    ~cancellation_token();
+
+    cancellation_token& operator=(const cancellation_token& other) noexcept;
+    cancellation_token& operator=(cancellation_token&& other) noexcept;
+
+    bool is_cancellation_requested() const noexcept;
+    void throw_if_cancellation_requested() const;
+
+    // Query if this token can ever have cancellation requested.
+    // Code can use this to take a more efficient code-path in cases
+    // that the operation does not need to handle cancellation.
+    bool can_be_cancelled() const noexcept;
+  };
+
+  // RAII class for registering a callback to be executed if cancellation
+  // is requested on a particular cancellation token.
+  class cancellation_registration
+  {
+  public:
+
+    // Register a callback to be executed if cancellation is requested.
+    // Callback will be called with no arguments on the thread that calls
+    // request_cancellation() if cancellation is not yet requested, or
+    // called immediately if cancellation has already been requested.
+    // Callback must not throw an unhandled exception when called.
+    template<typename CALLBACK>
+    cancellation_registration(cancellation_token token, CALLBACK&& callback);
+
+    cancellation_registration(const cancellation_registration& other) = delete;
+
+    ~cancellation_registration();
+  };
+
+  class operation_cancelled : public std::exception
+  {
+  public:
+    operation_cancelled();
+    const char* what() const override;
+  };
+}
+```
+
+Example: Polling Approach
+```c++
+cppcoro::task<> do_something_async(cppcoro::cancellation_token token)
+{
+  // Explicitly define cancellation points within the function
+  // by calling throw_if_cancellation_requested().
+  token.throw_if_cancellation_requested();
+
+  co_await do_step_1();
+
+  token.throw_if_cancellation_requested();
+
+  do_step_2();
+
+  // Alternatively, you can query if cancellation has been
+  // requested to allow yourself to do some cleanup before
+  // returning.
+  if (token.is_cancellation_requested())
+  {
+    display_message_to_user("Cancelling operation...");
+    do_cleanup();
+    throw cppcoro::operation_cancelled{};
+  }
+
+  do_final_step();
+}
+```
+
+Example: Callback Approach
+```c++
+// Say we already have a timer abstraction that supports being
+// cancelled but it doesn't support cancellation_tokens natively.
+// You can use a cancellation_registration to register a callback
+// that calls the existing cancellation API. e.g.
+cppcoro::task<> cancellable_timer_wait(cppcoro::cancellation_token token)
+{
+  auto timer = create_timer(10s);
+
+  cppcoro::cancellation_registration registration(token, [&]
+  {
+    // Call existing timer cancellation API.
+    timer.cancel();
+  });
+
+  co_await timer;
 }
 ```
 
