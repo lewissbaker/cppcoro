@@ -1172,7 +1172,9 @@ int main(int argc, char** argv)
 	// failing the test as it calls move-constructor twice for the
 	// captured parameter value. Need to check whether this is a
 	// bug or something that is unspecified in standard.
-	//testPassingParameterByValueToLazyTaskCallsMoveConstructorOnce();
+#if !defined(_MSC_VER) || _MSC_FULL_VER > 191025019
+	testPassingParameterByValueToLazyTaskCallsMoveConstructorOnce();
+#endif
 
 	testAsyncMutex();
 
