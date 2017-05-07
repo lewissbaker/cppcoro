@@ -812,6 +812,36 @@ void testMakeSharedTask()
 	assert(consumerTask1.is_ready());
 }
 
+void testMakeSharedTaskOfVoid()
+{
+	cppcoro::single_consumer_event event;
+
+	auto f = [&]() -> cppcoro::task<>
+	{
+		co_await event;
+	};
+
+	auto t = cppcoro::make_shared_task(f());
+
+	assert(!t.is_ready());
+
+	auto consumer = [](cppcoro::shared_task<> task) -> cppcoro::task<>
+	{
+		co_await task;
+	};
+
+	auto consumerTask0 = consumer(t);
+	auto consumerTask1 = consumer(t);
+
+	assert(!consumerTask0.is_ready());
+	assert(!consumerTask1.is_ready());
+
+	event.set();
+
+	assert(consumerTask0.is_ready());
+	assert(consumerTask1.is_ready());
+}
+
 void testDefaultCancellationTokenIsNotCancellable()
 {
 	cppcoro::cancellation_token t;
@@ -1187,6 +1217,7 @@ int main(int argc, char** argv)
 	testSharedTaskReturningRValueReferenceMovesIntoPromise();
 	testSharedTaskEquality();
 	testMakeSharedTask();
+	testMakeSharedTaskOfVoid();
 
 	testDefaultCancellationTokenIsNotCancellable();
 	testRequestCancellation();
