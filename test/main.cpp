@@ -1098,11 +1098,6 @@ void testConcurrentRegistrationAndCancellation()
 
 void testCancellationRegistrationPerformanceSingleThreaded()
 {
-	cppcoro::cancellation_source s;
-
-	cppcoro::async_mutex m;
-	m.try_lock();
-
 	struct batch
 	{
 		batch(cppcoro::cancellation_token t)
@@ -1130,9 +1125,13 @@ void testCancellationRegistrationPerformanceSingleThreaded()
 		cppcoro::cancellation_registration r9;
 	};
 
+	cppcoro::cancellation_source s;
+
+	constexpr int iterationCount = 100'000;
+
 	auto start = std::chrono::high_resolution_clock::now();
 
-	for (int i = 0; i < 1'000'000; ++i)
+	for (int i = 0; i < iterationCount; ++i)
 	{
 		cppcoro::cancellation_registration r{ s.token(), [] {} };
 	}
@@ -1143,7 +1142,7 @@ void testCancellationRegistrationPerformanceSingleThreaded()
 
 	start = end;
 
-	for (int i = 0; i < 1'000'000; ++i)
+	for (int i = 0; i < iterationCount; ++i)
 	{
 		batch b{ s.token() };
 	}
@@ -1154,7 +1153,7 @@ void testCancellationRegistrationPerformanceSingleThreaded()
 
 	start = end;
 
-	for (int i = 0; i < 1'000'000; ++i)
+	for (int i = 0; i < iterationCount; ++i)
 	{
 		batch b0{ s.token() };
 		batch b1{ s.token() };
@@ -1174,9 +1173,9 @@ void testCancellationRegistrationPerformanceSingleThreaded()
 			<< std::endl;
 	};
 
-	report("Individual", time1, 1'000'000);
-	report("Batch10", time2, 10'000'000);
-	report("Batch50", time3, 50'000'000);
+	report("Individual", time1, iterationCount);
+	report("Batch10", time2, 10 * iterationCount);
+	report("Batch50", time3, 50 * iterationCount);
 }
 
 int main(int argc, char** argv)
