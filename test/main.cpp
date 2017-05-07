@@ -1181,6 +1181,7 @@ void testCancellationRegistrationPerformanceSingleThreaded()
 
 int main(int argc, char** argv)
 {
+	// task<T> tests
 	testAwaitSynchronouslyCompletingVoidFunction();
 	testAwaitTaskReturningMoveOnlyType();
 	testAwaitTaskReturningReference();
@@ -1191,6 +1192,7 @@ int main(int argc, char** argv)
 	testAwaitRethrowsException();
 	testAwaitWhenReadyDoesntThrowException();
 
+	// lazy_task<T> tests
 	testLazyTaskDoesntStartUntilAwaited();
 	testAwaitingDefaultConstructedLazyTaskThrowsBrokenPromise();
 	testAwaitingLazyTaskThatCompletesAsynchronously();
@@ -1206,8 +1208,10 @@ int main(int argc, char** argv)
 	testPassingParameterByValueToLazyTaskCallsMoveConstructorOnce();
 #endif
 
+	// async_mutex tests
 	testAsyncMutex();
 
+	// shared_task<T> tests
 	testSharedTaskDefaultConstruction();
 	testSharedTaskMultipleWaiters();
 	testSharedTaskRethrowsUnhandledException();
@@ -1219,6 +1223,7 @@ int main(int argc, char** argv)
 	testMakeSharedTask();
 	testMakeSharedTaskOfVoid();
 
+	// cancellation_source/cancellation_token/cancellation_registration tests
 	testDefaultCancellationTokenIsNotCancellable();
 	testRequestCancellation();
 	testCantBeCancelledWhenLastSourceDestructed();
