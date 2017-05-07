@@ -11,6 +11,7 @@
 #include <cppcoro/single_consumer_event.hpp>
 #include <cppcoro/async_mutex.hpp>
 #include <cppcoro/shared_task.hpp>
+#include <cppcoro/shared_lazy_task.hpp>
 #include <cppcoro/cancellation_source.hpp>
 #include <cppcoro/cancellation_token.hpp>
 #include <cppcoro/cancellation_registration.hpp>
@@ -842,6 +843,206 @@ void testMakeSharedTaskOfVoid()
 	assert(consumerTask1.is_ready());
 }
 
+void testDefaultSharedLazyTaskThrowsBrokenPromiseWhenAwaited()
+{
+	auto t = []() -> cppcoro::task<>
+	{
+		cppcoro::shared_lazy_task<> t;
+		try
+		{
+			co_await t;
+			assert(false);
+		}
+		catch (cppcoro::broken_promise)
+		{
+		}
+		catch (...)
+		{
+			assert(false);
+		}
+	}();
+
+	assert(t.is_ready());
+}
+
+void testSharedLazyTaskDoesntStartExecutingUntilAwaited()
+{
+	bool startedExecuting = false;
+	auto f = [&]() -> cppcoro::shared_lazy_task<>
+	{
+		startedExecuting = true;
+		co_return;
+	};
+
+	auto t = f();
+
+	assert(!t.is_ready());
+	assert(!startedExecuting);
+
+	auto waiter = [](cppcoro::shared_lazy_task<> t) -> cppcoro::task<>
+	{
+		co_await t;
+	}(t);
+
+	assert(waiter.is_ready());
+	assert(t.is_ready());
+	assert(startedExecuting);
+}
+
+void testSharedLazyTaskDestroysResultWhenLastReferenceDestroyed()
+{
+	counter::reset_counts();
+
+	{
+		auto t = []() -> cppcoro::shared_lazy_task<counter>
+		{
+			co_return counter{};
+		}();
+
+		assert(counter::active_count() == 0);
+
+		[](cppcoro::shared_lazy_task<counter> t) -> cppcoro::task<>
+		{
+			co_await t;
+		}(t);
+
+		assert(counter::active_count() == 1);
+	}
+
+	assert(counter::active_count() == 0);
+}
+
+void testSharedLazyTaskMultipleAwaiters()
+{
+	cppcoro::single_consumer_event event;
+	bool startedExecution = false;
+	auto produce = [&]() -> cppcoro::shared_lazy_task<int>
+	{
+		startedExecution = true;
+		co_await event;
+		co_return 1;
+	};
+
+	auto consume = [](cppcoro::shared_lazy_task<int> t) -> cppcoro::task<>
+	{
+		int result = co_await t;
+		assert(result == 1);
+	};
+
+	auto sharedTask = produce();
+
+	assert(!sharedTask.is_ready());
+	assert(!startedExecution);
+
+	auto t1 = consume(sharedTask);
+
+	assert(!t1.is_ready());
+	assert(startedExecution);
+	assert(!sharedTask.is_ready());
+
+	auto t2 = consume(sharedTask);
+
+	assert(!t2.is_ready());
+	assert(!sharedTask.is_ready());
+
+	auto t3 = consume(sharedTask);
+
+	event.set();
+
+	assert(sharedTask.is_ready());
+	assert(t1.is_ready());
+	assert(t2.is_ready());
+	assert(t3.is_ready());
+}
+
+void testWaitingOnSharedLazyTaskInLoopDoesntBlowStack()
+{
+	// This test checks that awaiting a shared_lazy_task that completes
+	// synchronously doesn't recursively resume the awaiter inside the
+	// call to start executing the task. If it were to do this then we'd
+	// expect that this test would result in failure due to stack-overflow.
+
+	auto completesSynchronously = []() -> cppcoro::shared_lazy_task<int>
+	{
+		co_return 1;
+	};
+
+	auto run = [&]() -> cppcoro::task<>
+	{
+		int result = 0;
+		for (int i = 0; i < 100'000; ++i)
+		{
+			result += co_await completesSynchronously();
+		}
+		assert(result == 100'000);
+	};
+
+	auto t = run();
+	assert(t.is_ready());
+}
+
+void testMakeSharedLazyTask()
+{
+	bool startedExecution = false;
+
+	auto f = [&]() -> cppcoro::lazy_task<std::string>
+	{
+		startedExecution = false;
+		co_return "test";
+	};
+
+	auto t = f();
+
+	cppcoro::shared_lazy_task<std::string> sharedT =
+		cppcoro::make_shared_task(std::move(t));
+
+	assert(!sharedT.is_ready());
+	assert(!startedExecution);
+
+	auto consume = [](cppcoro::shared_lazy_task<std::string> t) -> cppcoro::task<>
+	{
+		auto x = co_await std::move(t);
+		assert(x == "test");
+	};
+
+	auto c1 = consume(sharedT);
+	auto c2 = consume(sharedT);
+
+	assert(c1.is_ready());
+	assert(c2.is_ready());
+}
+
+void testMakeSharedLazyTaskOfVoid()
+{
+	bool startedExecution = false;
+
+	auto f = [&]() -> cppcoro::lazy_task<>
+	{
+		startedExecution = true;
+		co_return;
+	};
+
+	auto t = f();
+
+	cppcoro::shared_lazy_task<> sharedT = cppcoro::make_shared_task(std::move(t));
+
+	assert(!sharedT.is_ready());
+	assert(!startedExecution);
+
+	auto consume = [](cppcoro::shared_lazy_task<> t) -> cppcoro::task<>
+	{
+		co_await t;
+	};
+
+	auto c1 = consume(sharedT);
+	assert(startedExecution);
+
+	auto c2 = consume(sharedT);
+
+	assert(c1.is_ready());
+	assert(c2.is_ready());
+}
+
 void testDefaultCancellationTokenIsNotCancellable()
 {
 	cppcoro::cancellation_token t;
@@ -1221,6 +1422,15 @@ int main(int argc, char** argv)
 	testSharedTaskEquality();
 	testMakeSharedTask();
 	testMakeSharedTaskOfVoid();
+
+	// shared_lazy_task<T> tests
+	testDefaultSharedLazyTaskThrowsBrokenPromiseWhenAwaited();
+	testSharedLazyTaskDoesntStartExecutingUntilAwaited();
+	testSharedLazyTaskMultipleAwaiters();
+	testMakeSharedLazyTask();
+	testMakeSharedLazyTaskOfVoid();
+	testWaitingOnSharedLazyTaskInLoopDoesntBlowStack();
+	testSharedLazyTaskDestroysResultWhenLastReferenceDestroyed();
 
 	// cancellation_source/cancellation_token/cancellation_registration tests
 	testDefaultCancellationTokenIsNotCancellable();

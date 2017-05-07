@@ -7,7 +7,7 @@ These include:
   * `task<T>`
   * `lazy_task<T>`
   * `shared_task<T>`
-  * `shared_lazy_task<T>` (coming - lewissbaker/cppcoro#2)
+  * `shared_lazy_task<T>`
   * `generator<T>` (coming - lewissbaker/cppcoro#5)
   * `recursive_generator<T>` (coming - lewissbaker/cppcoro#6)
   * `async_generator<T>` (coming)
@@ -228,6 +228,10 @@ suspending if the coroutine completed synchronously.
 The `shared_task<T>` class is a coroutine type that yields a single value
 asynchronously.
 
+The task value can be copied, allowing multiple references
+to the result of the task to be created. It also allows multiple coroutines
+to concurrently await the result.
+
 API Summary
 ```c++
 namespace cppcoro
@@ -302,6 +306,77 @@ result, never an r-value reference (since the result may be shared) which
 may limit ability to move-construct the result into a local variable.
 It also has a slightly higher run-time cost due to the need to maintain
 a reference count and support multiple awaiters.
+
+## `shared_lazy_task<T>`
+
+The `shared_lazy_task<T>` class is a coroutine type that yields a single value
+asynchronously.
+
+It is 'lazy' in that execution of the task does not start until it is awaited by some
+coroutine.
+
+It is 'shared' in that the task value can be copied, allowing multiple references to
+the result of the task to be created. It also allows multiple coroutines to
+concurrently await the result.
+
+API Summary
+```c++
+namespace cppcoro
+{
+  template<typename T = void>
+  class shared_lazy_task
+  {
+  public:
+    shared_lazy_task() noexcept;
+    shared_lazy_task(const shared_lazy_task& other) noexcept;
+    shared_lazy_task(shared_lazy_task&& other) noexcept;
+    shared_lazy_task& operator=(const shared_lazy_task& other) noexcept;
+    shared_lazy_task& operator=(shared_lazy_task&& other) noexcept;
+
+    void swap(shared_lazy_task& other) noexcept;
+
+    // Query if the task has completed and the result is ready.
+    bool is_ready() const noexcept;
+
+    // Returns an operation that when awaited will suspend the
+    // current coroutine until the task completes and the result
+    // is available.
+    //
+    // The type of the result of the 'co_await someTask' expression
+    // is an l-value reference to the task's result value (unless T
+    // is void in which case the expression has type 'void').
+    // If the task completed with an unhandled exception then the
+    // exception will be rethrown by the co_await expression.
+    <unspecified> operator co_await() const noexcept;
+
+    // Returns an operation that when awaited will suspend the
+    // calling coroutine until the task completes and the result
+    // is available.
+    //
+    // The result is not returned from the co_await expression.
+    // This can be used to synchronise with the task without the
+    // possibility of the co_await expression throwing an exception.
+    <unspecified> when_ready() const noexcept;
+
+  };
+
+  template<typename T>
+  bool operator==(const shared_lazy_task<T>& a, const shared_lazy_task<T>& b) noexcept;
+  template<typename T>
+  bool operator!=(const shared_lazy_task<T>& a, const shared_lazy_task<T>& b) noexcept;
+
+  template<typename T>
+  void swap(shared_lazy_task<T>& a, shared_lazy_task<T>& b) noexcept;
+
+  // Wrap a lazy_task in a shared_lazy_task to allow multiple coroutines to concurrently
+  // await the result.
+  template<typename T>
+  shared_lazy_task<T> make_shared_task(lazy_task<T> task);
+}
+```
+
+All const-methods on `shared_lazy_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
+It is not safe to call non-const methods of `shared_lazy_task<T>` concurrently with any other method on the same instance of a `shared_lazy_task<T>`.
 
 ## `single_consumer_event`
 
