@@ -233,13 +233,32 @@ if cake.system.isWindows() or cake.system.isCygwin():
             windows10SdkBaseDir=None, # Or path to unzipped Windows 10 SDK
             )
         elif msvcVer == "14.10":
-          msvcVariant.tools["compiler"] = compiler = getVisualStudio2017Compiler(
-            targetArchitecture=arch,
-            ucrtVersion=ucrtVersion,
-            windows10SdkVersion=windows10SdkVersion,
-            vcInstallDir=None, # Or path to unzipped .nuget package
-            windows10SdkBaseDir=None, # Or path to unzipped Windows 10 SDK
-            )
+          nugetPath = None
+
+          # Uncomment the next line to use an experimental MSVC compiler version
+          # downloaded from the http://vcppdogfooding.azurewebsites.net/ NuGet repository.
+          # Unzip the .nuget file to a folder and specify the path here.
+          #nugetPath = r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
+
+          if nugetPath:
+            # NuGet package for VS 2017 has same layout as VS 2015.
+            compiler = getVisualStudio2015Compiler(
+              targetArchitecture=arch,
+              ucrtVersion=ucrtVersion,
+              windows10SdkVersion=windows10SdkVersion,
+              vcInstallDir=cake.path.join(nugetPath, 'lib', 'native'),
+              windows10SdkBaseDir=None, # Or path to unzipped Windows 10 SDK
+              )
+          else:
+            # Otherwise, try to use the installed MSVC compiler
+            compiler = getVisualStudio2017Compiler(
+              targetArchitecture=arch,
+              ucrtVersion=ucrtVersion,
+              windows10SdkVersion=windows10SdkVersion,
+              vcInstallDir=None, # Or path to unzipped .nuget package
+              windows10SdkBaseDir=None, # Or path to unzipped Windows 10 SDK
+              )
+          msvcVariant.tools["compiler"] = compiler
 
         if engine.options.createProjects:
           compiler.enabled = False
@@ -247,6 +266,7 @@ if cake.system.isWindows() or cake.system.isCygwin():
         compiler.enableRtti = True
         compiler.enableExceptions = True
         compiler.outputMapFile = True
+        compiler.outputFullPath = True
         compiler.messageStyle = compiler.MSVS_CLICKABLE
         compiler.warningLevel = '3'
         compiler.warningsAsErrors = True

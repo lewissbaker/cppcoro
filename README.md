@@ -752,6 +752,18 @@ Ensure Python 2.7 interpreter is in your PATH and available as 'python'.
 
 Ensure either Visual Studio 2015 Update 3 or Visual Studio 2017 is installed.
 
+You can also use an experimental version of the Visual Studio compiler by downloading a NuGet package from http://vcppdogfooding.azurewebsites.net/ and unzipping the .nuget file to a directory.
+Just update the `config.cake` file to point at the unzipped location by modifying and uncommenting the following line:
+```python
+#nugetPath = r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
+```
+
+Ensure the Windows 10 SDK version 10.0.10586.0 is installed.
+It's straight-forward to use a different Windows 10 SDK version by modifing the following line in the `config.cake` file.
+```python
+windows10SdkVersion = "10.0.10586.0"
+```
+
 ## Building from the command-line
 
 To build from the command-line just run 'cake.bat' in the workspace root.
