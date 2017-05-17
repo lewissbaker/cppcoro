@@ -58,13 +58,15 @@ namespace cppcoro
 
 			void unhandled_exception() noexcept
 			{
-				set_exception(std::current_exception());
+				m_exception = std::current_exception();
 			}
 
+#if _MSC_FULL_VER < 191025224
 			void set_exception(std::exception_ptr exception)
 			{
 				m_exception = std::move(exception);
 			}
+#endif
 
 			bool is_ready() const noexcept
 			{
