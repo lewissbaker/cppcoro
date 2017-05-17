@@ -10,7 +10,7 @@ These include:
   * `shared_lazy_task<T>`
   * `generator<T>` (coming - lewissbaker/cppcoro#5)
   * `recursive_generator<T>` (coming - lewissbaker/cppcoro#6)
-  * `async_generator<T>` (coming)
+  * `async_generator<T>`
 * Awaitable Types
   * `single_consumer_event`
   * `async_mutex`
@@ -195,15 +195,15 @@ namespace cppcoro
   {
   public:
     using promise_type = <unspecified>;
-	lazy_task() noexcept;
-	lazy_task(lazy_task&& other) noexcept;
-	lazy_task(const lazy_task& other) = delete;
-	lazy_task& operator=(lazy_task&& other);
-	lazy_task& operator=(const lazy_task& other) = delete;
-	bool is_ready() const noexcept;
-	<unspecified> operator co_await() const & noexcept;
-	<unspecified> operator co_await() const && noexcept;
-	<unspecified> when_ready() const noexcept;
+    lazy_task() noexcept;
+    lazy_task(lazy_task&& other) noexcept;
+    lazy_task(const lazy_task& other) = delete;
+    lazy_task& operator=(lazy_task&& other);
+    lazy_task& operator=(const lazy_task& other) = delete;
+    bool is_ready() const noexcept;
+    <unspecified> operator co_await() const & noexcept;
+    <unspecified> operator co_await() const && noexcept;
+    <unspecified> when_ready() const noexcept;
   };
 }
 ```
@@ -377,6 +377,112 @@ namespace cppcoro
 
 All const-methods on `shared_lazy_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
 It is not safe to call non-const methods of `shared_lazy_task<T>` concurrently with any other method on the same instance of a `shared_lazy_task<T>`.
+
+## `async_generator<T>`
+
+An `async_generator` represents a coroutine type that produces a sequence of values of type, `T`, where values are produced lazily and values may be produced asynchronously.
+
+The coroutine body is able to use both `co_await` and `co_yield` expressions.
+
+Consumers of the generator can use a `for co_await` range-based for-loop to consume the values.
+
+Example
+```c++
+cppcoro::async_generator<int> ticker(int count, threadpool& tp)
+{
+  for (int i = 0; i < count; ++i)
+  {
+    co_await tp.delay(std::chrono::seconds(1));
+    co_yield i;
+  }
+}
+
+cppcoro::task<> consumer(threadpool& tp)
+{
+  auto sequence = ticker(tp);
+  for co_await(std::uint32_t i : sequence)
+  {
+    std::cout << "Tick " << i << std::endl;
+  }
+}
+```
+
+API Summary
+```c++
+// <cppcoro/async_generator.hpp>
+namespace cppcoro
+{
+  template<typename T>
+  class async_generator
+  {
+  public:
+
+    class iterator
+    {
+    public:
+      using iterator_tag = std::forward_iterator_tag;
+      using difference_type = std::size_t;
+      using value_type = std::remove_reference_t<T>;
+      using reference = value_type&;
+      using pointer = value_type*;
+      
+      iterator(const iterator& other) noexcept;
+      iterator& operator=(const iterator& other) noexcept;
+
+      // Resumes the generator coroutine if suspended
+      // Returns an operation object that must be awaited to wait
+      // for the increment operation to complete.
+      // If the coroutine runs to completion then the iterator
+      // will subsequently become equal to the end() iterator.
+      // If the coroutine completes with an unhandled exception then
+      // that exception will be rethrown from the co_await expression.
+      <unspecified> operator++() noexcept;
+
+      // Dereference the iterator.
+      pointer operator->() const noexcept;
+      reference operator*() const noexcept;
+
+      bool operator==(const iterator& other) const noexcept;
+      bool operator!=(const iterator& other) const noexcept;
+    };
+
+    // Construct to the empty sequence.
+    async_generator() noexcept;
+    async_generator(const async_generator&) = delete;
+    async_generator(async_generator&& other) noexcept;
+    ~async_generator();
+
+    async_generator& operator=(const async_generator&) = delete;
+    async_generator& operator=(async_generator&& other) noexcept;
+
+    void swap(async_generator& other) noexcept;
+
+    // Starts execution of the coroutine and returns an operation object
+    // that must be awaited to wait for the first value to become available.
+    // The result of co_await'ing the returned object is an iterator that
+    // can be used to advance to subsequent elements of the sequence.
+    //
+    // This method is not valid to be called once the coroutine has
+    // run to completion.
+    <unspecified> begin() noexcept;
+    iterator end() noexcept;
+
+  };
+}
+```
+
+### Early termination of an async_generator
+
+When the `async_generator` object is destructed it requests cancellation of the underlying coroutine.
+If the coroutine has already run to completion or is currently suspended in a `co_yield` expression
+then the coroutine is destroyed immediately. Otherwise, the coroutine will continue execution until
+it either runs to completion or reaches the next `co_yield` expression.
+
+When the coroutine frame is destroyed the destructors of all variables in scope at that point will be
+executed to ensure the resources of the generator are cleaned up.
+
+Note that the caller must ensure that the `async_generator` object must not be destroyed while a
+consumer coroutine is executing a `co_await` expression waiting for the next item to be produced.
 
 ## `single_consumer_event`
 

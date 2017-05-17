@@ -10,6 +10,7 @@
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/single_consumer_event.hpp>
 #include <cppcoro/async_mutex.hpp>
+#include <cppcoro/async_generator.hpp>
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/shared_lazy_task.hpp>
 #include <cppcoro/cancellation_source.hpp>
@@ -1379,6 +1380,272 @@ void testCancellationRegistrationPerformanceSingleThreaded()
 	report("Batch50", time3, 50 * iterationCount);
 }
 
+void testAsyncGeneratorDefaultConstructor()
+{
+	[]() -> cppcoro::task<>
+	{
+		// Iterating over default-constructed async_generator just
+		// gives an empty sequence.
+		cppcoro::async_generator<int> g;
+		for co_await(int x : g)
+		{
+			assert(false);
+		}
+	}();
+}
+
+void testAsyncGeneratorDestructingWithoutCallingBegin()
+{
+	bool startedExecution = false;
+	{
+		auto gen = [&]() -> cppcoro::async_generator<int>
+		{
+			startedExecution = true;
+			co_yield 1;
+		}();
+		assert(!startedExecution);
+	}
+	assert(!startedExecution);
+}
+
+void testEnumerateFirstValueOfSequenceOfOne()
+{
+	bool startedExecution = false;
+	auto gen = [&]() -> cppcoro::async_generator<std::uint32_t>
+	{
+		startedExecution = true;
+		co_yield 1;
+	}();
+
+	assert(!startedExecution);
+
+	auto itAwaitable = gen.begin();
+	assert(startedExecution);
+	assert(itAwaitable.await_ready());
+	auto it = itAwaitable.await_resume();
+	assert(it != gen.end());
+	assert(*it == 1u);
+}
+
+void testEnumerateMultipleValues()
+{
+	bool startedExecution = false;
+	auto gen = [&]() -> cppcoro::async_generator<std::uint32_t>
+	{
+		startedExecution = true;
+		co_yield 1;
+		co_yield 2;
+		co_yield 3;
+	}();
+
+	assert(!startedExecution);
+
+	auto beginAwaitable = gen.begin();
+	assert(startedExecution);
+	assert(beginAwaitable.await_ready());
+
+	auto it = beginAwaitable.await_resume();
+	assert(it != gen.end());
+	assert(*it == 1u);
+
+	auto incrementAwaitable1 = ++it;
+	assert(incrementAwaitable1.await_ready());
+	incrementAwaitable1.await_resume();
+	assert(*it == 2u);
+
+	auto incrementAwaitable2 = ++it;
+	assert(incrementAwaitable2.await_ready());
+	incrementAwaitable2.await_resume();
+	assert(*it == 3u);
+
+	auto incrementAwaitable3 = ++it;
+	assert(incrementAwaitable3.await_ready());
+	incrementAwaitable3.await_resume();
+	assert(it == gen.end());
+}
+
+class set_to_true_on_destruction
+{
+public:
+	set_to_true_on_destruction(bool* value)
+		: m_value(value)
+	{}
+
+	set_to_true_on_destruction(set_to_true_on_destruction&& other)
+		: m_value(other.m_value)
+	{
+		other.m_value = nullptr;
+	}
+
+	~set_to_true_on_destruction()
+	{
+		if (m_value != nullptr)
+		{
+			*m_value = true;
+		}
+	}
+
+	set_to_true_on_destruction(const set_to_true_on_destruction&) = delete;
+	set_to_true_on_destruction& operator=(const set_to_true_on_destruction&) = delete;
+
+private:
+
+	bool* m_value;
+};
+
+void testDestructorsAreCalledWhenSequenceDestructedEarly()
+{
+	bool aDestructed = false;
+	bool bDestructed = false;
+	{
+		auto gen = [&](set_to_true_on_destruction a) -> cppcoro::async_generator<std::uint32_t>
+		{
+			set_to_true_on_destruction b(&bDestructed);
+			co_yield 1;
+			co_yield 2;
+		}(&aDestructed);
+
+		assert(!aDestructed);
+		assert(!bDestructed);
+
+		auto beginOp = gen.begin();
+		assert(beginOp.await_ready());
+		assert(!aDestructed);
+		assert(!bDestructed);
+
+		auto it = beginOp.await_resume();
+		assert(*it == 1u);
+		assert(!aDestructed);
+		assert(!bDestructed);
+	}
+
+	assert(aDestructed);
+	assert(bDestructed);
+}
+
+void testAsyncProducerAsyncConsumer()
+{
+	cppcoro::single_consumer_event p1;
+	cppcoro::single_consumer_event p2;
+	cppcoro::single_consumer_event p3;
+	cppcoro::single_consumer_event c1;
+
+	auto producer = [&]() -> cppcoro::async_generator<std::uint32_t>
+	{
+		co_await p1;
+		co_yield 1;
+		co_await p2;
+		co_yield 2;
+		co_await p3;
+	}();
+
+	auto consumer = [&]() -> cppcoro::task<>
+	{
+		auto it = co_await producer.begin();
+		assert(*it == 1u);
+		co_await ++it;
+		assert(*it == 2u);
+		co_await c1;
+		co_await ++it;
+		assert(it == producer.end());
+	}();
+
+	p1.set();
+	p2.set();
+	c1.set();
+	assert(!consumer.is_ready());
+	p3.set();
+	assert(consumer.is_ready());
+}
+
+void testExceptionThrownBeforeFirstYield()
+{
+	class TestException {};
+	auto gen = [&](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
+	{
+		if (shouldThrow)
+		{
+			throw TestException();
+		}
+		co_yield 1;
+	}(true);
+
+	auto beginAwaitable = gen.begin();
+	assert(beginAwaitable.await_ready());
+	try
+	{
+		auto it = beginAwaitable.await_resume();
+		assert(false);
+	}
+	catch (const TestException&)
+	{
+	}
+}
+
+void testExceptionThrownAfterFirstYield()
+{
+	class TestException {};
+	auto gen = [&](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
+	{
+		co_yield 1;
+		if (shouldThrow)
+		{
+			throw TestException();
+		}
+	}(true);
+
+	auto beginAwaitable = gen.begin();
+	assert(beginAwaitable.await_ready());
+	auto it = beginAwaitable.await_resume();
+	assert(*it == 1u);
+	auto incrementAwaitable = ++it;
+	assert(incrementAwaitable.await_ready());
+	try
+	{
+		incrementAwaitable.await_resume();
+		assert(false);
+	}
+	catch (const TestException&)
+	{
+	}
+}
+
+void testAsyncGeneratorLargeNumberOfSynchronousCompletions()
+{
+	cppcoro::single_consumer_event event;
+
+	auto sequence = [](cppcoro::single_consumer_event& event) -> cppcoro::async_generator<std::uint32_t>
+	{
+		for (std::uint32_t i = 0; i < 1'000'000u; ++i)
+		{
+			if (i == 500'000u) co_await event;
+			co_yield i;
+		}
+	}(event);
+
+	auto consumerTask = [](cppcoro::async_generator<std::uint32_t> sequence) -> cppcoro::task<>
+	{
+		std::uint32_t expected = 0;
+		for co_await(std::uint32_t i : sequence)
+		{
+			assert(i == expected++);
+		}
+
+		assert(expected == 1'000'000u);
+	}(std::move(sequence));
+
+	assert(!consumerTask.is_ready());
+
+	// Should have processed the first 500'000 elements synchronously with consumer driving
+	// iteraction before producer suspends and thus consumer suspends.
+	// Then we resume producer in call to set() below and it continues processing remaining
+	// 500'000 elements, this time with producer driving the interaction.
+
+	event.set();
+
+	assert(consumerTask.is_ready());
+}
+
 int main(int argc, char** argv)
 {
 	// task<T> tests
@@ -1404,7 +1671,7 @@ int main(int argc, char** argv)
 	// failing the test as it calls move-constructor twice for the
 	// captured parameter value. Need to check whether this is a
 	// bug or something that is unspecified in standard.
-#if !defined(_MSC_VER) || _MSC_FULL_VER > 191025019
+#if !defined(_MSC_VER) || _MSC_FULL_VER > 191025224
 	testPassingParameterByValueToLazyTaskCallsMoveConstructorOnce();
 #endif
 
@@ -1443,6 +1710,17 @@ int main(int argc, char** argv)
 	testRegisteringManyCallbacks();
 	testConcurrentRegistrationAndCancellation();
 	testCancellationRegistrationPerformanceSingleThreaded();
+
+	// async_generator<T> tests
+	testAsyncGeneratorDefaultConstructor();
+	testAsyncGeneratorDestructingWithoutCallingBegin();
+	testEnumerateFirstValueOfSequenceOfOne();
+	testEnumerateMultipleValues();
+	testDestructorsAreCalledWhenSequenceDestructedEarly();
+	testExceptionThrownAfterFirstYield();
+	testExceptionThrownBeforeFirstYield();
+	testAsyncProducerAsyncConsumer();
+	testAsyncGeneratorLargeNumberOfSynchronousCompletions();
 
 	return 0;
 }
