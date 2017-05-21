@@ -3,5 +3,9 @@
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest/doctest.h"
+#include "counted.hpp"
+
+int counted::default_construction_count;
+int counted::copy_construction_count;
+int counted::move_construction_count;
+int counted::destruction_count;
