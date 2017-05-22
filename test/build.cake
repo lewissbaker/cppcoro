@@ -5,7 +5,7 @@
 
 import cake.path
 
-from cake.tools import script, env, compiler, project, variant
+from cake.tools import script, env, compiler, project, variant, test
 
 script.include([
   env.expand('${CPPCORO}/lib/use.cake'),
@@ -44,6 +44,12 @@ testExe = compiler.program(
   target=env.expand('${CPPCORO_BUILD}/test/run'),
   sources=objects,
 )
+
+testResult = test.run(
+  program=testExe,
+  results=env.expand('${CPPCORO_BUILD}/test/run.results'),
+  )
+script.addTarget('testresult', testResult)
 
 vcproj = project.project(
   target=env.expand('${CPPCORO_PROJECT}/cppcoro_tests'),

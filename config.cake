@@ -10,6 +10,7 @@
 ##############################################################################
 
 import os
+import sys
 
 import cake.path
 import cake.system
@@ -19,6 +20,10 @@ from cake.script import Script
 
 configuration = Script.getCurrent().configuration
 engine = configuration.engine
+
+# Add path containing custom cake extensions to Python's import path.
+toolsDir = configuration.abspath(cake.path.join('tools', 'cake_extensions'))
+sys.path.insert(0, toolsDir)
 
 hostPlatform = cake.system.platform().lower()
 hostArchitecture = cake.system.architecture().lower()
@@ -30,9 +35,11 @@ from cake.library.variant import VariantTool
 from cake.library.env import EnvironmentTool
 from cake.library.project import ProjectTool
 from cake.library.compilers import CompilerNotFoundError
+from testtool import UnitTestTool
 
 baseVariant.tools["script"] = script = ScriptTool(configuration=configuration)
 baseVariant.tools["variant"] = variant = VariantTool(configuration=configuration)
+baseVariant.tools["test"] = test = UnitTestTool(configuration=configuration)
 
 baseVariant.tools["env"] = env = EnvironmentTool(configuration=configuration)
 
@@ -49,6 +56,7 @@ baseVariant.tools["project"] = project = ProjectTool(configuration=configuration
 project.product = project.VS2015
 project.enabled = engine.options.createProjects
 if project.enabled:
+  test.enabled = False
   engine.addBuildSuccessCallback(project.build)
 
 def getVisualStudio2015Compiler(targetArchitecture, ucrtVersion, windows10SdkVersion, vcInstallDir=None, windows10SdkBaseDir=None):
