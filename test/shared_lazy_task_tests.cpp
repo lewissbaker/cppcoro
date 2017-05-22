@@ -47,7 +47,17 @@ TEST_CASE("coroutine doesn't start executing until awaited")
 	CHECK(startedExecuting);
 }
 
-TEST_CASE("result is destroyed when last reference is destroyed")
+static constexpr bool is_msvc_2015_x86_optimised =
+#if defined(_MSC_VER) && _MSC_VER < 1910 && defined(CPPCORO_RELEASE_OPTIMISED)
+	true;
+#else
+	false;
+#endif
+
+// Skip running under MSVC 2015 x86 opt due to compiler bug which causes this test
+// to crash with an access violation inside shared_lazy_task_promise_base::try_await().
+TEST_CASE("result is destroyed when last reference is destroyed"
+	* doctest::skip{ is_msvc_2015_x86_optimised })
 {
 	counted::reset_counts();
 
@@ -113,7 +123,10 @@ TEST_CASE("multiple awaiters")
 	CHECK(t3.is_ready());
 }
 
-TEST_CASE("waiting on shared_lazy_task in loop doesn't cause stack-overflow")
+// Skip running under MSVC 2015 x86 opt due to compiler bug which causes this test
+// to crash with an access violation inside shared_lazy_task_promise_base::try_await().
+TEST_CASE("waiting on shared_lazy_task in loop doesn't cause stack-overflow"
+	* doctest::skip{ is_msvc_2015_x86_optimised })
 {
 	// This test checks that awaiting a shared_lazy_task that completes
 	// synchronously doesn't recursively resume the awaiter inside the
