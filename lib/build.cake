@@ -18,6 +18,7 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'shared_task.hpp',
   'single_consumer_event.hpp',
   'task.hpp',
+  'on_scope_exit.hpp',
   ])
 
 privateHeaders = script.cwd([
