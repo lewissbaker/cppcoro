@@ -25,6 +25,7 @@ sources = script.cwd([
   'shared_lazy_task_tests.cpp',
   'shared_task_tests.cpp',
   'task_tests.cpp',
+  'io_service_tests.cpp',
 ])
 
 extras = script.cwd([

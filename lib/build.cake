@@ -5,7 +5,7 @@
 
 import cake.path
 
-from cake.tools import compiler, script, env, project
+from cake.tools import compiler, script, env, project, variant
 
 includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'async_mutex.hpp',
@@ -18,8 +18,12 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'shared_task.hpp',
   'single_consumer_event.hpp',
   'task.hpp',
+  'io_service.hpp',
+  'config.hpp',
   'on_scope_exit.hpp',
   ])
+
+detailIncludes = []
 
 privateHeaders = script.cwd([
   'cancellation_state.hpp',
@@ -31,12 +35,21 @@ sources = script.cwd([
   'cancellation_token.cpp',
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
+  'io_service.cpp',
   ])
 
 extras = script.cwd([
   'build.cake',
   'use.cake',
   ])
+
+if variant.platform == "windows":
+  detailIncludes.extend(script.cwd([
+    'win32.hpp',
+    ]))
+  sources.extend(script.cwd([
+    'win32.cpp',
+    ]))
 
 buildDir = env.expand('${CPPCORO_BUILD}')
 
@@ -55,7 +68,10 @@ lib = compiler.library(
 vcproj = project.project(
   target=env.expand('${CPPCORO_PROJECT}/cppcoro'),
   items={
-    'Include': includes,
+    'Include': {
+      'Detail': detailIncludes,
+      '': includes,
+      },
     'Source': sources + privateHeaders,
     '': extras
   },
