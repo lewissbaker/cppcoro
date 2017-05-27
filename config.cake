@@ -212,7 +212,7 @@ def getVisualStudio2017Compiler(targetArchitecture, ucrtVersion, windows10SdkVer
     )
 
 if cake.system.isWindows() or cake.system.isCygwin():
-  for msvcVer in ("14.10", "14.0"):
+  for msvcVer in ("14.10",):
     for arch in ("x64", "x86"):
       try:
         msvcVariant = baseVariant.clone(
@@ -281,6 +281,9 @@ if cake.system.isWindows() or cake.system.isCygwin():
 
         # Enable experimental C++ coroutines via command-line flag.
         compiler.addCppFlag('/await')
+
+        # Enable C++17 features like std::optional<>
+        compiler.addCppFlag('/std:c++latest')
 
         env = msvcVariant.tools["env"]
         env["COMPILER"] = "msvc"

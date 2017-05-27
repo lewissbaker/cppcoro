@@ -21,6 +21,17 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'io_service.hpp',
   'config.hpp',
   'on_scope_exit.hpp',
+  'file_share_mode.hpp',
+  'file_open_mode.hpp',
+  'file_buffering_mode.hpp',
+  'file.hpp',
+  'readable_file.hpp',
+  'writable_file.hpp',
+  'read_only_file.hpp',
+  'write_only_file.hpp',
+  'read_write_file.hpp',
+  'file_read_operation.hpp',
+  'file_write_operation.hpp',
   ])
 
 detailIncludes = []
@@ -36,6 +47,14 @@ sources = script.cwd([
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
   'io_service.cpp',
+  'file.cpp',
+  'readable_file.cpp',
+  'writable_file.cpp',
+  'read_only_file.cpp',
+  'write_only_file.cpp',
+  'read_write_file.cpp',
+  'file_read_operation.cpp',
+  'file_write_operation.cpp',
   ])
 
 extras = script.cwd([
