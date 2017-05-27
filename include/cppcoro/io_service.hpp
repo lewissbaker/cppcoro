@@ -38,6 +38,7 @@ namespace cppcoro
 		/// Returns an operation that when awaited suspends the awaiting
 		/// coroutine and reschedules it for resumption on an I/O thread
 		/// associated with this io_service.
+		[[nodiscard]]
 		schedule_operation schedule() noexcept;
 
 		/// Process events until the io_service is stopped.
@@ -181,6 +182,7 @@ namespace cppcoro
 			}
 		}
 
+		[[nodiscard]]
 		io_service::schedule_operation schedule() noexcept
 		{
 			return m_service->schedule();
