@@ -7,10 +7,6 @@
 #include <cppcoro/single_consumer_event.hpp>
 #include <cppcoro/task.hpp>
 
-// HACK: Include <ostream> here to workaround bug in doctest.h
-// See https://github.com/onqtam/doctest/issues/72
-#include <ostream>
-
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("async_mutex");

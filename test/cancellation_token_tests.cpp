@@ -10,10 +10,6 @@
 
 #include <thread>
 
-// HACK: Including <ostream> here to work around bug in doctest.h
-// See https://github.com/onqtam/doctest/issues/72
-#include <ostream>
-
 #include "doctest/doctest.h"
 
 TEST_CASE("default cancellation_token is not cancellable")
