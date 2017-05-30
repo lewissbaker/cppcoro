@@ -196,6 +196,7 @@ namespace cppcoro
 		io_context& operator=(io_context other) noexcept
 		{
 			swap(other);
+			return *this;
 		}
 
 #if CPPCORO_OS_WINNT
