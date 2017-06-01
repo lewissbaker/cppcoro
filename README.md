@@ -742,7 +742,7 @@ cppcoro::task<> cancellable_timer_wait(cppcoro::cancellation_token token)
 
 This library makes use of the [Cake build system](https://github.com/lewissbaker/cake) (no, not the [C# one](http://cakebuild.net/)).
 
-This library has been tested with C++ compiler from Visual Studio 2015 Update 3 and Visual Studio 2017.
+This library requires Visual Studio 2017 or later.
 
 ## Prerequisites
 
@@ -750,19 +750,16 @@ The Cake build-system is implemented in Python and requires Python 2.7 to be ins
 
 Ensure Python 2.7 interpreter is in your PATH and available as 'python'.
 
-Ensure either Visual Studio 2015 Update 3 or Visual Studio 2017 is installed.
+Ensure Visual Studio 2017 is installed (preferably the latest update).
 
 You can also use an experimental version of the Visual Studio compiler by downloading a NuGet package from http://vcppdogfooding.azurewebsites.net/ and unzipping the .nuget file to a directory.
 Just update the `config.cake` file to point at the unzipped location by modifying and uncommenting the following line:
 ```python
-#nugetPath = r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
+nugetPath = None #r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
 ```
 
-Ensure the Windows 10 SDK version 10.0.10586.0 is installed.
-It's straight-forward to use a different Windows 10 SDK version by modifing the following line in the `config.cake` file.
-```python
-windows10SdkVersion = "10.0.10586.0"
-```
+Ensure that you have the Windows 10 SDK installed.
+It will use the latest Windows 10 SDK and Universal C Runtime version by default.
 
 ## Building from the command-line
 
@@ -771,18 +768,18 @@ To build from the command-line just run 'cake.bat' in the workspace root.
 eg.
 ```
 C:\cppcoro> cake.bat
-Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.0')
-Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.0')
-Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.0')
-Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.0')
+Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.10')
+Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.10')
+Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.10')
+Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.10')
 Compiling test\main.cpp
 Compiling test\main.cpp
 Compiling test\main.cpp
 Compiling test\main.cpp
-Linking build\windows_x86_msvc14.0_debug\test\run.exe
-Linking build\windows_x64_msvc14.0_optimised\test\run.exe
-Linking build\windows_x86_msvc14.0_optimised\test\run.exe
-Linking build\windows_x64_msvc14.0_debug\test\run.exe
+Linking build\windows_x86_msvc14.10_debug\test\run.exe
+Linking build\windows_x64_msvc14.10_optimised\test\run.exe
+Linking build\windows_x86_msvc14.10_optimised\test\run.exe
+Linking build\windows_x64_msvc14.10_debug\test\run.exe
 Generating code
 Finished generating code
 Generating code
@@ -796,8 +793,8 @@ You can narrow what is built by passing additional command-line arguments.
 eg.
 ```
 c:\cppcoro> cake.bat release=debug architecture=x64 lib/build.cake
-Building with C:\Users\Lewis\Code\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.0')
-Archiving build\windows_x64_msvc14.0_debug\lib\cppcoro.lib
+Building with C:\Users\Lewis\Code\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.10')
+Archiving build\windows_x64_msvc14.10_debug\lib\cppcoro.lib
 Build succeeded.
 Build took 0:00:00.321.
 ```
@@ -811,10 +808,10 @@ To develop from within Visual Studio you can build .vcproj/.sln files by running
 eg.
 ```
 c:\cppcoro> cake.bat -p
-Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.0')
-Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.0')
-Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.0')
-Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.0')
+Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.10')
+Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.10')
+Building with C:\cppcoro\config.cake - Variant(release='debug', platform='windows', architecture='x64', compilerFamily='msvc', compiler='msvc14.10')
+Building with C:\cppcoro\config.cake - Variant(release='optimised', platform='windows', architecture='x86', compilerFamily='msvc', compiler='msvc14.10')
 Generating Solution build/project/cppcoro.sln
 Generating Project build/project/cppcoro_tests.vcxproj
 Generating Filters build/project/cppcoro_tests.vcxproj.filters
