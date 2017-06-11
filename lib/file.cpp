@@ -109,7 +109,7 @@ cppcoro::detail::win32::safe_handle cppcoro::file::open(
 	// Open the file
 	detail::win32::safe_handle fileHandle(
 		::CreateFileW(
-			path.c_str(),
+			path.wstring().c_str(),
 			fileAccess,
 			shareFlags,
 			nullptr,
