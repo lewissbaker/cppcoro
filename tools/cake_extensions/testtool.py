@@ -119,13 +119,13 @@ class UnitTestTool(Tool):
     self.engine.logger.outputInfo(testOutput)
 
     if exitCode != 0:
-      msg = "test %s failed with exit code %i (0x%08x)" % (programPath, exitCode, exitCode)
+      msg = "test %s failed with exit code %i (0x%08x)\n" % (programPath, exitCode, exitCode)
       self.engine.raiseError(msg, targets=[results])
 
     if results:
       newDependencyInfo = self.configuration.createDependencyInfo(
         targets=[results],
         args=dependencyArgs,
-        dependencies=getPaths(dependencies),
+        dependencies=[programPath] + getPaths(dependencies),
         )
       self.configuration.storeDependencyInfo(newDependencyInfo)
