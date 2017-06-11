@@ -3,7 +3,7 @@
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
 #ifndef CPPCORO_CANCELLATION_STATE_HPP_INCLUDED
-#define CPPCORO_CANCELLATION_STATE_HPP_INLUCDED
+#define CPPCORO_CANCELLATION_STATE_HPP_INCLUDED
 
 #include <cppcoro/cancellation_token.hpp>
 
