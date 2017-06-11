@@ -26,7 +26,7 @@ namespace cppcoro
 			: m_func(std::forward<FUNC>(other.m_func))
 			, m_cancelled(other.m_cancelled)
 		{
-			other.Cancel();
+			other.cancel();
 		}
 
 		~scoped_lambda()
@@ -80,7 +80,7 @@ namespace cppcoro
 			other.cancel();
 		}
 
-		~conditional_scoped_lambda() noexcept(CALL_ON_FAILURE || noexcept(std::declval<T>()()))
+		~conditional_scoped_lambda() noexcept(CALL_ON_FAILURE || noexcept(std::declval<FUNC>()()))
 		{
 			if (!m_cancelled && (is_unwinding_due_to_exception() == CALL_ON_FAILURE))
 			{
@@ -128,7 +128,7 @@ namespace cppcoro
 	template<typename FUNC>
 	auto on_scope_failure(FUNC&& func)
 	{
-		return conditional_scoped_lambda<FUNC, true>{ std::forward<Func>(func) };
+		return conditional_scoped_lambda<FUNC, true>{ std::forward<FUNC>(func) };
 	}
 
 	/// Returns an object that calls the provided function when it goes out
