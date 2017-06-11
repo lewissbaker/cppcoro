@@ -223,7 +223,7 @@ namespace cppcoro
 
 			~shared_lazy_task_promise()
 			{
-				if (is_ready() && !completed_with_unhandled_exception())
+				if (this->is_ready() && !this->completed_with_unhandled_exception())
 				{
 					reinterpret_cast<T*>(&m_valueStorage)->~T();
 				}
@@ -245,7 +245,7 @@ namespace cppcoro
 
 			T& result()
 			{
-				rethrow_if_unhandled_exception();
+				this->rethrow_if_unhandled_exception();
 				return *reinterpret_cast<T*>(&m_valueStorage);
 			}
 
@@ -275,7 +275,7 @@ namespace cppcoro
 
 			void result()
 			{
-				rethrow_if_unhandled_exception();
+				this->rethrow_if_unhandled_exception();
 			}
 
 		};
@@ -299,7 +299,7 @@ namespace cppcoro
 
 			T& result()
 			{
-				rethrow_if_unhandled_exception();
+				this->rethrow_if_unhandled_exception();
 				return *m_value;
 			}
 
@@ -426,12 +426,12 @@ namespace cppcoro
 
 				decltype(auto) await_resume()
 				{
-					if (!m_coroutine)
+					if (!this->m_coroutine)
 					{
 						throw broken_promise{};
 					}
 
-					return m_coroutine.promise().result();
+					return this->m_coroutine.promise().result();
 				}
 			};
 

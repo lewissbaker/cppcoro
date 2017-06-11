@@ -313,12 +313,12 @@ namespace cppcoro
 
 				decltype(auto) await_resume()
 				{
-					if (!m_coroutine)
+					if (!this->m_coroutine)
 					{
 						throw broken_promise{};
 					}
 
-					return m_coroutine.promise().result();
+					return this->m_coroutine.promise().result();
 				}
 			};
 
@@ -333,12 +333,12 @@ namespace cppcoro
 
 				decltype(auto) await_resume()
 				{
-					if (!m_coroutine)
+					if (!this->m_coroutine)
 					{
 						throw broken_promise{};
 					}
 
-					return std::move(m_coroutine.promise()).result();
+					return std::move(this->m_coroutine.promise()).result();
 				}
 			};
 
