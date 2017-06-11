@@ -108,10 +108,7 @@ namespace cppcoro
 				}
 			}
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this);
-			}
+			lazy_task<T> get_return_object() noexcept;
 
 			template<
 				typename VALUE,
@@ -150,10 +147,7 @@ namespace cppcoro
 
 			lazy_task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this);
-			}
+			lazy_task<void> get_return_object() noexcept;
 
 			void return_void() noexcept
 			{}
@@ -172,10 +166,7 @@ namespace cppcoro
 
 			lazy_task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this);
-			}
+			lazy_task<T&> get_return_object() noexcept;
 
 			void return_value(T& value) noexcept
 			{
@@ -365,6 +356,27 @@ namespace cppcoro
 		std::experimental::coroutine_handle<promise_type> m_coroutine;
 
 	};
+
+	namespace detail
+	{
+		template<typename T>
+		lazy_task<T> lazy_task_promise<T>::get_return_object() noexcept
+		{
+			return lazy_task<T>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
+		}
+
+		inline lazy_task<void> lazy_task_promise<void>::get_return_object() noexcept
+		{
+			return lazy_task<void>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
+		}
+
+		template<typename T>
+		lazy_task<T&> lazy_task_promise<T&>::get_return_object() noexcept
+		{
+			return lazy_task<T&>{ std::experimental::coroutine_handle<lazy_task_promise<T&>>::from_promise(*this) };
+		}
+	}
+
 }
 
 #endif

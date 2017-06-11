@@ -147,10 +147,7 @@ namespace cppcoro
 				}
 			}
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<task_promise>::from_promise(*this);
-			}
+			task<T> get_return_object() noexcept;
 
 			template<
 				typename VALUE,
@@ -189,10 +186,7 @@ namespace cppcoro
 
 			task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<task_promise>::from_promise(*this);
-			}
+			task<void> get_return_object() noexcept;
 
 			void return_void() noexcept
 			{}
@@ -211,10 +205,7 @@ namespace cppcoro
 
 			task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<task_promise>::from_promise(*this);
-			}
+			task<T&> get_return_object() noexcept;
 
 			void return_value(T& value) noexcept
 			{
@@ -406,6 +397,23 @@ namespace cppcoro
 		std::experimental::coroutine_handle<promise_type> m_coroutine;
 
 	};
+
+	template<typename T>
+	task<T> detail::task_promise<T>::get_return_object() noexcept
+	{
+		return task<T>{ std::experimental::coroutine_handle<task_promise<T>>::from_promise(*this) };
+	}
+
+	template<typename T>
+	task<T&> detail::task_promise<T&>::get_return_object() noexcept
+	{
+		return task<T&>{ std::experimental::coroutine_handle<task_promise<T&>>::from_promise(*this) };
+	}
+
+	inline task<void> detail::task_promise<void>::get_return_object() noexcept
+	{
+		return task<void>{ std::experimental::coroutine_handle<task_promise<void>>::from_promise(*this) };
+	}
 }
 
 #endif
