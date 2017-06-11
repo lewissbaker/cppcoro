@@ -47,10 +47,10 @@ namespace cppcoro
 		/// \throw std::bad_alloc
 		/// If registration failed due to insufficient memory available.
 		template<
-			typename CALLBACK,
-			typename = std::enable_if_t<std::is_constructible_v<std::function<void()>, CALLBACK&&>>>
-		cancellation_registration(cancellation_token token, CALLBACK&& callback)
-			: m_callback(std::forward<CALLBACK>(callback))
+			typename FUNC,
+			typename = std::enable_if_t<std::is_constructible_v<std::function<void()>, FUNC&&>>>
+		cancellation_registration(cancellation_token token, FUNC&& callback)
+			: m_callback(std::forward<FUNC>(callback))
 		{
 			register_callback(std::move(token));
 		}
