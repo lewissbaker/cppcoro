@@ -77,13 +77,13 @@ cppcoro::detail::cancellation_registration_list_chunk::allocate(std::uint32_t en
 		throw std::bad_alloc{};
 	}
 
-	std::atomic_init(&chunk->m_nextChunk, nullptr);
+	std::atomic_init(&chunk->m_nextChunk, static_cast<cancellation_registration_list_chunk*>(nullptr));
 	chunk->m_prevChunk = nullptr;
-	std::atomic_init(&chunk->m_approximateFreeCount, entryCount - 1);
+	std::atomic_init(&chunk->m_approximateFreeCount, static_cast<std::int32_t>(entryCount - 1));
 	chunk->m_entryCount = entryCount;
 	for (std::uint32_t i = 0; i < entryCount; ++i)
 	{
-		std::atomic_init(&chunk->m_entries[i], nullptr);
+		std::atomic_init(&chunk->m_entries[i], static_cast<cancellation_registration*>(nullptr));
 	}
 
 	return chunk;
@@ -111,13 +111,13 @@ cppcoro::detail::cancellation_registration_list::allocate()
 	}
 
 	std::atomic_init(&bucket->m_approximateTail, &bucket->m_headChunk);
-	std::atomic_init(&bucket->m_headChunk.m_nextChunk, nullptr);
+	std::atomic_init(&bucket->m_headChunk.m_nextChunk, static_cast<cancellation_registration_list_chunk*>(nullptr));
 	bucket->m_headChunk.m_prevChunk = nullptr;
-	std::atomic_init(&bucket->m_headChunk.m_approximateFreeCount, initialChunkSize - 1);
+	std::atomic_init(&bucket->m_headChunk.m_approximateFreeCount, static_cast<std::int32_t>(initialChunkSize - 1));
 	bucket->m_headChunk.m_entryCount = initialChunkSize;
 	for (std::uint32_t i = 0; i < initialChunkSize; ++i)
 	{
-		std::atomic_init(&bucket->m_headChunk.m_entries[i], nullptr);
+		std::atomic_init(&bucket->m_headChunk.m_entries[i], static_cast<cancellation_registration*>(nullptr));
 	}
 
 	return bucket;
@@ -156,7 +156,7 @@ cppcoro::detail::cancellation_registration_state::allocate()
 	state->m_listCount = listCount;
 	for (std::uint32_t i = 0; i < listCount; ++i)
 	{
-		std::atomic_init(&state->m_lists[i], nullptr);
+		std::atomic_init(&state->m_lists[i], static_cast<cancellation_registration_list*>(nullptr));
 	}
 
 	return state;
