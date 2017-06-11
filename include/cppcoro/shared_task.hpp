@@ -96,13 +96,6 @@ namespace cppcoro
 				}
 			}
 
-#if _MSC_FULL_VER < 191025224
-			void set_exception(std::exception_ptr exception)
-			{
-				m_exception = std::move(exception);
-			}
-#endif
-
 			bool is_ready() const noexcept
 			{
 				return m_waiters.load(std::memory_order_acquire) == static_cast<const void*>(this);

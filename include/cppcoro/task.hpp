@@ -77,13 +77,6 @@ namespace cppcoro
 				}
 			}
 
-#if _MSC_FULL_VER < 191025224
-			void set_exception(std::exception_ptr exception)
-			{
-				m_exception = std::move(exception);
-			}
-#endif
-
 			bool is_ready() const noexcept
 			{
 				return m_state.load(std::memory_order_acquire) == state::finished;

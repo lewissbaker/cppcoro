@@ -47,13 +47,6 @@ namespace cppcoro
 
 			async_generator_yield_operation final_suspend() noexcept;
 
-#if _MSC_FULL_VER < 191025224
-			void set_exception(std::exception_ptr ex) noexcept
-			{
-				m_exception = std::move(ex);
-			}
-#endif
-
 			void unhandled_exception() noexcept
 			{
 				// Don't bother capturing the exception if we have been cancelled

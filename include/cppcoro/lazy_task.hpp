@@ -61,13 +61,6 @@ namespace cppcoro
 				m_exception = std::current_exception();
 			}
 
-#if _MSC_FULL_VER < 191025224
-			void set_exception(std::exception_ptr exception)
-			{
-				m_exception = std::move(exception);
-			}
-#endif
-
 			bool is_ready() const noexcept
 			{
 				return static_cast<bool>(m_awaiter);
