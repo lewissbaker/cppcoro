@@ -80,9 +80,9 @@ namespace cppcoro
 		friend class async_mutex_lock_operation;
 
 		static constexpr std::uintptr_t not_locked = 1;
-		static constexpr std::uintptr_t locked_no_waiters =
-			reinterpret_cast<std::uintptr_t>(
-				static_cast<async_mutex_lock_operation*>(nullptr));
+
+		// assume == reinterpret_cast<std::uintptr_t>(static_cast<void*>(nullptr))
+		static constexpr std::uintptr_t locked_no_waiters = 0;
 
 		// This field provides synchronisation for the mutex.
 		//
