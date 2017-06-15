@@ -61,6 +61,10 @@ namespace cppcoro
 				return *m_value;
 			}
 
+			// Don't allow any use of 'co_await' inside the generator coroutine.
+			template<typename U>
+			std::experimental::suspend_never await_transform(U&& value) = delete;
+
 		private:
 
 			pointer_type m_value;

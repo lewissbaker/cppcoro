@@ -114,6 +114,10 @@ namespace cppcoro
 				return awaitable{ nullptr };
 			}
 
+			// Don't allow any use of 'co_await' inside the recursive_generator coroutine.
+			template<typename U>
+			std::experimental::suspend_never await_transform(U&& value) = delete;
+
 			void destroy() noexcept
 			{
 				std::experimental::coroutine_handle<promise_type>::from_promise(*this).destroy();
