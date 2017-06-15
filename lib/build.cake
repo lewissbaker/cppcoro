@@ -28,6 +28,7 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'file.hpp',
   'generator.hpp',
   'readable_file.hpp',
+  'recursive_generator.hpp',
   'writable_file.hpp',
   'read_only_file.hpp',
   'write_only_file.hpp',

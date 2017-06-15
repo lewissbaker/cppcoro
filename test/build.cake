@@ -19,6 +19,7 @@ sources = script.cwd([
   'main.cpp',
   'counted.cpp',
   'generator_tests.cpp',
+  'recursive_generator_tests.cpp',
   'async_generator_tests.cpp',
   'async_mutex_tests.cpp',
   'cancellation_token_tests.cpp',
