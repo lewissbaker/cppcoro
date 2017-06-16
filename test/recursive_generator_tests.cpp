@@ -7,6 +7,7 @@
 #include <cppcoro/on_scope_exit.hpp>
 
 #include <chrono>
+#include <algorithm>
 
 #include "doctest/doctest.h"
 
@@ -352,6 +353,21 @@ TEST_CASE("recursive iteration performance")
 
 	const auto timeTakenUs = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 	MESSAGE("Range iteration of " << count << "elements took " << timeTakenUs << "us");
+}
+
+TEST_CASE("usage in standard algorithms")
+{
+	{
+		auto a = iterate_range(5, 30);
+		auto b = iterate_range(5, 30);
+		CHECK(std::equal(a.begin(), a.end(), b.begin(), b.end()));
+	}
+
+	{
+		auto a = iterate_range(5, 30);
+		auto b = iterate_range(5, 300);
+		CHECK(!std::equal(a.begin(), a.end(), b.begin(), b.end()));
+	}
 }
 
 TEST_SUITE_END();
