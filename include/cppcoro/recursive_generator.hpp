@@ -221,6 +221,13 @@ namespace cppcoro
 		{
 		public:
 
+			using iterator_category = std::input_iterator_tag;
+			// What type should we use for counting elements of a potentially infinite sequence?
+			using difference_type = std::size_t;
+			using value_type = std::remove_reference_t<T>;
+			using reference = value_type&;
+			using pointer = value_type*;
+
 			iterator(promise_type* promise) noexcept
 				: m_promise(promise)
 			{}
@@ -251,10 +258,15 @@ namespace cppcoro
 				return *this;
 			}
 
-			T& operator*() const noexcept
+			reference operator*() const noexcept
 			{
 				assert(m_promise != nullptr);
 				return m_promise->value();
+			}
+
+			pointer operator->() const noexcept
+			{
+				return std::addressof(operator*());
 			}
 
 		private:
