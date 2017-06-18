@@ -8,8 +8,8 @@ These include:
   * `lazy_task<T>`
   * `shared_task<T>`
   * `shared_lazy_task<T>`
-  * `generator<T>` (coming - lewissbaker/cppcoro#5)
-  * `recursive_generator<T>` (coming - lewissbaker/cppcoro#6)
+  * `generator<T>`
+  * `recursive_generator<T>`
   * `async_generator<T>`
 * Awaitable Types
   * `single_consumer_event`
@@ -377,6 +377,142 @@ namespace cppcoro
 
 All const-methods on `shared_lazy_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
 It is not safe to call non-const methods of `shared_lazy_task<T>` concurrently with any other method on the same instance of a `shared_lazy_task<T>`.
+
+## `generator<T>`
+
+A `generator` represents a coroutine type that produces a sequence of values of type, `T`, where values are produced lazily and synchronously.
+
+The coroutine body is able to yield values of type `T` using the `co_yield` keyword.
+Note, however, that the coroutine body is not able to use the `co_await` keyword; values must be produced synchronously.
+
+For example:
+```c++
+cppcoro::generator<const std::uint64_t> fibonacci()
+{
+  std::uint64_t a = 0, b = 1;
+  while (true)
+  {
+    co_yield b;
+    auto tmp = a;
+    a = b;
+    b += tmp;
+  }
+}
+
+void usage()
+{
+  for (auto i : fibonacci())
+  {
+    if (i > 1'000'000) break;
+    std::cout << i << std::endl;
+  }
+}
+```
+
+When a coroutine function returning a `generator<T>` is called the coroutine is created initially suspended.
+Execution of the coroutine enters the coroutine body when the `generator<T>::begin()` method is called and continues until
+either the first `co_yield` statement is reached or the coroutine runs to completion.
+
+If the returned iterator is not equal to the `end()` iterator then dereferencing the iterator will return a reference to the value passed to the `co_yield` statement.
+
+Calling `operator++()` on the iterator will resume execution of the coroutine and continue until either the next `co_yield` point is reached or the coroutine runs to completion().
+
+Any unhandled exceptions thrown by the coroutine will propagate out of the `begin()` or `operator++()` calls to the caller.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+	template<typename T>
+	class generator
+	{
+	public:
+
+		using promise_type = <unspecified>;
+
+		class iterator
+		{
+		public:
+			using iterator_category = std::input_iterator_tag;
+			using value_type = std::remove_reference_t<T>;
+			using reference = value_type&;
+			using pointer = value_type*;
+			using difference_type = std::size_t;
+
+			iterator(const iterator& other) noexcept;
+			iterator& operator=(const iterator& other) noexcept;
+
+			// If the generator coroutine throws an unhandled exception before producing
+			// the next element then the exception will propagate out of this call.
+			iterator& operator++();
+
+			reference operator*() const noexcept;
+			pointer operator->() const noexcept;
+
+			bool operator==(const iterator& other) const noexcept;
+			bool operator!=(const iterator& other) const noexcept;
+		};
+
+		// Constructs to the empty sequence.
+		generator() noexcept;
+
+		generator(generator&& other) noexcept;
+		generator& operator=(generator&& other) noexcept;
+		
+		generator(const generator& other) = delete;
+		generator& operator=(const generator&) = delete;
+
+		~generator();
+
+		// Starts executing the generator coroutine which runs until either a value is yielded
+		// or the coroutine runs to completion or an unhandled exception propagates out of the
+		// the coroutine.
+		iterator begin();
+
+		iterator end() noexcept;
+
+		// Swap the contents of two generators.
+		void swap(generator& other) noexcept;
+
+	};
+
+	template<typename T>
+	void swap(generator<T>& a, generator<T>&b) noexcept;
+}
+```
+
+## `recursive_generator<T>`
+
+A `recursive_generator` is similar to a `generator` except that it is designed to more efficiently
+support yielding the elements of a nested sequence as elements of an outer sequence.
+
+In addition to being able to `co_yield` a value of type `T` you can also `co_yield` a value of type `recursive_generator<T>`.
+
+When you `co_yield` a `recursive_generator<T>` value the all elements of the yielded generator are yielded as elements of the current generator.
+The current coroutine is suspended until the consumer has finished consuming all elements of the nested generator, after which point execution
+of the current coroutine will resume execution to produce the next element.
+
+The benefit of `recursive_generator<T>` over `generator<T>` for iterating over recursive data-structures is that the `iterator::operator++()`
+is able to directly resume the leaf-most coroutine to produce the next element, rather than having to resume/suspend O(depth) coroutines for each element.
+The down-side is that there is additional overhead 
+
+For example:
+```c++
+// Lists the immediate contents of a directory.
+cppcoro::generator<dir_entry> list_directory(std::filesystem::path path);
+
+cppcoro::recursive_generator<dir_entry> list_directory_recursive(std::filesystem::path path)
+{
+  for (auto& entry : list_directory(path))
+  {
+    co_yield entry;
+    if (entry.is_directory())
+    {
+      co_yield list_directory_recursive(entry.path());
+    }
+  }
+}
+```
 
 ## `async_generator<T>`
 
