@@ -19,6 +19,8 @@ These include:
   * `when_all()` (coming)
 * Cancellation
   * `cancellation_token`
+  * `cancellation_source`
+  * `cancellation_registration`
 
 This library is an experimental library that is exploring the space of high-performance,
 scalable asynchronous programming abstractions that can be built on top of the C++ coroutines
@@ -878,7 +880,9 @@ cppcoro::task<> cancellable_timer_wait(cppcoro::cancellation_token token)
 
 This library makes use of the [Cake build system](https://github.com/lewissbaker/cake) (no, not the [C# one](http://cakebuild.net/)).
 
-This library requires Visual Studio 2017 or later.
+This library currently requires Visual Studio 2017 or later and the Windows 10 SDK.
+
+Support for Clang ([#3](https://github.com/lewissbaker/cppcoro/issues/3)) and Linux ([#15](https://github.com/lewissbaker/cppcoro/issues/15)) is planned.
 
 ## Prerequisites
 
@@ -896,6 +900,20 @@ nugetPath = None #r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
 
 Ensure that you have the Windows 10 SDK installed.
 It will use the latest Windows 10 SDK and Universal C Runtime version by default.
+
+## Cloning the repository
+
+The cppcoro repository makes use of git submodules to pull in the source for the Cake build system.
+
+This means you need to pass the `--recursive` flag to the `git clone` command. eg.
+```
+c:\Code> git clone --recursive https://github.com/lewissbaker/cppcoro
+```
+
+If you have already cloned cppcoro, then you should update the submodules after pulling changes.
+```
+c:\Code\cppcoro> git submodule update --init --recursive
+```
 
 ## Building from the command-line
 
@@ -924,7 +942,7 @@ Build succeeded.
 Build took 0:00:02.419.
 ```
 
-By default this will build all projects with all build variants.
+By default this will build all projects with all build variants and execute the unit-tests.
 You can narrow what is built by passing additional command-line arguments.
 eg.
 ```
