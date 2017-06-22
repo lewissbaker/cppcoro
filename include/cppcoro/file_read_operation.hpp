@@ -20,6 +20,9 @@
 namespace cppcoro
 {
 	class file_read_operation
+#if CPPCORO_OS_WINNT
+		: private cppcoro::detail::win32::io_state
+#endif
 	{
 	public:
 
@@ -66,7 +69,6 @@ namespace cppcoro
 
 #if CPPCORO_OS_WINNT
 		detail::win32::handle_t m_fileHandle;
-		detail::win32::io_state m_ioState;
 #endif
 
 		void* m_buffer;

@@ -30,8 +30,8 @@ cppcoro::file_write_operation::file_write_operation(
 	, m_cancellationToken(std::move(cancellationToken))
 	, m_cancellationRegistration(std::nullopt)
 {
-	m_ioState.Offset = static_cast<detail::win32::dword_t>(fileOffset);
-	m_ioState.OffsetHigh = static_cast<detail::win32::dword_t>(fileOffset >> 32);
+	this->Offset = static_cast<detail::win32::dword_t>(fileOffset);
+	this->OffsetHigh = static_cast<detail::win32::dword_t>(fileOffset >> 32);
 
 	if (m_cancellationToken.is_cancellation_requested())
 	{
@@ -50,8 +50,8 @@ cppcoro::file_write_operation::file_write_operation(
 	, m_cancellationToken(std::move(other.m_cancellationToken))
 	, m_cancellationRegistration(std::nullopt)
 {
-	m_ioState.Offset = other.m_ioState.Offset;
-	m_ioState.OffsetHigh = other.m_ioState.OffsetHigh;
+	this->Offset = other.Offset;
+	this->OffsetHigh = other.OffsetHigh;
 
 	if (m_cancellationToken.is_cancellation_requested())
 	{
@@ -70,8 +70,8 @@ cppcoro::file_write_operation::file_write_operation(
 	, m_cancellationToken(other.m_cancellationToken)
 	, m_cancellationRegistration(std::nullopt)
 {
-	m_ioState.Offset = other.m_ioState.Offset;
-	m_ioState.OffsetHigh = other.m_ioState.OffsetHigh;
+	this->Offset = other.Offset;
+	this->OffsetHigh = other.OffsetHigh;
 
 	if (m_cancellationToken.is_cancellation_requested())
 	{
@@ -91,8 +91,8 @@ bool cppcoro::file_write_operation::await_suspend(
 {
 	m_awaiter = awaiter;
 
-	m_ioState.hEvent = nullptr;
-	m_ioState.m_callback = &file_write_operation::on_operation_completed;
+	this->hEvent = nullptr;
+	this->m_callback = &file_write_operation::on_operation_completed;
 
 	const bool enableCancellation = m_cancellationToken.can_be_cancelled();
 	if (enableCancellation)
@@ -119,7 +119,8 @@ bool cppcoro::file_write_operation::await_suspend(
 		m_buffer,
 		numberOfBytesToWrite,
 		nullptr,
-		reinterpret_cast<LPOVERLAPPED>(&m_ioState));
+		reinterpret_cast<LPOVERLAPPED>(
+			static_cast<detail::win32::io_state*>(this)));
 	const DWORD errorCode = ok ? ERROR_SUCCESS : ::GetLastError();
 	if (errorCode != ERROR_IO_PENDING)
 	{
@@ -134,7 +135,8 @@ bool cppcoro::file_write_operation::await_suspend(
 
 		ok = ::GetOverlappedResult(
 			m_fileHandle,
-			reinterpret_cast<LPOVERLAPPED>(&m_ioState),
+			reinterpret_cast<LPOVERLAPPED>(
+				static_cast<detail::win32::io_state*>(this)),
 			&m_numberOfBytesTransferred,
 			FALSE);
 		if (!ok)
@@ -175,7 +177,8 @@ bool cppcoro::file_write_operation::await_suspend(
 				// handed off responsibility for cancelling the operation to us.
 				::CancelIoEx(
 					m_fileHandle,
-					reinterpret_cast<LPOVERLAPPED>(&m_ioState));
+					reinterpret_cast<LPOVERLAPPED>(
+						static_cast<detail::win32::io_state*>(this)));
 
 				// We might still be racing with an I/O thread that is processing
 				// completion of this operation concurrently so we need to use
@@ -250,7 +253,8 @@ void cppcoro::file_write_operation::on_cancellation_requested() noexcept
 	{
 		::CancelIoEx(
 			m_fileHandle,
-			reinterpret_cast<LPOVERLAPPED>(&m_ioState));
+			reinterpret_cast<LPOVERLAPPED>(
+				static_cast<detail::win32::io_state*>(this)));
 	}
 }
 
@@ -260,9 +264,7 @@ void cppcoro::file_write_operation::on_operation_completed(
 	detail::win32::dword_t numberOfBytesTransferred,
 	detail::win32::ulongptr_t completionKey) noexcept
 {
-	auto* operation = reinterpret_cast<file_write_operation*>(
-		reinterpret_cast<char*>(ioState) -
-		offsetof(file_write_operation, m_ioState));
+	auto* operation = static_cast<file_write_operation*>(ioState);
 
 	operation->m_errorCode = errorCode;
 	operation->m_numberOfBytesTransferred = numberOfBytesTransferred;
