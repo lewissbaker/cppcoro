@@ -6,6 +6,9 @@
 #include <cppcoro/generator.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
+#include <vector>
+#include <string>
+
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("generator");
@@ -150,6 +153,37 @@ TEST_CASE("generator throwing after first element rethrows out of operator++")
 	catch (const X&)
 	{
 	}
+}
+
+template<typename FIRST, typename SECOND>
+auto concat(FIRST&& first, SECOND&& second)
+{
+	using value_type = std::remove_reference_t<decltype(*first.begin())>;
+	return [](FIRST first, SECOND second) -> cppcoro::generator<value_type>
+	{
+		for (auto&& x : first) co_yield x;
+		for (auto&& y : second) co_yield y;
+	}(std::forward<FIRST>(first), std::forward<SECOND>(second));
+}
+
+TEST_CASE("safe capture of r-value reference args")
+{
+	using namespace std::string_literals;
+
+	// Check that we can capture l-values by reference and that temporary
+	// values are moved into the coroutine frame.
+	std::string byRef = "bar";
+	auto g = concat("foo"s, concat(byRef, std::vector<char>{ 'b', 'a', 'z' }));
+
+	byRef = "buzz";
+
+	std::string s;
+	for (char c : g)
+	{
+		s += c;
+	}
+
+	CHECK(s == "foobuzzbaz");
 }
 
 TEST_SUITE_END();
