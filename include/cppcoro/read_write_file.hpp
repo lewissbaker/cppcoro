@@ -15,8 +15,6 @@
 
 namespace cppcoro
 {
-	class io_context;
-
 	class read_write_file : public readable_file, public writable_file
 	{
 	public:
@@ -50,7 +48,7 @@ namespace cppcoro
 		/// If the file could not be opened for write.
 		[[nodiscard]]
 		static read_write_file open(
-			io_context& ioContext,
+			io_service& ioService,
 			const std::experimental::filesystem::path& path,
 			file_open_mode openMode = file_open_mode::create_or_open,
 			file_share_mode shareMode = file_share_mode::none,

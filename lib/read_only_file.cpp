@@ -10,14 +10,14 @@
 # include <Windows.h>
 
 cppcoro::read_only_file cppcoro::read_only_file::open(
-	io_context& ioContext,
+	io_service& ioService,
 	const std::experimental::filesystem::path& path,
 	file_share_mode shareMode,
 	file_buffering_mode bufferingMode)
 {
 	return read_only_file(file::open(
 		GENERIC_READ,
-		ioContext,
+		ioService,
 		path,
 		file_open_mode::open_existing,
 		shareMode,

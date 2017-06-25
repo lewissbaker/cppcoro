@@ -19,7 +19,7 @@
 
 namespace cppcoro
 {
-	class io_context;
+	class io_service;
 
 	class file
 	{
@@ -39,7 +39,7 @@ namespace cppcoro
 
 		static detail::win32::safe_handle open(
 			detail::win32::dword_t fileAccess,
-			io_context& ioContext,
+			io_service& ioService,
 			const std::experimental::filesystem::path& path,
 			file_open_mode openMode,
 			file_share_mode shareMode,

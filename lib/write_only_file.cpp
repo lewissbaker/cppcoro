@@ -10,7 +10,7 @@
 # include <Windows.h>
 
 cppcoro::write_only_file cppcoro::write_only_file::open(
-	io_context& ioContext,
+	io_service& ioService,
 	const std::experimental::filesystem::path& path,
 	file_open_mode openMode,
 	file_share_mode shareMode,
@@ -18,7 +18,7 @@ cppcoro::write_only_file cppcoro::write_only_file::open(
 {
 	return write_only_file(file::open(
 		GENERIC_WRITE,
-		ioContext,
+		ioService,
 		path,
 		openMode,
 		shareMode,

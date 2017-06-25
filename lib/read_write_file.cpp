@@ -10,7 +10,7 @@
 # include <Windows.h>
 
 cppcoro::read_write_file cppcoro::read_write_file::open(
-	io_context& ioContext,
+	io_service& ioService,
 	const std::experimental::filesystem::path& path,
 	file_open_mode openMode,
 	file_share_mode shareMode,
@@ -18,7 +18,7 @@ cppcoro::read_write_file cppcoro::read_write_file::open(
 {
 	return read_write_file(file::open(
 		GENERIC_READ | GENERIC_WRITE,
-		ioContext,
+		ioService,
 		path,
 		openMode,
 		shareMode,

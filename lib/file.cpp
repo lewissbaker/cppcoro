@@ -44,7 +44,7 @@ cppcoro::file::file(detail::win32::safe_handle&& fileHandle) noexcept
 
 cppcoro::detail::win32::safe_handle cppcoro::file::open(
 	detail::win32::dword_t fileAccess,
-	io_context& ioContext,
+	io_service& ioService,
 	const std::experimental::filesystem::path& path,
 	file_open_mode openMode,
 	file_share_mode shareMode,
@@ -130,7 +130,7 @@ cppcoro::detail::win32::safe_handle cppcoro::file::open(
 	// Associate with the I/O service's completion port.
 	const HANDLE result = ::CreateIoCompletionPort(
 		fileHandle.handle(),
-		ioContext.native_iocp_handle(),
+		ioService.native_iocp_handle(),
 		0,
 		0);
 	if (result == nullptr)

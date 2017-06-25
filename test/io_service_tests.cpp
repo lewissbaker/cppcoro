@@ -39,15 +39,16 @@ TEST_CASE("schedule coroutine")
 
 	bool reachedPointA = false;
 	bool reachedPointB = false;
-	auto startTask = [&](cppcoro::io_context ioCtx) -> cppcoro::task<>
+	auto startTask = [&](cppcoro::io_service& ioService) -> cppcoro::task<>
 	{
+		cppcoro::io_work_scope ioScope(ioService);
 		reachedPointA = true;
-		co_await ioCtx.schedule();
+		co_await ioService.schedule();
 		reachedPointB = true;
 	};
 
 	{
-		auto t = startTask(service.get_context());
+		auto t = startTask(service);
 
 		CHECK_FALSE(t.is_ready());
 		CHECK(reachedPointA);
@@ -58,11 +59,8 @@ TEST_CASE("schedule coroutine")
 		CHECK(reachedPointB);
 		CHECK(t.is_ready());
 
-		// Stop isn't requested until task goes out of scope.
-		CHECK_FALSE(service.is_stop_requested());
+		CHECK(service.is_stop_requested());
 	}
-
-	CHECK(service.is_stop_requested());
 }
 
 TEST_CASE("multiple I/O threads servicing events")
@@ -77,12 +75,13 @@ TEST_CASE("multiple I/O threads servicing events")
 
 	auto runOnIoThread = [&]() -> cppcoro::task<>
 	{
-		co_await ioService.get_context().schedule();
+		cppcoro::io_work_scope ioScope(ioService);
+		co_await ioService.schedule();
 	};
 
 	std::vector<cppcoro::task<>> tasks;
 	{
-		auto ioContext = ioService.get_context();
+		cppcoro::io_work_scope ioScope(ioService);
 		for (int i = 0; i < 1000; ++i)
 		{
 			tasks.emplace_back(runOnIoThread());

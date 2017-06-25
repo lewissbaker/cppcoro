@@ -158,11 +158,6 @@ void cppcoro::io_service::notify_work_finished() noexcept
 	}
 }
 
-cppcoro::io_context cppcoro::io_service::get_context() noexcept
-{
-	return io_context{ *this };
-}
-
 cppcoro::detail::win32::handle_t cppcoro::io_service::native_iocp_handle() noexcept
 {
 	return m_iocpHandle.handle();

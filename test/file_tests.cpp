@@ -80,9 +80,9 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 
 	auto filePath = temp_dir() / "foo";
 
-	auto write = [&](cppcoro::io_context io) -> cppcoro::lazy_task<>
+	auto write = [&](cppcoro::io_service& ioService) -> cppcoro::lazy_task<>
 	{
-		auto f = cppcoro::write_only_file::open(io, filePath);
+		auto f = cppcoro::write_only_file::open(ioService, filePath);
 
 		CHECK(f.size() == 0);
 
@@ -98,7 +98,7 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 		}
 	};
 
-	auto read = [&](cppcoro::io_context io) -> cppcoro::lazy_task<>
+	auto read = [&](cppcoro::io_service& io) -> cppcoro::lazy_task<>
 	{
 		auto f = cppcoro::read_only_file::open(io, filePath);
 
@@ -122,9 +122,9 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 	{
 		try
 		{
-			auto io = ioService.get_context();
-			co_await write(io);
-			co_await read(io);
+			cppcoro::io_work_scope scope{ ioService };
+			co_await write(ioService);
+			co_await read(ioService);
 		}
 		catch (...)
 		{
@@ -146,8 +146,8 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
 
 	auto run = [&]() -> cppcoro::task<>
 	{
-		auto ioContext = ioService.get_context();
-		auto f = cppcoro::read_write_file::open(ioContext, temp_dir() / "foo.txt");
+		cppcoro::io_work_scope ioScope{ ioService };
+		auto f = cppcoro::read_write_file::open(ioService, temp_dir() / "foo.txt");
 
 		char buffer1[100];
 		std::memset(buffer1, 0xAB, sizeof(buffer1));

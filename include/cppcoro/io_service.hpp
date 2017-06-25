@@ -18,8 +18,6 @@
 
 namespace cppcoro
 {
-	class io_context;
-
 	class io_service
 	{
 	public:
@@ -93,8 +91,6 @@ namespace cppcoro
 
 		void notify_work_finished() noexcept;
 
-		io_context get_context() noexcept;
-
 #if CPPCORO_OS_WINNT
 		detail::win32::handle_t native_iocp_handle() noexcept;
 #endif
@@ -149,17 +145,17 @@ namespace cppcoro
 		std::experimental::coroutine_handle<> m_awaiter;
 	};
 
-	class io_context
+	class io_work_scope
 	{
 	public:
 
-		io_context(io_service& service) noexcept
+		io_work_scope(io_service& service) noexcept
 			: m_service(&service)
 		{
 			service.notify_work_started();
 		}
 
-		io_context(const io_context& other) noexcept
+		io_work_scope(const io_work_scope& other) noexcept
 			: m_service(other.m_service)
 		{
 			if (m_service != nullptr)
@@ -168,13 +164,13 @@ namespace cppcoro
 			}
 		}
 
-		io_context(io_context&& other) noexcept
+		io_work_scope(io_work_scope&& other) noexcept
 			: m_service(other.m_service)
 		{
 			other.m_service = nullptr;
 		}
 
-		~io_context()
+		~io_work_scope()
 		{
 			if (m_service != nullptr)
 			{
@@ -182,29 +178,21 @@ namespace cppcoro
 			}
 		}
 
-		[[nodiscard]]
-		io_service::schedule_operation schedule() noexcept
-		{
-			return m_service->schedule();
-		}
-
-		void swap(io_context& other) noexcept
+		void swap(io_work_scope& other) noexcept
 		{
 			std::swap(m_service, other.m_service);
 		}
 
-		io_context& operator=(io_context other) noexcept
+		io_work_scope& operator=(io_work_scope other) noexcept
 		{
 			swap(other);
 			return *this;
 		}
 
-#if CPPCORO_OS_WINNT
-		detail::win32::handle_t native_iocp_handle() noexcept
+		io_service& service() noexcept
 		{
-			return m_service->native_iocp_handle();
+			return *m_service;
 		}
-#endif
 
 	private:
 
@@ -212,7 +200,7 @@ namespace cppcoro
 
 	};
 
-	inline void swap(io_context& a, io_context& b)
+	inline void swap(io_work_scope& a, io_work_scope& b)
 	{
 		a.swap(b);
 	}

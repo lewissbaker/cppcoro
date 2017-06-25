@@ -13,8 +13,6 @@
 
 namespace cppcoro
 {
-	class io_context;
-
 	class read_only_file : public readable_file
 	{
 	public:
@@ -44,7 +42,7 @@ namespace cppcoro
 		/// If the file could not be opened for read.
 		[[nodiscard]]
 		static read_only_file open(
-			io_context& ioContext,
+			io_service& ioService,
 			const std::experimental::filesystem::path& path,
 			file_share_mode shareMode = file_share_mode::read,
 			file_buffering_mode bufferingMode = file_buffering_mode::default_);

@@ -14,8 +14,6 @@
 
 namespace cppcoro
 {
-	class io_context;
-
 	class write_only_file : public writable_file
 	{
 	public:
@@ -49,7 +47,7 @@ namespace cppcoro
 		/// If the file could not be opened for write.
 		[[nodiscard]]
 		static write_only_file open(
-			io_context& ioContext,
+			io_service& ioService,
 			const std::experimental::filesystem::path& path,
 			file_open_mode openMode = file_open_mode::create_or_open,
 			file_share_mode shareMode = file_share_mode::none,
