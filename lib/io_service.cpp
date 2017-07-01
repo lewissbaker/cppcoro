@@ -25,6 +25,7 @@ cppcoro::io_service::io_service(std::uint32_t concurrencyHint)
 #if CPPCORO_OS_WINNT
 	, m_iocpHandle()
 #endif
+	, m_scheduleOperations(nullptr)
 {
 	m_iocpHandle = detail::win32::safe_handle(
 		::CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, concurrencyHint));
@@ -42,6 +43,7 @@ cppcoro::io_service::io_service(std::uint32_t concurrencyHint)
 
 cppcoro::io_service::~io_service()
 {
+	assert(m_scheduleOperations.load(std::memory_order_relaxed) == nullptr);
 	assert(m_threadState.load(std::memory_order_relaxed) < active_thread_count_increment);
 }
 
@@ -163,8 +165,9 @@ cppcoro::detail::win32::handle_t cppcoro::io_service::native_iocp_handle() noexc
 	return m_iocpHandle.handle();
 }
 
-void cppcoro::io_service::schedule_impl(schedule_operation* operation)
+void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 {
+#if CPPCORO_OS_WINNT
 	const BOOL ok = ::PostQueuedCompletionStatus(
 		m_iocpHandle.handle(),
 		0,
@@ -172,17 +175,64 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation)
 		nullptr);
 	if (!ok)
 	{
-		// TODO: Implement some form of overflow linked-list in the io_service
-		// to handle cases where the IOCP queue is full rather than throwing here.
-
-		const DWORD errorCode = ::GetLastError();
-		throw std::system_error
+		// Failed to post to the I/O completion port.
+		//
+		// This is most-likely because the queue is currently full.
+		//
+		// We'll queue up the operation to a linked-list using a lock-free
+		// push and defer the dispatch to the completion port until some I/O
+		// thread next enters its event loop.
+		auto* head = m_scheduleOperations.load(std::memory_order_acquire);
+		do
 		{
-			static_cast<int>(errorCode),
-			std::system_category(),
-			"schedule_operation failed: PostQueuedCompletionStatus"
-		};
+			operation->m_next = head;
+		} while (!m_scheduleOperations.compare_exchange_weak(
+			head,
+			operation,
+			std::memory_order_release,
+			std::memory_order_acquire));
 	}
+#endif
+}
+
+void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
+{
+#if CPPCORO_OS_WINNT
+	auto* operation = m_scheduleOperations.exchange(nullptr, std::memory_order_acquire);
+	while (operation != nullptr)
+	{
+		auto* next = operation->m_next;
+		BOOL ok = ::PostQueuedCompletionStatus(
+			m_iocpHandle.handle(),
+			0,
+			reinterpret_cast<ULONG_PTR>(operation->m_awaiter.address()),
+			nullptr);
+		if (!ok)
+		{
+			// Still unable to queue these operations.
+			// Put them back on the list of overflow operations.
+			auto* tail = operation;
+			while (tail->m_next != nullptr)
+			{
+				tail = tail->m_next;
+			}
+
+			schedule_operation* head = nullptr;
+			while (!m_scheduleOperations.compare_exchange_weak(
+				head,
+				operation,
+				std::memory_order_release,
+				std::memory_order_relaxed))
+			{
+				tail->m_next = head;
+			}
+
+			return;
+		}
+
+		operation = next;
+	}
+#endif
 }
 
 bool cppcoro::io_service::try_enter_event_loop() noexcept
@@ -219,6 +269,10 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 
 	while (true)
 	{
+		// Check for any schedule_operation objects that were unable to be
+		// queued to the I/O completion port and try to requeue them now.
+		try_reschedule_overflow_operations();
+
 		DWORD numberOfBytesTransferred = 0;
 		ULONG_PTR completionKey = 0;
 		LPOVERLAPPED overlapped = nullptr;
@@ -295,7 +349,8 @@ void cppcoro::io_service::post_wake_up_event() noexcept
 #endif
 }
 
-void cppcoro::io_service::schedule_operation::await_suspend(std::experimental::coroutine_handle<> awaiter)
+void cppcoro::io_service::schedule_operation::await_suspend(
+	std::experimental::coroutine_handle<> awaiter) noexcept
 {
 	m_awaiter = awaiter;
 	m_service.schedule_impl(this);

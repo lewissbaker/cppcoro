@@ -99,7 +99,9 @@ namespace cppcoro
 
 		friend class schedule_operation;
 
-		void schedule_impl(schedule_operation* operation);
+		void schedule_impl(schedule_operation* operation) noexcept;
+
+		void try_reschedule_overflow_operations() noexcept;
 
 		bool try_enter_event_loop() noexcept;
 		void exit_event_loop() noexcept;
@@ -121,6 +123,11 @@ namespace cppcoro
 		detail::win32::safe_handle m_iocpHandle;
 #endif
 
+		// Head of a linked-list of schedule operations that are
+		// ready to run but that failed to be queued to the I/O
+		// completion port (eg. due to low memory).
+		std::atomic<schedule_operation*> m_scheduleOperations;
+
 	};
 
 	class io_service::schedule_operation
@@ -132,9 +139,7 @@ namespace cppcoro
 		{}
 
 		bool await_ready() const noexcept { return false; }
-
-		void await_suspend(std::experimental::coroutine_handle<> awaiter);
-
+		void await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
 		void await_resume() const noexcept {}
 
 	private:
@@ -143,6 +148,7 @@ namespace cppcoro
 
 		io_service& m_service;
 		std::experimental::coroutine_handle<> m_awaiter;
+		schedule_operation* m_next;
 	};
 
 	class io_work_scope
