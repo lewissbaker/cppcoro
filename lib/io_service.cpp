@@ -14,6 +14,28 @@
 # include <Windows.h>
 #endif
 
+namespace
+{
+#if CPPCORO_OS_WINNT
+	cppcoro::detail::win32::safe_handle create_io_completion_port(std::uint32_t concurrencyHint)
+	{
+		HANDLE handle = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, concurrencyHint);
+		if (handle == NULL)
+		{
+			DWORD errorCode = ::GetLastError();
+			throw std::system_error
+			{
+				static_cast<int>(errorCode),
+				std::system_category(),
+				"Error creating io_service: CreateIoCompletionPort"
+			};
+		}
+
+		return cppcoro::detail::win32::safe_handle{ handle };
+	}
+#endif
+}
+
 cppcoro::io_service::io_service()
 	: io_service(0)
 {
@@ -23,22 +45,10 @@ cppcoro::io_service::io_service(std::uint32_t concurrencyHint)
 	: m_threadState(0)
 	, m_workCount(0)
 #if CPPCORO_OS_WINNT
-	, m_iocpHandle()
+	, m_iocpHandle(create_io_completion_port(concurrencyHint))
 #endif
 	, m_scheduleOperations(nullptr)
 {
-	m_iocpHandle = detail::win32::safe_handle(
-		::CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, concurrencyHint));
-	if (m_iocpHandle.handle() == NULL)
-	{
-		detail::win32::dword_t errorCode = ::GetLastError();
-		throw std::system_error
-		{
-			static_cast<int>(errorCode),
-			std::system_category(),
-			"Error creating io_service: CreateIoCompletionPort"
-		};
-	}
 }
 
 cppcoro::io_service::~io_service()
