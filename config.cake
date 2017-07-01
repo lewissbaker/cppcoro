@@ -61,22 +61,18 @@ if project.enabled:
 
 if cake.system.isWindows() or cake.system.isCygwin():
   # Uncomment the next line to use an experimental MSVC compiler version
-  # downloaded from the http://vcppdogfooding.azurewebsites.net/ NuGet repository.
+  # downloaded from the https://vcppdogfooding.azurewebsites.net/ NuGet repository.
   # Unzip the .nuget file to a folder and specify the path here.
-  nugetPath = None #r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
+  nugetPath = None #r'C:\Path\To\VisualCppTools.Community.VS2017Layout.14.11.25415-Pre'
 
   for arch in ("x64", "x86"):
     try:
-      if nugetPath:
-        from cake.library.compilers.msvc import getVisualStudio2015Compiler
-        compiler = getVisualStudio2015Compiler(
-          configuration,
-          targetArchitecture=arch,
-          vcInstallDir=cake.path.join(extractedNugetPath, 'Lib', 'native'),
-          )
-      else:
-        from cake.library.compilers.msvc import getVisualStudio2017Compiler
-        compiler = getVisualStudio2017Compiler(configuration, targetArchitecture=arch)
+      from cake.library.compilers.msvc import getVisualStudio2017Compiler
+      compiler = getVisualStudio2017Compiler(
+        configuration,
+        targetArchitecture=arch,
+        vcInstallDir=cake.path.join(nugetPath, 'lib', 'native') if nugetPath else None,
+        )
 
       msvcVariant = baseVariant.clone(
         platform="windows",
