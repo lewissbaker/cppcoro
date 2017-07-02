@@ -6,11 +6,15 @@
 #define CPPCORO_IO_SERVICE_HPP_INCLUDED
 
 #include <cppcoro/config.hpp>
+#include <cppcoro/cancellation_token.hpp>
+#include <cppcoro/cancellation_registration.hpp>
 
 #if CPPCORO_OS_WINNT
 # include <cppcoro/detail/win32.hpp>
 #endif
 
+#include <optional>
+#include <chrono>
 #include <cstdint>
 #include <atomic>
 #include <utility>
@@ -23,6 +27,7 @@ namespace cppcoro
 	public:
 
 		class schedule_operation;
+		class timed_schedule_operation;
 
 		/// Initialises the io_service.
 		///
@@ -49,6 +54,28 @@ namespace cppcoro
 		/// associated with this io_service.
 		[[nodiscard]]
 		schedule_operation schedule() noexcept;
+
+		/// Returns an operation that when awaited will suspend the
+		/// awaiting coroutine for the specified delay. Once the delay
+		/// has elapsed, the coroutine will resume execution on an
+		/// I/O thread associated with this io_service.
+		///
+		/// \param delay
+		/// The amount of time to delay scheduling resumption of the coroutine
+		/// on an I/O thread. There is no guarantee that the coroutine will
+		/// be resumed exactly after this delay.
+		///
+		/// \param cancellationToken [optional]
+		/// A cancellation token that can be used to communicate a request to
+		/// cancel the delayed schedule operation and schedule it for resumption
+		/// immediately.
+		/// The co_await operation will throw cppcoro::operation_cancelled if
+		/// cancellation was requested before the coroutine could be resumed.
+		template<typename REP, typename PERIOD>
+		[[nodiscard]]
+		timed_schedule_operation schedule_after(
+			const std::chrono::duration<REP, PERIOD>& delay,
+			cancellation_token cancellationToken = {}) noexcept;
 
 		/// Process events until the io_service is stopped.
 		///
@@ -108,7 +135,11 @@ namespace cppcoro
 
 	private:
 
+		class timer_thread_state;
+		class timer_queue;
+
 		friend class schedule_operation;
+		friend class timed_schedule_operation;
 
 		void schedule_impl(schedule_operation* operation) noexcept;
 
@@ -120,6 +151,8 @@ namespace cppcoro
 		bool try_process_one_event(bool waitForEvent);
 
 		void post_wake_up_event() noexcept;
+
+		timer_thread_state* ensure_timer_thread_started();
 
 		static constexpr std::uint32_t stop_requested_flag = 1;
 		static constexpr std::uint32_t active_thread_count_increment = 2;
@@ -139,6 +172,8 @@ namespace cppcoro
 		// completion port (eg. due to low memory).
 		std::atomic<schedule_operation*> m_scheduleOperations;
 
+		std::atomic<timer_thread_state*> m_timerState;
+
 	};
 
 	class io_service::schedule_operation
@@ -156,17 +191,57 @@ namespace cppcoro
 	private:
 
 		friend class io_service;
+		friend class io_service::timed_schedule_operation;
 
 		io_service& m_service;
 		std::experimental::coroutine_handle<> m_awaiter;
 		schedule_operation* m_next;
+
+	};
+
+	class io_service::timed_schedule_operation
+	{
+	public:
+
+		timed_schedule_operation(
+			io_service& service,
+			std::chrono::high_resolution_clock::time_point resumeTime,
+			cppcoro::cancellation_token cancellationToken) noexcept;
+
+		timed_schedule_operation(timed_schedule_operation&& other) noexcept;
+
+		~timed_schedule_operation();
+
+		timed_schedule_operation& operator=(timed_schedule_operation&& other) = delete;
+		timed_schedule_operation(const timed_schedule_operation& other) = delete;
+		timed_schedule_operation& operator=(const timed_schedule_operation& other) = delete;
+
+		bool await_ready() const noexcept;
+		void await_suspend(std::experimental::coroutine_handle<> awaiter);
+		void await_resume();
+
+	private:
+
+		friend class io_service::timer_queue;
+		friend class io_service::timer_thread_state;
+
+		io_service::schedule_operation m_scheduleOperation;
+		std::chrono::high_resolution_clock::time_point m_resumeTime;
+
+		cppcoro::cancellation_token m_cancellationToken;
+		std::optional<cppcoro::cancellation_registration> m_cancellationRegistration;
+
+		timed_schedule_operation* m_next;
+
+		std::atomic<std::uint32_t> m_refCount;
+
 	};
 
 	class io_work_scope
 	{
 	public:
 
-		io_work_scope(io_service& service) noexcept
+		explicit io_work_scope(io_service& service) noexcept
 			: m_service(&service)
 		{
 			service.notify_work_started();
@@ -221,6 +296,19 @@ namespace cppcoro
 	{
 		a.swap(b);
 	}
+}
+
+template<typename REP, typename RATIO>
+cppcoro::io_service::timed_schedule_operation
+cppcoro::io_service::schedule_after(
+	const std::chrono::duration<REP, RATIO>& duration,
+	cppcoro::cancellation_token cancellationToken) noexcept
+{
+	return timed_schedule_operation{
+		*this,
+		std::chrono::high_resolution_clock::now() + duration,
+		std::move(cancellationToken)
+	};
 }
 
 #endif

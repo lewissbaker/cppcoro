@@ -6,6 +6,8 @@
 #include <cppcoro/io_service.hpp>
 #include <cppcoro/task.hpp>
 #include <cppcoro/on_scope_exit.hpp>
+#include <cppcoro/operation_cancelled.hpp>
+#include <cppcoro/cancellation_source.hpp>
 
 #include <thread>
 #include <vector>
@@ -98,6 +100,135 @@ TEST_CASE("multiple I/O threads servicing events")
 	{
 		CHECK(task.is_ready());
 	}
+}
+
+TEST_CASE("Multiple concurrent timers")
+{
+	cppcoro::io_service ioService;
+
+	auto start = [&](std::chrono::milliseconds duration)
+		-> cppcoro::task<std::chrono::high_resolution_clock::duration>
+	{
+		cppcoro::io_work_scope scope(ioService);
+
+		auto start = std::chrono::high_resolution_clock::now();
+
+		co_await ioService.schedule_after(duration);
+
+		auto end = std::chrono::high_resolution_clock::now();
+
+		co_return end - start;
+	};
+
+	using namespace std::literals::chrono_literals;
+	auto t1 = start(100ms);
+	auto t2 = start(120ms);
+	auto t3 = start(50ms);
+
+	ioService.process_events();
+
+	REQUIRE(t1.is_ready());
+	REQUIRE(t2.is_ready());
+	REQUIRE(t3.is_ready());
+
+	auto test = [&]() -> cppcoro::task<>
+	{
+		using namespace std::chrono;
+		auto time1 = duration_cast<microseconds>(co_await t1);
+		auto time2 = duration_cast<microseconds>(co_await t2);
+		auto time3 = duration_cast<microseconds>(co_await t3);
+
+		MESSAGE("Waiting 100ms took " << time1.count() << "us");
+		MESSAGE("Waiting 120ms took " << time2.count() << "us");
+		MESSAGE("Waiting 50ms took " << time3.count() << "us");
+
+		CHECK(time1 >= 100ms);
+		CHECK(time2 >= 120ms);
+		CHECK(time3 >= 50ms);
+	};
+
+	test();
+}
+
+TEST_CASE("Timer cancellation")
+{
+	using namespace std::literals::chrono_literals;
+
+	cppcoro::io_service ioService;
+
+	auto longWait = [&](cppcoro::cancellation_token ct) -> cppcoro::task<>
+	{
+		co_await ioService.schedule_after(20'000ms, ct);
+	};
+
+	auto test = [&]() -> cppcoro::task<>
+	{
+		cppcoro::io_work_scope scope(ioService);
+
+		cppcoro::cancellation_source source;
+
+		auto t = longWait(source.token());
+
+		co_await ioService.schedule_after(10ms);
+
+		source.request_cancellation();
+
+		CHECK_THROWS_AS(co_await t, cppcoro::operation_cancelled);
+	};
+
+	auto t = test();
+
+	ioService.process_events();
+
+	CHECK(t.is_ready());
+}
+
+TEST_CASE("Many concurrent timers")
+{
+	cppcoro::io_service ioService;
+
+	std::thread workerThread{ [&] { ioService.process_events(); } };
+	auto joinOnExit = cppcoro::on_scope_exit([&] { workerThread.join(); });
+
+	auto startTimer = [&]() -> cppcoro::task<>
+	{
+		using namespace std::literals::chrono_literals;
+		co_await ioService.schedule_after(50ms);
+	};
+
+	constexpr std::uint32_t taskCount = 10'000;
+
+	auto runManyTimers = [&]() -> cppcoro::task<>
+	{
+		cppcoro::io_work_scope scope(ioService);
+
+		std::vector<cppcoro::task<>> tasks;
+
+		tasks.reserve(taskCount);
+
+		for (std::uint32_t i = 0; i < taskCount; ++i)
+		{
+			tasks.emplace_back(startTimer());
+		}
+
+		for (auto& t : tasks)
+		{
+			co_await t;
+		}
+	};
+
+	auto start = std::chrono::high_resolution_clock::now();
+
+	auto t = runManyTimers();
+
+	joinOnExit.call_now();
+
+	auto end = std::chrono::high_resolution_clock::now();
+
+	MESSAGE(
+		"Waiting for " << taskCount << " x 50ms timers took "
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+		<< "ms");
 }
 
 TEST_SUITE_END();
