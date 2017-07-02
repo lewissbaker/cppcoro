@@ -24,8 +24,19 @@ namespace cppcoro
 
 		class schedule_operation;
 
+		/// Initialises the io_service.
+		///
+		/// Does not set a concurrency hint. All threads that enter the
+		/// event loop will actively process events.
 		io_service();
 
+		/// Initialise the io_service with a concurrency hint.
+		///
+		/// \param concurrencyHint
+		/// Specifies the target maximum number of I/O threads to be
+		/// actively processing events.
+		/// Note that the number of active threads may temporarily go
+		/// above this number.
 		io_service(std::uint32_t concurrencyHint);
 
 		~io_service();
