@@ -742,7 +742,7 @@ void cppcoro::io_service::timer_thread_state::run() noexcept
 			}
 
 			// Handle newly queued timers
-			auto* newTimers = m_newlyQueuedTimers.exchange(nullptr, std::memory_order_seq_cst);
+			auto* newTimers = m_newlyQueuedTimers.exchange(nullptr, std::memory_order_acquire);
 			while (newTimers != nullptr)
 			{
 				auto* timer = newTimers;
@@ -843,7 +843,8 @@ void cppcoro::io_service::timer_thread_state::run() noexcept
 
 			// Use 'release' memory order to ensure that any prior writes to
 			// m_next "happen before" any potential uses of that same memory
-			// back on the thread that is executing timed_schedule_operation::await_suspend().
+			// back on the thread that is executing timed_schedule_operation::await_suspend()
+			// which has the synchronising 'acquire' semantics.
 			if (timer->m_refCount.fetch_sub(1, std::memory_order_release) == 1)
 			{
 				timer->m_scheduleOperation.m_service.schedule_impl(
