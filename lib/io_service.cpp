@@ -736,7 +736,7 @@ void cppcoro::io_service::timer_thread_state::run() noexcept
 			// the wait operation for some reason.
 
 			// Handle cancelled timers
-			if (m_timerCancellationRequested.load(std::memory_order_seq_cst))
+			if (m_timerCancellationRequested.exchange(false, std::memory_order_acquire))
 			{
 				timerQueue.remove_cancelled_timers(timersReadyToResume);
 			}

@@ -150,7 +150,8 @@ TEST_CASE("Multiple concurrent timers")
 	test();
 }
 
-TEST_CASE("Timer cancellation")
+TEST_CASE("Timer cancellation"
+	* doctest::timeout{ 5.0 })
 {
 	using namespace std::literals::chrono_literals;
 
@@ -161,26 +162,35 @@ TEST_CASE("Timer cancellation")
 		co_await ioService.schedule_after(20'000ms, ct);
 	};
 
+
 	auto test = [&]() -> cppcoro::task<>
 	{
 		cppcoro::io_work_scope scope(ioService);
 
-		cppcoro::cancellation_source source;
 
-		auto t = longWait(source.token());
+		{
+			cppcoro::cancellation_source source;
+			auto t = longWait(source.token());
+			co_await ioService.schedule_after(1ms);
+			source.request_cancellation();
+			CHECK_THROWS_AS(co_await t, cppcoro::operation_cancelled);
+		}
 
-		co_await ioService.schedule_after(10ms);
-
-		source.request_cancellation();
-
-		CHECK_THROWS_AS(co_await t, cppcoro::operation_cancelled);
+		// Check that a second timer cancellation is also promptly responded-to.
+		{
+			cppcoro::cancellation_source source;
+			auto t = longWait(source.token());
+			co_await ioService.schedule_after(1ms);
+			source.request_cancellation();
+			CHECK_THROWS_AS(co_await t, cppcoro::operation_cancelled);
+		}
 	};
 
 	auto t = test();
 
 	ioService.process_events();
 
-	CHECK(t.is_ready());
+	REQUIRE(t.is_ready());
 }
 
 TEST_CASE("Many concurrent timers")
