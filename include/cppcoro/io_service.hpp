@@ -46,7 +46,9 @@ namespace cppcoro
 
 		~io_service();
 
+		io_service(io_service&& other) = delete;
 		io_service(const io_service& other) = delete;
+		io_service& operator=(io_service&& other) = delete;
 		io_service& operator=(const io_service& other) = delete;
 
 		/// Returns an operation that when awaited suspends the awaiting
