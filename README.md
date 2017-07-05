@@ -21,6 +21,11 @@ These include:
   * `cancellation_token`
   * `cancellation_source`
   * `cancellation_registration`
+* Schedulers and I/O
+  * `io_service`
+  * `io_work_scope`
+  * `file`, `readable_file`, `writable_file`
+  * `read_only_file`, `write_only_file`, `read_write_file`
 
 This library is an experimental library that is exploring the space of high-performance,
 scalable asynchronous programming abstractions that can be built on top of the C++ coroutines
@@ -425,61 +430,61 @@ API Summary:
 ```c++
 namespace cppcoro
 {
-	template<typename T>
-	class generator
-	{
-	public:
+    template<typename T>
+    class generator
+    {
+    public:
 
-		using promise_type = <unspecified>;
+        using promise_type = <unspecified>;
 
-		class iterator
-		{
-		public:
-			using iterator_category = std::input_iterator_tag;
-			using value_type = std::remove_reference_t<T>;
-			using reference = value_type&;
-			using pointer = value_type*;
-			using difference_type = std::size_t;
+        class iterator
+        {
+        public:
+            using iterator_category = std::input_iterator_tag;
+            using value_type = std::remove_reference_t<T>;
+            using reference = value_type&;
+            using pointer = value_type*;
+            using difference_type = std::size_t;
 
-			iterator(const iterator& other) noexcept;
-			iterator& operator=(const iterator& other) noexcept;
+            iterator(const iterator& other) noexcept;
+            iterator& operator=(const iterator& other) noexcept;
 
-			// If the generator coroutine throws an unhandled exception before producing
-			// the next element then the exception will propagate out of this call.
-			iterator& operator++();
+            // If the generator coroutine throws an unhandled exception before producing
+            // the next element then the exception will propagate out of this call.
+            iterator& operator++();
 
-			reference operator*() const noexcept;
-			pointer operator->() const noexcept;
+            reference operator*() const noexcept;
+            pointer operator->() const noexcept;
 
-			bool operator==(const iterator& other) const noexcept;
-			bool operator!=(const iterator& other) const noexcept;
-		};
+            bool operator==(const iterator& other) const noexcept;
+            bool operator!=(const iterator& other) const noexcept;
+        };
 
-		// Constructs to the empty sequence.
-		generator() noexcept;
+        // Constructs to the empty sequence.
+        generator() noexcept;
 
-		generator(generator&& other) noexcept;
-		generator& operator=(generator&& other) noexcept;
-		
-		generator(const generator& other) = delete;
-		generator& operator=(const generator&) = delete;
+        generator(generator&& other) noexcept;
+        generator& operator=(generator&& other) noexcept;
+        
+        generator(const generator& other) = delete;
+        generator& operator=(const generator&) = delete;
 
-		~generator();
+        ~generator();
 
-		// Starts executing the generator coroutine which runs until either a value is yielded
-		// or the coroutine runs to completion or an unhandled exception propagates out of the
-		// the coroutine.
-		iterator begin();
+        // Starts executing the generator coroutine which runs until either a value is yielded
+        // or the coroutine runs to completion or an unhandled exception propagates out of the
+        // the coroutine.
+        iterator begin();
 
-		iterator end() noexcept;
+        iterator end() noexcept;
 
-		// Swap the contents of two generators.
-		void swap(generator& other) noexcept;
+        // Swap the contents of two generators.
+        void swap(generator& other) noexcept;
 
-	};
+    };
 
-	template<typename T>
-	void swap(generator<T>& a, generator<T>&b) noexcept;
+    template<typename T>
+    void swap(generator<T>& a, generator<T>&b) noexcept;
 }
 ```
 
@@ -876,6 +881,419 @@ cppcoro::task<> cancellable_timer_wait(cppcoro::cancellation_token token)
 }
 ```
 
+## `io_service`
+
+The `io_service` class provides an abstraction for processing I/O completion events
+from asynchronous I/O operations.
+
+When an asynchronous I/O operation completes, the coroutine that was awaiting
+that operation will be resumed on an I/O thread inside a call to one of the
+event-processing methods: `process_events()`, `process_pending_events()`,
+`process_one_event()` or `process_one_pending_event()`.
+
+The `io_service` class does not manage any I/O threads.
+You must ensure that some thread calls one of the event-processing methods for coroutines awaiting I/O
+completion events to be dispatched. This can either be a dedicated thread that calls `process_events()`
+or mixed in with some other event loop (e.g. a UI event loop) by periodically polling for new events
+via a call to `process_pending_events()` or `process_one_pending_event()`.
+
+This allows integration of the `io_service` event-loop with other event loops, such as a user-interface event loop.
+
+You can multiplex processing of events across multiple threads by having multiple threads call
+`process_events()`. You can specify a hint as to the maximum number of threads to have actively
+processing events via an optional `io_service` constructor parameter.
+
+On Windows, the implementation makes use of the Windows I/O Completion Port facility to dispatch
+events to I/O threads in a scalable manner.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class io_service
+  {
+  public:
+
+    class schedule_operation;
+    class timed_schedule_operation;
+
+    io_service();
+    io_service(std::uint32_t concurrencyHint);
+
+    io_service(io_service&&) = delete;
+    io_service(const io_service&) = delete;
+    io_service& operator=(io_service&&) = delete;
+    io_service& operator=(const io_service&) = delete;
+
+    ~io_service();
+
+    // Scheduler methods
+
+    [[nodiscard]]
+    schedule_operation schedule() noexcept;
+
+    template<typename REP, typename RATIO>
+    [[nodiscard]]
+    timed_schedule_operation schedule_after(
+      std::chrono::duration<REP, RATIO> delay,
+      cppcoro::cancellation_token cancellationToken = {}) noexcept;
+
+    // Event-loop methods
+    //
+    // I/O threads must call these to process I/O events and execute
+    // scheduled coroutines.
+
+    std::uint64_t process_events();
+    std::uint64_t process_pending_events();
+    std::uint64_t process_one_event();
+    std::uint64_t process_one_pending_event();
+
+    // Request that all threads processing events exit their event loops.
+    void stop() noexcept;
+
+    // Query if some thread has called stop()
+    bool is_stop_requested() const noexcept;
+
+    // Reset the event-loop after a call to stop() so that threads can
+    // start processing events again.
+    void reset();
+
+    // Reference-counting methods for tracking outstanding references
+    // to the io_service.
+    //
+    // The io_service::stop() method will be called when the last work
+    // reference is decremented.
+    //
+    // Use the io_work_scope RAII class to manage calling these methods on
+    // entry-to and exit-from a scope.
+    void notify_work_started() noexcept;
+    void notify_work_finished() noexcept;
+
+  };
+
+  class io_service::schedule_operation
+  {
+  public:
+    schedule_operation(const schedule_operation&) noexcept;
+    schedule_operation& operator=(const schedule_operation&) noexcept;
+
+    bool await_ready() const noexcept;
+    void await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+    void await_resume() noexcept;
+  };
+
+  class io_service::timed_schedule_operation
+  {
+  public:
+    timed_schedule_operation(timed_schedule_operation&&) noexcept;
+
+    timed_schedule_operation(const timed_schedule_operation&) = delete;
+    timed_schedule_operation& operator=(const timed_schedule_operation&) = delete;
+    timed_schedule_operation& operator=(timed_schedule_operation&&) = delete;
+
+    bool await_ready() const noexcept;
+    void await_suspend(std::experimental::coroutine_handle<> awaiter);
+    void await_resume();
+  };
+
+  class io_work_scope
+  {
+  public:
+
+    io_work_scope(io_service& ioService) noexcept;
+
+    io_work_scope(const io_work_scope& other) noexcept;
+    io_work_scope(io_work_scope&& other) noexcept;
+
+    ~io_work_scope();
+
+    io_work_scope& operator=(const io_work_scope& other) noexcept;
+    io_work_scope& operator=(io_work_scope&& other) noexcept;
+
+    io_service& service() const noexcept;
+  };
+
+}
+```
+
+Example:
+```c++
+#include <cppcoro/task.hpp>
+#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/io_service.hpp>
+#include <cppcoro/read_only_file.hpp>
+
+#include <experimental/filesystem>
+#include <memory>
+#include <algorithm>
+#include <iostream>
+
+namespace fs = std::experimental::filesystem;
+
+cppcoro::lazy_task<std::uint64_t> count_lines(cppcoro::io_service& ioService, fs::path path)
+{
+  auto file = cppcoro::read_only_file::open(ioService, path);
+
+  constexpr size_t bufferSize = 4096;
+  auto buffer = std::make_unique<std::uint8_t[]>(bufferSize);
+
+  std::uint64_t newlineCount = 0;
+
+  for (std::uint64_t offset = 0, fileSize = file.size(); offset < fileSize;)
+  {
+    const auto bytesToRead = static_cast<size_t>(
+      std::min<std::uint64_t>(bufferSize, fileSize - offset));
+
+    const auto bytesRead = co_await file.read(offset, buffer.get(), bytesToRead);
+
+    newlineCount += std::count(buffer.get(), buffer.get() + bytesRead, '\n');
+
+    offset += bytesRead;
+  }
+
+  co_return newlineCount;
+}
+
+cppcoro::task<> run(cppcoro::io_service& ioService)
+{
+  cppcoro::io_work_scope ioScope(ioService);
+
+  auto lineCount = co_await count_lines(ioService, fs::path{"foo.txt"});
+
+  std::cout << "foo.txt has " << lineCount << " lines." << std::endl;;
+}
+
+int main()
+{
+  cppcoro::io_service ioService;
+
+  auto t = run(ioService);
+
+  // Run until all io_work_scope objects have destructed.
+  ioService.process_events();
+
+  return 0;
+}
+```
+
+### `io_service` as a scheduler
+
+An `io_sevice` class implements the interfaces for the `Scheduler` and `DelayedScheduler` concepts.
+
+This allows a coroutine to suspend execution on the current thread and schedule itself for resumption
+on an I/O thread associated with a particular `io_service` object.
+
+Example:
+```c++
+cppcoro::task<> do_something(cppcoro::io_service& ioService)
+{
+  // Coroutine starts execution on the thread of the caller.
+
+  // A coroutine can transfer execution to an I/O thread by awaiting the
+  // result of io_service::schedule().
+  co_await ioService.schedule();
+
+  // At this point, the coroutine is now executing on an I/O thread.
+
+  // A coroutine can also perform a delayed-schedule that will suspend
+  // the coroutine for a specified duration of time before scheduling
+  // it for resumption on an I/O thread
+  co_await ioService.schedule_after(100ms);
+
+  // At this point, the coroutine is executing on a potentially different I/O thread.
+}
+```
+
+## `file`, `readable_file`, `writable_file`
+
+These types are abstract base-classes for performing concrete file I/O.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class file_read_operation;
+  class file_write_operation;
+
+  class file
+  {
+  public:
+
+    virtual ~file();
+
+    std::uint64_t size() const;
+
+  protected:
+
+    file(file&& other) noexcept;
+
+  };
+
+  class readable_file : public virtual file
+  {
+  public:
+
+    [[nodiscard]]
+    file_read_operation read(
+      std::uint64_t offset,
+      void* buffer,
+      std::size_t byteCount,
+      cancellation_token ct = {}) const noexcept;
+
+  };
+
+  class writable_file : public virtual file
+  {
+  public:
+
+    void set_size(std::uint64_t fileSize);
+
+    [[nodiscard]]
+    file_write_operation write(
+      std::uint64_t offset,
+      const void* buffer,
+      std::size_t byteCount,
+      cancellation_token ct = {}) noexcept;
+
+  };
+
+  class file_read_operation
+  {
+  public:
+
+    file_read_operation(file_read_operation&& other) noexcept;
+
+    bool await_ready() const noexcept;
+    bool await_suspend(std::experimental::coroutine_handle<> awaiter);
+    std::size_t await_resume();
+
+  };
+
+  class file_write_operation
+  {
+  public:
+
+    file_write_operation(file_write_operation&& other) noexcept;
+
+    bool await_ready() const noexcept;
+    bool await_suspend(std::experimental::coroutine_handle<> awaiter);
+    std::size_t await_resume();
+
+  };
+}
+```
+
+## `read_only_file`, `write_only_file`, `read_write_file`
+
+These types represent concrete file I/O classes.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class read_only_file : public readable_file
+  {
+  public:
+
+    [[nodiscard]]
+    static read_only_file open(
+      io_service& ioService,
+      const std::experimental::filesystem::path& path,
+      file_share_mode shareMode = file_share_mode::read,
+      file_buffering_mode bufferingMode = file_buffering_mode::default_);
+
+  };
+
+  class write_only_file : public writable_file
+  {
+  public:
+
+    [[nodiscard]]
+    static write_only_file open(
+      io_service& ioService,
+      const std::experimental::filesystem::path& path,
+      file_open_mode openMode = file_open_mode::create_or_open,
+      file_share_mode shareMode = file_share_mode::none,
+      file_buffering_mode bufferingMode = file_buffering_mode::default_);
+
+  };
+
+  class read_write_file : public readable_file, public writable_file
+  {
+  public:
+
+    [[nodiscard]]
+    static read_write_file open(
+      io_service& ioService,
+      const std::experimental::filesystem::path& path,
+      file_open_mode openMode = file_open_mode::create_or_open,
+      file_share_mode shareMode = file_share_mode::none,
+      file_buffering_mode bufferingMode = file_buffering_mode::default_);
+
+  };
+}
+```
+
+All `open()` functions throw `std::system_error` on failure.
+
+# Concepts
+
+## `Scheduler` concept
+
+A `Scheduler` is a concept that allows scheduling execution of coroutines within some execution context.
+
+```c++
+concept Scheduler
+{
+  <awaitable-type> schedule();
+}
+```
+
+Given a type, `S`, that implements the `Scheduler` concept, and an instance, `s`, of type `S`:
+* The `s.schedule()` method returns an awaitable-type such that `co_await s.schedule()`
+  will unconditionally suspend the current coroutine and schedule it for resumption on the
+  execution context associated with the scheduler, `s`.
+* The result of the `co_await s.schedule()` expression has type `void`.
+
+```c++
+cppcoro::task<> f(Scheduler& scheduler)
+{
+  // Execution of the coroutine is initially on the caller's execution context.
+
+  // Suspends execution of the coroutine and schedules it for resumption on
+  // the scheduler's execution context.
+  co_await scheduler.schedule();
+
+  // At this point the coroutine is now executing on the scheduler's
+  // execution context.
+}
+```
+
+## `DelayedScheduler` concept
+
+A `DelayedScheduler` is a concept that allows a coroutine to schedule itself for execution on
+the scheduler's execution context after a specified duration of time has elapsed.
+
+```c++
+concept DelayedScheduler : Scheduler
+{
+  template<typename REP, typename RATIO>
+  <awaitable-type> schedule_after(std::chrono::duration<REP, RATIO> delay);
+
+  template<typename REP, typename RATIO>
+  <awaitable-type> schedule_after(
+    std::chrono::duration<REP, RATIO> delay,
+    cppcoro::cancellation_token cancellationToken);
+}
+```
+
+Given a type, `S`, that implements the `DelayedScheduler` and an instance, `s` of type `S`:
+* The `s.schedule_after(delay)` method returns an object that can be awaited
+  such that `co_await s.schedule_after(delay)` suspends the current coroutine
+  for a duration of `delay` before scheduling the coroutine for resumption on
+  the execution context associated with the scheduler, `s`.
+* The `co_await s.schedule_after(delay)` expression has type `void`.
+
 # Building
 
 This library makes use of the [Cake build system](https://github.com/lewissbaker/cake) (no, not the [C# one](http://cakebuild.net/)).
@@ -892,10 +1310,10 @@ Ensure Python 2.7 interpreter is in your PATH and available as 'python'.
 
 Ensure Visual Studio 2017 is installed (preferably the latest update).
 
-You can also use an experimental version of the Visual Studio compiler by downloading a NuGet package from http://vcppdogfooding.azurewebsites.net/ and unzipping the .nuget file to a directory.
+You can also use an experimental version of the Visual Studio compiler by downloading a NuGet package from https://vcppdogfooding.azurewebsites.net/ and unzipping the .nuget file to a directory.
 Just update the `config.cake` file to point at the unzipped location by modifying and uncommenting the following line:
 ```python
-nugetPath = None #r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
+nugetPath = None # r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
 ```
 
 Ensure that you have the Windows 10 SDK installed.
