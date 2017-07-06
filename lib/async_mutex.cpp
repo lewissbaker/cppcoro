@@ -14,7 +14,7 @@ cppcoro::async_mutex::async_mutex() noexcept
 
 cppcoro::async_mutex::~async_mutex()
 {
-	auto state = m_state.load(std::memory_order_relaxed);
+	[[maybe_unused]] auto state = m_state.load(std::memory_order_relaxed);
 	assert(state == not_locked || state == locked_no_waiters);
 	assert(m_waiters == nullptr);
 }

@@ -5,6 +5,8 @@
 
 #include "cancellation_state.hpp"
 
+#include "cppcoro/config.hpp"
+
 #include <cppcoro/cancellation_registration.hpp>
 
 #include <cassert>
@@ -213,6 +215,11 @@ cppcoro::detail::cancellation_registration_state::add_registration(
 		{
 			lastChunk = next;
 		}
+
+		// Work around false-warning raised by MSVC static analysis complaining that
+		// warning C28182: Dereferencing NULL pointer. 'lastChunk' contains the same NULL value as 'chunk' did.
+		// on statement initialising 'elementCount' below.
+		CPPCORO_ASSUME(lastChunk != nullptr);
 
 		if (lastChunk != originalLastChunk)
 		{

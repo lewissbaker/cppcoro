@@ -262,7 +262,7 @@ void cppcoro::file_read_operation::on_operation_completed(
 	detail::win32::io_state* ioState,
 	detail::win32::dword_t errorCode,
 	detail::win32::dword_t numberOfBytesTransferred,
-	detail::win32::ulongptr_t completionKey) noexcept
+	[[maybe_unused]] detail::win32::ulongptr_t completionKey) noexcept
 {
 	auto* operation = static_cast<file_read_operation*>(ioState);
 

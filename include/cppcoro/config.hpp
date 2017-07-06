@@ -30,6 +30,12 @@
 # define CPPCORO_COMPILER_GCC 0
 #endif
 
+#if CPPCORO_COMPILER_MSVC
+# define CPPCORO_ASSUME(X) __assume(X)
+#else
+# define CPPCORO_ASSUME(X)
+#endif
+
 /////////////////////////////////////////////////////////////////////////////
 // OS Detection
 

@@ -45,7 +45,7 @@ namespace cppcoro
 
 					bool await_ready() const noexcept { return false; }
 
-					void await_suspend(std::experimental::coroutine_handle<> coroutine)
+					void await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
 					{
 						m_awaiter.resume();
 					}

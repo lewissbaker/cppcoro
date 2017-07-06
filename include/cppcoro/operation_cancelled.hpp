@@ -9,7 +9,7 @@
 
 namespace cppcoro
 {
-	class operation_cancelled : std::exception
+	class operation_cancelled : public std::exception
 	{
 	public:
 

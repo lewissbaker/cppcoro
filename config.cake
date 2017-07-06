@@ -97,11 +97,14 @@ if cake.system.isWindows() or cake.system.isCygwin():
       compiler.outputMapFile = True
       compiler.outputFullPath = True
       compiler.messageStyle = compiler.MSVS_CLICKABLE
-      compiler.warningLevel = '3'
+      compiler.warningLevel = '4'
       compiler.warningsAsErrors = True
 
       # Enable experimental C++ coroutines via command-line flag.
       compiler.addCppFlag('/await')
+      compiler.addCppFlag('/analyze:WX-')
+      compiler.addCppFlag('/analyze:max_paths')
+      compiler.addCppFlag('512')
 
       # Enable C++17 features like std::optional<>
       compiler.addCppFlag('/std:c++latest')

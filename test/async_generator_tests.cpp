@@ -16,10 +16,8 @@ TEST_CASE("default-constructed async_generator is an empty sequence")
 		// Iterating over default-constructed async_generator just
 		// gives an empty sequence.
 		cppcoro::async_generator<int> g;
-		for co_await(int x : g)
-		{
-			CHECK(false);
-		}
+		auto it = co_await g.begin();
+		CHECK(it == g.end());
 	}();
 }
 

@@ -129,11 +129,12 @@ TEST_CASE("destroying generator before completion destructs objects on stack")
 		completed = true;
 	};
 
-	for (auto x : f())
 	{
-		CHECK(x == 1u);
+		auto g = f();
+		auto it = g.begin();
+		auto itEnd = g.end();
+		CHECK(*it == 1u);
 		CHECK(!destructed);
-		break;
 	}
 
 	CHECK(!completed);

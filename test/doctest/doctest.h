@@ -5284,7 +5284,7 @@ namespace doctest
 				DOCTEST_PRINTF_COLORED(buff, Color::None);
 				DOCTEST_SNPRINTF(buff, DOCTEST_COUNTOF(buff), " | ");
 				DOCTEST_PRINTF_COLORED(buff, Color::None);
-				DOCTEST_SNPRINTF(buff, DOCTEST_COUNTOF(buff), "%6d passed",
+				DOCTEST_SNPRINTF(buff, DOCTEST_COUNTOF(buff), "%6u passed",
 					p->numTestsPassingFilters - p->numFailed);
 				DOCTEST_PRINTF_COLORED(buff,
 					(p->numTestsPassingFilters == 0 || anythingFailed) ?
