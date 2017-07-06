@@ -35,6 +35,11 @@ cppcoro::async_mutex_lock_operation cppcoro::async_mutex::lock_async() noexcept
 	return async_mutex_lock_operation{ *this };
 }
 
+cppcoro::async_mutex_scoped_lock_operation cppcoro::async_mutex::scoped_lock_async() noexcept
+{
+	return async_mutex_scoped_lock_operation{ *this };
+}
+
 void cppcoro::async_mutex::unlock()
 {
 	assert(m_state.load(std::memory_order_relaxed) != not_locked);

@@ -14,7 +14,7 @@ namespace cppcoro
 {
 	class async_mutex_lock;
 	class async_mutex_lock_operation;
-	class async_mutex_lock_result;
+	class async_mutex_scoped_lock_operation;
 
 	/// \brief
 	/// A mutex that can be locked asynchronously using 'co_await'.
@@ -60,10 +60,24 @@ namespace cppcoro
 		/// \return
 		/// An operation object that must be 'co_await'ed to wait until the
 		/// lock is acquired. The result of the 'co_await m.lock_async()'
-		/// expression is a value that can be optionallly assigned to an
-		/// 'async_mutex_lock' variable which will take ownership of the
-		/// lock and call unlock() when it goes out of scope.
+		/// expression has type 'void'.
 		async_mutex_lock_operation lock_async() noexcept;
+
+		/// \brief
+		/// Acquire a lock on the mutex asynchronously, returning an object that
+		/// will call unlock() automatically when it goes out of scope.
+		///
+		/// If the lock could not be acquired synchronously then the awaiting
+		/// coroutine will be suspended and later resumed when the lock becomes
+		/// available. If suspended, the coroutine will be resumed inside the
+		/// call to unlock() from the previous lock owner.
+		///
+		/// \return
+		/// An operation object that must be 'co_await'ed to wait until the
+		/// lock is acquired. The result of the 'co_await m.scoped_lock_async()'
+		/// expression returns an 'async_mutex_lock' object that will call
+		/// this->mutex() when it destructs.
+		async_mutex_scoped_lock_operation scoped_lock_async() noexcept;
 
 		/// \brief
 		/// Unlock the mutex.
@@ -104,28 +118,6 @@ namespace cppcoro
 	};
 
 	/// \brief
-	/// A value returned from a lock operation which represents
-	/// a held lock.
-	///
-	/// It can be used to construct an async_mutex_lock object
-	/// to pass ownership of the lock to the lock object.
-	/// Otherwise, the caller must manually unlock the mutex.
-	class async_mutex_lock_result
-	{
-	private:
-
-		friend class async_mutex_lock;
-		friend class async_mutex_lock_operation;
-
-		explicit async_mutex_lock_result(async_mutex& mutex) noexcept
-			: m_mutex(mutex)
-		{}
-
-		async_mutex& m_mutex;
-
-	};
-
-	/// \brief
 	/// An object that holds onto a mutex lock for its lifetime and
 	/// ensures that the mutex is unlocked when it is destructed.
 	///
@@ -137,13 +129,15 @@ namespace cppcoro
 	{
 	public:
 
-		async_mutex_lock(async_mutex_lock_result result) noexcept
-			: m_mutex(result.m_mutex)
+		explicit async_mutex_lock(async_mutex& mutex, std::adopt_lock_t) noexcept
+			: m_mutex(&mutex)
 		{}
 
-		explicit async_mutex_lock(async_mutex& mutex, std::adopt_lock_t) noexcept
-			: m_mutex(mutex)
-		{}
+		async_mutex_lock(async_mutex_lock&& other) noexcept
+			: m_mutex(other.m_mutex)
+		{
+			other.m_mutex = nullptr;
+		}
 
 		async_mutex_lock(const async_mutex_lock& other) = delete;
 		async_mutex_lock& operator=(const async_mutex_lock& other) = delete;
@@ -151,12 +145,15 @@ namespace cppcoro
 		// Releases the lock.
 		~async_mutex_lock()
 		{
-			m_mutex.unlock();
+			if (m_mutex != nullptr)
+			{
+				m_mutex->unlock();
+			}
 		}
 
 	private:
 
-		async_mutex& m_mutex;
+		async_mutex* m_mutex;
 
 	};
 
@@ -170,15 +167,32 @@ namespace cppcoro
 
 		bool await_ready() const noexcept { return false; }
 		bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
-		auto await_resume() const noexcept { return async_mutex_lock_result{ m_mutex }; }
+		void await_resume() const noexcept {}
 
-	private:
+	protected:
 
 		friend class async_mutex;
 
 		async_mutex& m_mutex;
+
+	private:
+
 		async_mutex_lock_operation* m_next;
 		std::experimental::coroutine_handle<> m_awaiter;
+
+	};
+
+	class async_mutex_scoped_lock_operation : public async_mutex_lock_operation
+	{
+	public:
+
+		using async_mutex_lock_operation::async_mutex_lock_operation;
+
+		[[nodiscard]]
+		async_mutex_lock await_resume() const noexcept
+		{
+			return async_mutex_lock{ m_mutex, std::adopt_lock };
+		}
 
 	};
 }

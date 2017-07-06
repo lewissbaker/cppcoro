@@ -683,7 +683,9 @@ API Summary:
 // <cppcoro/async_mutex.hpp>
 namespace cppcoro
 {
+  class async_mutex_lock;
   class async_mutex_lock_operation;
+  class async_mutex_scoped_lock_operation;
 
   class async_mutex
   {
@@ -696,25 +698,34 @@ namespace cppcoro
 
     bool try_lock() noexcept;
     async_mutex_lock_operation lock_async() noexcept;
+    async_mutex_scoped_lock_operation scoped_lock_async() noexcept;
     void unlock();
   };
-
-  using async_mutex_lock_result = <implementation-defined>;
 
   class async_mutex_lock_operation
   {
   public:
     bool await_ready() const noexcept;
     bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
-    async_mutex_lock_result await_resume() const noexcept;
+    void await_resume() const noexcept;
+  };
+
+  class async_mutex_scoped_lock_operation
+  {
+  public:
+    bool await_ready() const noexcept;
+    bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+    [[nodiscard]] async_mutex_lock await_resume() const noexcept;
   };
 
   class async_mutex_lock
   {
   public:
     // Takes ownership of the lock.
-    async_mutex_lock(async_mutex_lock_result lockResult) noexcept;
     async_mutex_lock(async_mutex& mutex, std::adopt_lock_t) noexcept;
+
+    // Transfer ownership of the lock.
+    async_mutex_lock(async_mutex_lock&& other) noexcept;
 
     async_mutex_lock(const async_mutex_lock&) = delete;
     async_mutex_lock& operator=(const async_mutex_lock&) = delete;

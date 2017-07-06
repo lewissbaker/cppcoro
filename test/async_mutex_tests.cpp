@@ -35,7 +35,7 @@ TEST_CASE("multiple lockers")
 
 	auto f = [&](cppcoro::single_consumer_event& e) -> cppcoro::task<>
 	{
-		cppcoro::async_mutex_lock lock = co_await mutex.lock_async();
+		auto lock = co_await mutex.scoped_lock_async();
 		co_await e;
 		++value;
 	};
