@@ -6,11 +6,13 @@
 #define CPPCORO_TASK_HPP_INCLUDED
 
 #include <cppcoro/broken_promise.hpp>
+#include <cppcoro/fmap.hpp>
 
 #include <atomic>
 #include <exception>
 #include <utility>
 #include <type_traits>
+#include <functional>
 
 #include <experimental/coroutine>
 
@@ -413,6 +415,50 @@ namespace cppcoro
 	inline task<void> detail::task_promise<void>::get_return_object() noexcept
 	{
 		return task<void>{ std::experimental::coroutine_handle<task_promise<void>>::from_promise(*this) };
+	}
+
+	namespace detail
+	{
+		template<typename T, typename FUNC>
+		task<std::invoke_result_t<FUNC, T&&>> apply_fmap(task<T> t, FUNC func)
+		{
+			static_assert(
+				!std::is_reference_v<FUNC>,
+				"Passing by reference to task<T> coroutine is unsafe. "
+				"Use std::ref or std::cref to explicitly pass by reference.");
+
+			co_return std::invoke(std::move(func), co_await std::move(t));
+		}
+
+		template<typename FUNC>
+		task<std::invoke_result_t<FUNC>> apply_fmap(task<> t, FUNC func)
+		{
+			static_assert(
+				!std::is_reference_v<FUNC>,
+				"Passing by reference to task<T> coroutine is unsafe. "
+				"Use std::ref or std::cref to explicitly pass by reference.");
+
+			co_await t;
+			co_return std::invoke(std::move(func));
+		}
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(task<T>&& t, fmap_transform<FUNC>&& transform)
+	{
+		return detail::apply_fmap(std::move(t), std::forward<FUNC>(transform.func));
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(task<T>&& t, fmap_transform<FUNC>& transform)
+	{
+		return detail::apply_fmap(std::move(t), transform.func);
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(task<T>&& t, const fmap_transform<FUNC>& transform)
+	{
+		return detail::apply_fmap(std::move(t), transform.func);
 	}
 }
 

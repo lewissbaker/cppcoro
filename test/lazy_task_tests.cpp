@@ -9,7 +9,7 @@
 
 #include "counted.hpp"
 
-#include <cassert>
+#include <string>
 #include <type_traits>
 
 #include "doctest/doctest.h"
@@ -189,6 +189,164 @@ TEST_CASE("passing parameter by value to lazy_task coroutine calls move-construc
 	}
 
 	CHECK(counted::active_count() == 1);
+}
+
+TEST_CASE("lazy_task<void> fmap pipe operator")
+{
+	using cppcoro::fmap;
+
+	cppcoro::single_consumer_event event;
+
+	auto f = [&]() -> cppcoro::task<>
+	{
+		co_await event;
+		co_return;
+	};
+
+	auto t = f() | fmap([] { return 123; });
+
+	CHECK(!t.is_ready());
+
+	event.set();
+
+	REQUIRE(t.is_ready());
+
+	[&]() -> cppcoro::task<>
+	{
+		CHECK(co_await t == 123);
+	}();
+}
+
+TEST_CASE("lazy_task<int> fmap pipe operator")
+{
+	using cppcoro::task;
+	using cppcoro::lazy_task;
+	using cppcoro::fmap;
+
+	auto one = [&]() -> lazy_task<int>
+	{
+		co_return 1;
+	};
+
+	SUBCASE("r-value fmap / r-value lambda")
+	{
+		lazy_task<int> t = one() | fmap([delta = 1](auto i) { return i + delta; });
+		CHECK(!t.is_ready());
+		[&]() -> task<>
+		{
+			CHECK(co_await t == 2);
+		}();
+	}
+
+	SUBCASE("r-value fmap / l-value lambda")
+	{
+		using namespace std::string_literals;
+
+		lazy_task<std::string> t;
+
+		{
+			auto f = [prefix = "pfx"s](int x)
+			{
+				return prefix + std::to_string(x);
+			};
+
+			// Want to make sure that the resulting task has taken
+			// a copy of the lambda passed to fmap().
+			t = one() | fmap(f);
+		}
+
+		CHECK(!t.is_ready());
+
+		[&]() -> task<>
+		{
+			CHECK(co_await t == "pfx1");
+		}();
+	}
+
+	SUBCASE("l-value fmap / r-value lambda")
+	{
+		using namespace std::string_literals;
+
+		lazy_task<std::string> t;
+
+		{
+			auto addprefix = fmap([prefix = "a really really long prefix that prevents small string optimisation"s](int x)
+			{
+				return prefix + std::to_string(x);
+			});
+
+			// Want to make sure that the resulting task has taken
+			// a copy of the lambda passed to fmap().
+			t = one() | addprefix;
+		}
+
+		CHECK(!t.is_ready());
+
+		[&]() -> task<>
+		{
+			CHECK(co_await t == "a really really long prefix that prevents small string optimisation1");
+		}();
+	}
+
+	SUBCASE("l-value fmap / l-value lambda")
+	{
+		using namespace std::string_literals;
+
+		lazy_task<std::string> t;
+
+		{
+			auto lambda = [prefix = "a really really long prefix that prevents small string optimisation"s](int x)
+			{
+				return prefix + std::to_string(x);
+			};
+
+			auto addprefix = fmap(lambda);
+
+			// Want to make sure that the resulting task has taken
+			// a copy of the lambda passed to fmap().
+			t = one() | addprefix;
+		}
+
+		CHECK(!t.is_ready());
+
+		[&]() -> task<>
+		{
+			CHECK(co_await t == "a really really long prefix that prevents small string optimisation1");
+		}();
+	}
+}
+
+TEST_CASE("chained fmap pipe operations")
+{
+	using namespace std::string_literals;
+	using cppcoro::task;
+	using cppcoro::lazy_task;
+
+	auto prepend = [](std::string s)
+	{
+		using cppcoro::fmap;
+		return fmap([s = std::move(s)](const std::string& value) { return s + value; });
+	};
+
+	auto append = [](std::string s)
+	{
+		using cppcoro::fmap;
+		return fmap([s = std::move(s)](const std::string& value){ return value + s; });
+	};
+
+	auto asyncString = [](std::string s) -> lazy_task<std::string>
+	{
+		co_return std::move(s);
+	};
+
+	auto t = asyncString("base"s) | prepend("pre_"s) | append("_post"s);
+
+	CHECK(!t.is_ready());
+
+	[&]() -> task<>
+	{
+		CHECK(co_await t == "pre_base_post");
+	}();
 }
 
 TEST_SUITE_END();

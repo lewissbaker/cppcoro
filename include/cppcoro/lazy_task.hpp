@@ -6,6 +6,7 @@
 #define CPPCORO_LAZY_TASK_HPP_INCLUDED
 
 #include <cppcoro/broken_promise.hpp>
+#include <cppcoro/fmap.hpp>
 
 #include <atomic>
 #include <exception>
@@ -377,6 +378,51 @@ namespace cppcoro
 		}
 	}
 
+	// operator| for fmap_transform
+
+	namespace detail
+	{
+		template<typename T, typename FUNC>
+		lazy_task<std::invoke_result_t<FUNC, T&&>> apply_fmap(lazy_task<T> t, FUNC func)
+		{
+			static_assert(
+				!std::is_reference_v<FUNC>,
+				"Passing by reference to lazy_task<T> coroutine is unsafe. "
+				"Use std::ref or std::cref to explicitly pass by reference.");
+
+			co_return std::invoke(std::move(func), co_await std::move(t));
+		}
+
+		template<typename FUNC>
+		lazy_task<std::invoke_result_t<FUNC>> apply_fmap(lazy_task<> t, FUNC func)
+		{
+			static_assert(
+				!std::is_reference_v<FUNC>,
+				"Passing by reference to lazy_task<T> coroutine is unsafe. "
+				"Use std::ref or std::cref to explicitly pass by reference.");
+
+			co_await t;
+			co_return std::invoke(std::move(func));
+		}
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(lazy_task<T>&& t, fmap_transform<FUNC>&& transform)
+	{
+		return detail::apply_fmap(std::move(t), std::forward<FUNC>(transform.func));
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(lazy_task<T>&& t, fmap_transform<FUNC>& transform)
+	{
+		return detail::apply_fmap(std::move(t), transform.func);
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(lazy_task<T>&& t, const fmap_transform<FUNC>& transform)
+	{
+		return detail::apply_fmap(std::move(t), transform.func);
+	}
 }
 
 #endif
