@@ -5,11 +5,14 @@
 #ifndef CPPCORO_ASYNC_GENERATOR_HPP_INCLUDED
 #define CPPCORO_ASYNC_GENERATOR_HPP_INCLUDED
 
+#include <cppcoro/fmap.hpp>
+
 #include <exception>
 #include <atomic>
 #include <iterator>
 #include <type_traits>
 #include <experimental/coroutine>
+#include <functional>
 #include <cassert>
 
 namespace cppcoro
@@ -648,6 +651,47 @@ namespace cppcoro
 		{
 			return async_generator<T>{ *this };
 		}
+	}
+
+	// operator|(async_generator<T>, fmap_transform<F>)
+
+	namespace detail
+	{
+		template<typename T, typename FUNC>
+		auto apply_fmap(async_generator<T> g, FUNC func)
+			-> async_generator<std::invoke_result_t<FUNC&, typename async_generator<T>::iterator::reference>>
+		{
+			static_assert(
+				!std::is_reference_v<FUNC>,
+				"Passing by reference to async_generator<T> coroutine is unsafe. "
+				"Use std::ref or std::cref to explicitly pass by reference.");
+
+			auto it = co_await g.begin();
+			const auto itEnd = g.end();
+			while (it != itEnd)
+			{
+				co_yield std::invoke(func, *it);
+				co_await ++it;
+			}
+		}
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(async_generator<T>&& source, fmap_transform<FUNC>&& transform)
+	{
+		return detail::apply_fmap(std::move(source), std::forward<FUNC>(transform.func));
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(async_generator<T>&& source, fmap_transform<FUNC>& transform)
+	{
+		return detail::apply_fmap(std::move(source), transform.func);
+	}
+
+	template<typename T, typename FUNC>
+	auto operator|(async_generator<T>&& source, const fmap_transform<FUNC>& transform)
+	{
+		return detail::apply_fmap(std::move(source), transform.func);
 	}
 }
 

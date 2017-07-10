@@ -9,6 +9,8 @@
 
 #include "doctest/doctest.h"
 
+TEST_SUITE_BEGIN("async_generator");
+
 TEST_CASE("default-constructed async_generator is an empty sequence")
 {
 	[]() -> cppcoro::task<>
@@ -269,3 +271,32 @@ TEST_CASE("large number of synchronous completions doesn't result in stack-overf
 
 	CHECK(consumerTask.is_ready());
 }
+
+TEST_CASE("fmap")
+{
+	using cppcoro::async_generator;
+	using cppcoro::fmap;
+
+	auto iota = [](int count) -> async_generator<int>
+	{
+		for (int i = 0; i < count; ++i)
+		{
+			co_yield i;
+		}
+	};
+
+	auto squares = iota(5) | fmap([](auto x) { return x * x; });
+
+	[&]() -> cppcoro::task<>
+	{
+		auto it = co_await squares.begin();
+		CHECK(*it == 0);
+		CHECK(*co_await ++it == 1);
+		CHECK(*co_await ++it == 4);
+		CHECK(*co_await ++it == 9);
+		CHECK(*co_await ++it == 16);
+		CHECK(co_await ++it == squares.end());
+	}();
+}
+
+TEST_SUITE_END();
