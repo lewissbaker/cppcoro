@@ -659,7 +659,7 @@ namespace cppcoro
 	{
 		template<typename T, typename FUNC>
 		auto apply_fmap(async_generator<T> g, FUNC func)
-			-> async_generator<std::invoke_result_t<FUNC&, typename async_generator<T>::iterator::reference>>
+			-> async_generator<std::result_of_t<FUNC&(typename async_generator<T>::iterator::reference)>>
 		{
 			static_assert(
 				!std::is_reference_v<FUNC>,

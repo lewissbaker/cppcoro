@@ -383,7 +383,7 @@ namespace cppcoro
 	namespace detail
 	{
 		template<typename T, typename FUNC>
-		lazy_task<std::invoke_result_t<FUNC, T&&>> apply_fmap(lazy_task<T> t, FUNC func)
+		lazy_task<std::result_of_t<FUNC&&(T&&)>> apply_fmap(lazy_task<T> t, FUNC func)
 		{
 			static_assert(
 				!std::is_reference_v<FUNC>,
@@ -394,7 +394,7 @@ namespace cppcoro
 		}
 
 		template<typename FUNC>
-		lazy_task<std::invoke_result_t<FUNC>> apply_fmap(lazy_task<> t, FUNC func)
+		lazy_task<std::result_of_t<FUNC&&()>> apply_fmap(lazy_task<> t, FUNC func)
 		{
 			static_assert(
 				!std::is_reference_v<FUNC>,

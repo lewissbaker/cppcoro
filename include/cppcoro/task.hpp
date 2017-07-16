@@ -420,7 +420,7 @@ namespace cppcoro
 	namespace detail
 	{
 		template<typename T, typename FUNC>
-		task<std::invoke_result_t<FUNC, T&&>> apply_fmap(task<T> t, FUNC func)
+		task<std::result_of_t<FUNC&&(T&&)>> apply_fmap(task<T> t, FUNC func)
 		{
 			static_assert(
 				!std::is_reference_v<FUNC>,
@@ -431,7 +431,7 @@ namespace cppcoro
 		}
 
 		template<typename FUNC>
-		task<std::invoke_result_t<FUNC>> apply_fmap(task<> t, FUNC func)
+		task<std::result_of_t<FUNC&&()>> apply_fmap(task<> t, FUNC func)
 		{
 			static_assert(
 				!std::is_reference_v<FUNC>,
