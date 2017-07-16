@@ -190,10 +190,7 @@ namespace cppcoro
 				}
 			}
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this);
-			}
+			shared_task<T> get_return_object() noexcept;
 
 			template<
 				typename VALUE,
@@ -226,10 +223,7 @@ namespace cppcoro
 
 			shared_task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this);
-			}
+			shared_task<void> get_return_object() noexcept;
 
 			void return_void() noexcept
 			{}
@@ -248,10 +242,7 @@ namespace cppcoro
 
 			shared_task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this);
-			}
+			shared_task<T&> get_return_object() noexcept;
 
 			void return_value(T& value) noexcept
 			{
@@ -450,6 +441,32 @@ namespace cppcoro
 	void swap(shared_task<T>& a, shared_task<T>& b) noexcept
 	{
 		a.swap(b);
+	}
+
+	namespace detail
+	{
+		template<typename T>
+		shared_task<T> shared_task_promise<T>::get_return_object() noexcept
+		{
+			return shared_task<T>{
+				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
+			};
+		}
+
+		template<typename T>
+		shared_task<T&> shared_task_promise<T&>::get_return_object() noexcept
+		{
+			return shared_task<T&>{
+				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
+			};
+		}
+
+		inline shared_task<void> shared_task_promise<void>::get_return_object() noexcept
+		{
+			return shared_task<void>{
+				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
+			};
+		}
 	}
 
 	template<typename T>

@@ -374,7 +374,7 @@ namespace cppcoro
 		template<typename T>
 		lazy_task<T&> lazy_task_promise<T&>::get_return_object() noexcept
 		{
-			return lazy_task<T&>{ std::experimental::coroutine_handle<lazy_task_promise<T&>>::from_promise(*this) };
+			return lazy_task<T&>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
 		}
 	}
 

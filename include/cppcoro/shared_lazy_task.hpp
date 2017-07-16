@@ -18,9 +18,6 @@
 namespace cppcoro
 {
 	template<typename T>
-	class lazy_task;
-
-	template<typename T>
 	class shared_lazy_task;
 
 	namespace detail
@@ -229,10 +226,7 @@ namespace cppcoro
 				}
 			}
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this);
-			}
+			shared_lazy_task<T> get_return_object() noexcept;
 
 			template<
 				typename VALUE,
@@ -265,10 +259,7 @@ namespace cppcoro
 
 			shared_lazy_task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this);
-			}
+			shared_lazy_task<void> get_return_object() noexcept;
 
 			void return_void() noexcept
 			{}
@@ -287,10 +278,7 @@ namespace cppcoro
 
 			shared_lazy_task_promise() noexcept = default;
 
-			auto get_return_object() noexcept
-			{
-				return std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this);
-			}
+			shared_lazy_task<T&> get_return_object() noexcept;
 
 			void return_value(T& value) noexcept
 			{
@@ -490,6 +478,33 @@ namespace cppcoro
 	{
 		a.swap(b);
 	}
+
+	namespace detail
+	{
+		template<typename T>
+		shared_lazy_task<T> shared_lazy_task_promise<T>::get_return_object() noexcept
+		{
+			return shared_lazy_task<T>{
+				std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this)
+			};
+		}
+
+		template<typename T>
+		shared_lazy_task<T&> shared_lazy_task_promise<T&>::get_return_object() noexcept
+		{
+			return shared_lazy_task<T&>{
+				std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this)
+			};
+		}
+
+		inline shared_lazy_task<void> shared_lazy_task_promise<void>::get_return_object() noexcept
+		{
+			return shared_lazy_task<void>{
+				std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this)
+			};
+		}
+	}
+
 
 	template<typename T>
 	shared_lazy_task<T> make_shared_task(lazy_task<T> t)
