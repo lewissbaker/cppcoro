@@ -9,6 +9,8 @@
 
 #include "counted.hpp"
 
+#include <string>
+
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("shared_lazy_task");
