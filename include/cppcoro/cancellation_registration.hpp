@@ -5,6 +5,8 @@
 #ifndef CPPCORO_CANCELLATION_REGISTRATION_HPP_INCLUDED
 #define CPPCORO_CANCELLATION_REGISTRATION_HPP_INCLUDED
 
+#include <cppcoro/cancellation_token.hpp>
+
 #include <functional>
 #include <utility>
 #include <type_traits>
@@ -12,8 +14,6 @@
 
 namespace cppcoro
 {
-	class cancellation_token;
-
 	namespace detail
 	{
 		class cancellation_state;
