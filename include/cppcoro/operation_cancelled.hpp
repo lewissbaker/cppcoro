@@ -17,7 +17,7 @@ namespace cppcoro
 			: std::exception()
 		{}
 
-		const char* what() const override { return "operation cancelled"; }
+		const char* what() const noexcept override { return "operation cancelled"; }
 	};
 }
 
