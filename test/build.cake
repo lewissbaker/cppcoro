@@ -27,9 +27,13 @@ sources = script.cwd([
   'shared_lazy_task_tests.cpp',
   'shared_task_tests.cpp',
   'task_tests.cpp',
-  'io_service_tests.cpp',
-  'file_tests.cpp',
 ])
+
+if variant.platform == 'windows':
+  sources += script.cwd([
+    'io_service_tests.cpp',
+    'file_tests.cpp',
+    ])
 
 extras = script.cwd([
   'build.cake',

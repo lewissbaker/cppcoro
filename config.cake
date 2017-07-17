@@ -145,3 +145,65 @@ if cake.system.isWindows() or cake.system.isCygwin():
 
     except CompilerNotFoundError, e:
       print str(e)
+
+elif cake.system.isLinux():
+
+  from cake.library.compilers.clang import ClangCompiler
+
+  clangVariant = baseVariant.clone(compiler='clang',
+                                   platform='linux',
+                                   architecture='x64')
+
+  compiler = ClangCompiler(
+    configuration=configuration,
+    clangExe='/usr/bin/clang-5.0',
+    llvmArExe='/usr/bin/llvm-ar-5.0',
+    binPaths=['/usr/bin'])
+
+  compiler.addCppFlag('-std=c++1z')
+  compiler.addCppFlag('-fcoroutines-ts')
+  compiler.addCppFlag('-m64')
+
+  # Set this to the install-prefix of where libc++-5.0 is installed.
+  libCxxInstallPrefix = None # '/path/to/install'
+
+  if libCxxInstallPrefix:
+    compiler.addCppFlag('-nostdinc++')
+    compiler.addIncludePath(cake.path.join(
+      libCxxInstallPrefix, 'include', 'c++', 'v1'))
+    compiler.addLibraryPath(cake.path.join(
+      libCxxInstallPrefix, 'lib'))
+  else:
+    compiler.addCppFlag('-stdlib=libc++')
+
+  compiler.addLibrary('c++')
+  compiler.addLibrary('c++abi')
+  compiler.addLibrary('c')
+  compiler.addLibrary('pthread')
+  
+  #compiler.addProgramFlag('-Wl,--trace')
+  #compiler.addProgramFlag('-Wl,-v')
+  
+  clangVariant.tools['compiler'] = compiler
+
+  env = clangVariant.tools["env"]
+  env["COMPILER"] = "clang"
+  env["COMPILER_VERSION"] = "5.0"
+  env["PLATFORM"] = "linux"
+  env["ARCHITECTURE"] = "x64"
+
+  clangDebugVariant = clangVariant.clone(release='debug')
+  clangDebugVariant.tools["env"]["RELEASE"] = 'debug'
+  
+  # TODO: Configure debug-specific settings here
+  compiler = clangDebugVariant.tools["compiler"]
+  
+  configuration.addVariant(clangDebugVariant)
+
+  clangOptimisedVariant = clangVariant.clone(release='optimised')
+  clangOptimisedVariant.tools["env"]["RELEASE"] = 'optimised'
+
+  # TODO: Configure optimised-specific settings here
+  compiler = clangOptimisedVariant.tools["compiler"]
+  
+  configuration.addVariant(clangOptimisedVariant)
