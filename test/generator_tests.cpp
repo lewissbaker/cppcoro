@@ -6,6 +6,7 @@
 #include <cppcoro/generator.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
+#include <iostream>
 #include <vector>
 #include <string>
 
