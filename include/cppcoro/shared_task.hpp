@@ -5,6 +5,7 @@
 #ifndef CPPCORO_SHARED_TASK_HPP_INCLUDED
 #define CPPCORO_SHARED_TASK_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
 
@@ -475,7 +476,7 @@ namespace cppcoro
 		co_return co_await std::move(t);
 	}
 
-#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019
+#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019 || CPPCORO_COMPILER_CLANG
 	// HACK: Work around bug in MSVC handling of 'co_return <expr>' for void-returning expression.
 	// It doesn't actually evaluate <expr> before calling <promise>.return_void().
 	inline shared_task<void> make_shared_task(task<void> t)
