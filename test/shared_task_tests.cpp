@@ -9,6 +9,7 @@
 
 #include "counted.hpp"
 
+#include <ostream>
 #include <string>
 
 #include "doctest/doctest.h"
