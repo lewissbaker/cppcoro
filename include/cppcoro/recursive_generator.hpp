@@ -28,9 +28,12 @@ namespace cppcoro
 				, m_parentOrLeaf(this)
 			{}
 
-			promise_type& get_return_object() noexcept
+			promise_type(const promise_type&) = delete;
+			promise_type(promise_type&&) = delete;
+
+			auto get_return_object() noexcept
 			{
-				return *this;
+				return recursive_generator<T>{ *this };
 			}
 
 			std::experimental::suspend_always initial_suspend() noexcept
