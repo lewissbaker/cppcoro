@@ -195,15 +195,22 @@ elif cake.system.isLinux():
   clangDebugVariant = clangVariant.clone(release='debug')
   clangDebugVariant.tools["env"]["RELEASE"] = 'debug'
   
-  # TODO: Configure debug-specific settings here
+  # Configure debug-specific settings here
   compiler = clangDebugVariant.tools["compiler"]
+  compiler.addCppFlag('-O0')
+  compiler.addCppFlag('-g')
   
   configuration.addVariant(clangDebugVariant)
 
   clangOptimisedVariant = clangVariant.clone(release='optimised')
   clangOptimisedVariant.tools["env"]["RELEASE"] = 'optimised'
 
-  # TODO: Configure optimised-specific settings here
+  # Configure optimised-specific settings here
   compiler = clangOptimisedVariant.tools["compiler"]
+  compiler.addCppFlag('-O2')
+  compiler.addCppFlag('-g')
+  compiler.addCppFlag('-flto')
+  compiler.addProgramFlag('-flto')
+  compiler.addModuleFlag('-flto')
   
   configuration.addVariant(clangOptimisedVariant)
