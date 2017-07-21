@@ -67,11 +67,15 @@ if cake.system.isWindows() or cake.system.isCygwin():
 
   for arch in ("x64", "x86"):
     try:
-      from cake.library.compilers.msvc import getVisualStudio2017Compiler
+      from cake.library.compilers.msvc import getVisualStudio2017Compiler, findMsvc2017InstallDir
+      if nugetPath:
+        vcInstallDir = cake.path.join(nugetPath, 'lib', 'native')
+      else:
+        vcInstallDir = str(findMsvc2017InstallDir(targetArchitecture=arch, allowPreRelease=True))
       compiler = getVisualStudio2017Compiler(
         configuration,
         targetArchitecture=arch,
-        vcInstallDir=cake.path.join(nugetPath, 'lib', 'native') if nugetPath else None,
+        vcInstallDir=vcInstallDir,
         )
 
       msvcVariant = baseVariant.clone(
