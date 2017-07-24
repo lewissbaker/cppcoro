@@ -5,6 +5,8 @@
 
 #include <cppcoro/async_auto_reset_event.hpp>
 
+#include <cppcoro/config.hpp>
+
 #include <cassert>
 #include <algorithm>
 
@@ -140,6 +142,7 @@ void cppcoro::async_auto_reset_event::resume_waiters(
 				// There should always be enough waiters in the list as
 				// the waiters are queued before the waiter-count is incremented.
 				assert(newWaiters != nullptr);
+				CPPCORO_ASSUME(newWaiters != nullptr);
 
 				// Reverse order of new waiters so they are resumed in FIFO.
 				// This ensures fairness.
@@ -198,6 +201,8 @@ void cppcoro::async_auto_reset_event::resume_waiters(
 	// Now resume all of the waiters we've dequeued.
 	// There should be at least one.
 	assert(waitersToResumeList != nullptr);
+	CPPCORO_ASSUME(waitersToResumeList != nullptr);
+
 	do
 	{
 		auto* const waiter = waitersToResumeList;
