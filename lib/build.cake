@@ -9,6 +9,7 @@ from cake.tools import compiler, script, env, project, variant
 
 includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'async_auto_reset_event.hpp',
+  'async_manual_reset_event.hpp',
   'async_generator.hpp',
   'async_mutex.hpp',
   'broken_promise.hpp',
@@ -47,6 +48,7 @@ privateHeaders = script.cwd([
 
 sources = script.cwd([
   'async_auto_reset_event.cpp',
+  'async_manual_reset_event.cpp',
   'async_mutex.cpp',
   'cancellation_state.cpp',
   'cancellation_token.cpp',
