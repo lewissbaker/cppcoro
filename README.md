@@ -14,7 +14,8 @@ These include:
 * Awaitable Types
   * `single_consumer_event`
   * `async_mutex`
-  * `async_manual_reset_event` (coming)
+  * `async_manual_reset_event`
+  * `async_auto_reset_event`
 * Functions
   * `when_all()` (coming)
 * Cancellation
@@ -750,6 +751,156 @@ cppcoro::task<> add_item(std::string value)
 {
   cppcoro::async_mutex_lock lock = co_await mutex;
   values.insert(std::move(value));
+}
+```
+
+## `async_manual_reset_event`
+
+A manual-reset event is a coroutine/thread-synchronisation primitive that allows one or more threads
+to wait until the event is signalled by a thread that calls `set()`.
+
+The event is in one of two states; *'set'* and *'not set'*.
+
+If the event is in the *'set'* state when a coroutine awaits the event then the coroutine
+continues without suspending. However if the coroutine is in the *'not set'* state then the
+coroutine is suspended until some thread subsequently calls the `set()` method.
+
+Any threads that were suspended while waiting for the event to become *'set'* will be resumed
+inside the next call to `set()` by some thread.
+
+Note that you must ensure that no coroutines are awaiting a *'not set'* event when the
+event is destructed as they will not be resumed.
+
+Example:
+```c++
+cppcoro::async_manual_reset_event event;
+std::string value;
+
+void producer()
+{
+  value = get_some_string_value();
+
+  // Publish a value by setting the event.
+  event.set();
+}
+
+// Can be called many times to create many tasks.
+// All consumer tasks will wait until value has been published.
+cppcoro::task<> consumer()
+{
+  // Wait until value has been published by awaiting event.
+  co_await event;
+
+  consume_value(value);
+}
+```
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class async_manual_reset_event_operation;
+
+  class async_manual_reset_event
+  {
+  public:
+    async_manual_reset_event(bool initiallySet = false) noexcept;
+    ~async_manual_reset_event();
+
+    async_manual_reset_event(const async_manual_reset_event&) = delete;
+    async_manual_reset_event(async_manual_reset_event&&) = delete;
+    async_manual_reset_event& operator=(const async_manual_reset_event&) = delete;
+    async_manual_reset_event& operator=(async_manual_reset_event&&) = delete;
+
+    // Wait until the event becomes set.
+    <unspecified> operator co_await() const noexcept;
+
+    bool is_set() const noexcept;
+
+    void set() noexcept;
+
+    void reset() noexcept;
+
+  };
+
+  class async_manual_reset_event
+  {
+  public:
+    async_manual_reset_event_operation(async_manual_reset_event& event) noexcept;
+
+    bool await_ready() const noexcept;
+    bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+    void await_resume() const noexcept;
+  };
+}
+```
+
+## `async_auto_reset_event`
+
+An auto-reset event is a coroutine/thread-synchronisation primitive that allows one or more threads
+to wait until the event is signalled by a thread by calling `set()`.
+
+Once a coroutine that is awaiting the event is released by either a prior or subsequent call to `set()`
+the event is automatically reset back to the 'not set' state.
+
+API Summary:
+```c++
+// <cppcoro/async_auto_reset_event.hpp>
+namespace cppcoro
+{
+  class async_auto_reset_event_operation;
+
+  class async_auto_reset_event
+  {
+  public:
+
+    async_auto_reset_event(bool initiallySet = false) noexcept;
+
+    ~async_auto_reset_event();
+
+    async_auto_reset_event(const async_auto_reset_event&) = delete;
+    async_auto_reset_event(async_auto_reset_event&&) = delete;
+    async_auto_reset_event& operator=(const async_auto_reset_event&) = delete;
+    async_auto_reset_event& operator=(async_auto_reset_event&&) = delete;
+
+    // Wait for the event to enter the 'set' state.
+    //
+    // If the event is already 'set' then the event is set to the 'not set'
+    // state and the awaiting coroutine continues without suspending.
+    // Otherwise, the coroutine is suspended and later resumed when some
+    // thread calls 'set()'.
+    //
+    // Note that the coroutine may be resumed inside a call to 'set()'
+    // or inside another thread's call to 'operator co_await()'.
+    async_auto_reset_event_operation operator co_await() const noexcept;
+
+    // Set the state of the event to 'set'.
+    //
+    // If there are pending coroutines awaiting the event then one
+    // pending coroutine is resumed and the state is immediately
+    // set back to the 'not set' state.
+    //
+    // This operation is a no-op if the event was already 'set'.
+    void set() noexcept;
+
+    // Set the state of the event to 'not-set'.
+    //
+    // This is a no-op if the state was already 'not set'.
+    void reset() noexcept;
+
+  };
+
+  class async_auto_reset_event_operation
+  {
+  public:
+    explicit async_auto_reset_event_operation(async_auto_reset_event& event) noexcept;
+    async_auto_reset_event_operation(const async_auto_reset_event_operation& other) noexcept;
+
+    bool await_ready() const noexcept;
+    bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+    void await_resume() const noexcept;
+
+  };
 }
 ```
 
