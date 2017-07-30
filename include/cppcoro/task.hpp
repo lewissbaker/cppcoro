@@ -235,6 +235,8 @@ namespace cppcoro
 
 		using promise_type = detail::task_promise<T>;
 
+		using value_type = T;
+
 	private:
 
 		struct awaitable_base
