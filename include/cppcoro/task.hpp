@@ -7,6 +7,7 @@
 
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/fmap.hpp>
+#include <cppcoro/detail/resumer.hpp>
 
 #include <atomic>
 #include <exception>
@@ -57,7 +58,7 @@ namespace cppcoro
 						state oldState = m_promise.m_state.exchange(state::finished, std::memory_order_acq_rel);
 						if (oldState == state::consumer_suspended)
 						{
-							m_promise.m_awaiter.resume();
+							m_promise.m_resumer.resume();
 						}
 
 						return oldState != state::consumer_detached;
@@ -91,9 +92,9 @@ namespace cppcoro
 					std::memory_order_acq_rel) == state::running;
 			}
 
-			bool try_await(std::experimental::coroutine_handle<> awaiter)
+			bool try_await(detail::resumer resumer)
 			{
-				m_awaiter = awaiter;
+				m_resumer = resumer;
 
 				state oldState = state::running;
 				return m_state.compare_exchange_strong(
@@ -129,7 +130,7 @@ namespace cppcoro
 			};
 
 			std::atomic<state> m_state;
-			std::experimental::coroutine_handle<> m_awaiter;
+			cppcoro::detail::resumer m_resumer;
 			std::exception_ptr m_exception;
 
 		};
@@ -251,7 +252,7 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				return m_coroutine.promise().try_await(awaiter);
+				return m_coroutine.promise().try_await(detail::resumer{ awaiter });
 			}
 		};
 

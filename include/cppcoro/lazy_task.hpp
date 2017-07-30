@@ -7,6 +7,7 @@
 
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/fmap.hpp>
+#include <cppcoro/detail/resumer.hpp>
 
 #include <atomic>
 #include <exception>
@@ -26,7 +27,7 @@ namespace cppcoro
 		public:
 
 			lazy_task_promise_base() noexcept
-				: m_awaiter(nullptr)
+				: m_resumer()
 			{}
 
 			auto initial_suspend() noexcept
@@ -38,23 +39,23 @@ namespace cppcoro
 			{
 				struct awaitable
 				{
-					std::experimental::coroutine_handle<> m_awaiter;
+					resumer m_resumer;
 
-					awaitable(std::experimental::coroutine_handle<> awaiter) noexcept
-						: m_awaiter(awaiter)
+					awaitable(resumer resumer) noexcept
+						: m_resumer(resumer)
 					{}
 
 					bool await_ready() const noexcept { return false; }
 
 					void await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
 					{
-						m_awaiter.resume();
+						m_resumer.resume();
 					}
 
 					void await_resume() noexcept {}
 				};
 
-				return awaitable{ m_awaiter };
+				return awaitable{ m_resumer };
 			}
 
 			void unhandled_exception() noexcept
@@ -64,12 +65,12 @@ namespace cppcoro
 
 			bool is_ready() const noexcept
 			{
-				return static_cast<bool>(m_awaiter);
+				return static_cast<bool>(m_resumer);
 			}
 
-			void set_awaiter(std::experimental::coroutine_handle<> awaiter)
+			void set_resumer(resumer resumer)
 			{
-				m_awaiter = awaiter;
+				m_resumer = resumer;
 			}
 
 		protected:
@@ -89,7 +90,7 @@ namespace cppcoro
 
 		private:
 
-			std::experimental::coroutine_handle<> m_awaiter;
+			resumer m_resumer;
 			std::exception_ptr m_exception;
 
 		};
@@ -238,7 +239,7 @@ namespace cppcoro
 
 			void await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_coroutine.promise().set_awaiter(awaiter);
+				m_coroutine.promise().set_resumer(detail::resumer{ awaiter });
 				m_coroutine.resume();
 			}
 		};

@@ -7,6 +7,7 @@
 
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
+#include <cppcoro/detail/resumer.hpp>
 
 #include <atomic>
 #include <exception>
@@ -27,7 +28,7 @@ namespace cppcoro
 	{
 		struct shared_task_waiter
 		{
-			std::experimental::coroutine_handle<> m_coroutine;
+			cppcoro::detail::resumer m_resumer;
 			shared_task_waiter* m_next;
 		};
 
@@ -73,15 +74,15 @@ namespace cppcoro
 				void* waiters = m_waiters.exchange(static_cast<void*>(this), std::memory_order_acq_rel);
 				if (waiters != nullptr)
 				{
-					shared_task_waiter* next = static_cast<shared_task_waiter*>(waiters);
+					shared_task_waiter* waiter = static_cast<shared_task_waiter*>(waiters);
 					do
 					{
 						// Read the m_next pointer before resuming the coroutine
 						// since resuming the coroutine may destroy the shared_task_waiter value.
-						auto coroutine = next->m_coroutine;
-						next = next->m_next;
-						coroutine.resume();
-					} while (next != nullptr);
+						auto* next = waiter->m_next;
+						waiter->m_resumer.resume();
+						waiter = next;
+					} while (waiter != nullptr);
 				}
 
 				return awaitable{ *this };
@@ -287,7 +288,7 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_waiter.m_coroutine = awaiter;
+				m_waiter.m_resumer = detail::resumer{ awaiter };
 				return m_coroutine.promise().try_await(&m_waiter);
 			}
 		};
@@ -315,10 +316,10 @@ namespace cppcoro
 		shared_task(const shared_task& other) noexcept
 			: m_coroutine(other.m_coroutine)
 		{
-			if (m_coroutine)
-			{
-				m_coroutine.promise().add_ref();
-			}
+if (m_coroutine)
+{
+	m_coroutine.promise().add_ref();
+}
 		}
 
 		~shared_task()
