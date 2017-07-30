@@ -5,6 +5,7 @@
 #ifndef CPPCORO_SHARED_LAZY_TASK_HPP_INCLUDED
 #define CPPCORO_SHARED_LAZY_TASK_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/detail/resumer.hpp>
@@ -515,7 +516,7 @@ namespace cppcoro
 		co_return co_await std::move(t);
 	}
 
-#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019
+#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019 || CPPCORO_COMPILER_CLANG
 	// HACK: Workaround for broken MSVC that doesn't execute <expr> in 'co_return <expr>;'.
 	inline shared_lazy_task<void> make_shared_task(lazy_task<void> t)
 	{
