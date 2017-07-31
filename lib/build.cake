@@ -40,7 +40,9 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'file_write_operation.hpp',
   ])
 
-detailIncludes = []
+detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
+  'resumer.hpp',
+  ])
 
 privateHeaders = script.cwd([
   'cancellation_state.hpp',
@@ -71,7 +73,7 @@ extras = script.cwd([
   ])
 
 if variant.platform == "windows":
-  detailIncludes.extend(script.cwd([
+  detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
     'win32.hpp',
     ]))
   sources.extend(script.cwd([
