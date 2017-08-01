@@ -537,7 +537,7 @@ bool cppcoro::io_service::try_enter_event_loop() noexcept
 		{
 			return false;
 		}
-	} while (m_threadState.compare_exchange_weak(
+	} while (!m_threadState.compare_exchange_weak(
 		currentState,
 		currentState + active_thread_count_increment,
 		std::memory_order_relaxed));
