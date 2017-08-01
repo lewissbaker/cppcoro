@@ -41,7 +41,7 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   ])
 
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
-  'resumer.hpp',
+  'continuation.hpp',
   ])
 
 privateHeaders = script.cwd([

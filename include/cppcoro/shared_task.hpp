@@ -7,7 +7,8 @@
 
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
-#include <cppcoro/detail/resumer.hpp>
+
+#include <cppcoro/detail/continuation.hpp>
 
 #include <atomic>
 #include <exception>
@@ -28,7 +29,7 @@ namespace cppcoro
 	{
 		struct shared_task_waiter
 		{
-			cppcoro::detail::resumer m_resumer;
+			cppcoro::detail::continuation m_continuation;
 			shared_task_waiter* m_next;
 		};
 
@@ -80,7 +81,7 @@ namespace cppcoro
 						// Read the m_next pointer before resuming the coroutine
 						// since resuming the coroutine may destroy the shared_task_waiter value.
 						auto* next = waiter->m_next;
-						waiter->m_resumer.resume();
+						waiter->m_continuation.resume();
 						waiter = next;
 					} while (waiter != nullptr);
 				}
@@ -290,7 +291,7 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_waiter.m_resumer = detail::resumer{ awaiter };
+				m_waiter.m_continuation = detail::continuation{ awaiter };
 				return m_coroutine.promise().try_await(&m_waiter);
 			}
 		};

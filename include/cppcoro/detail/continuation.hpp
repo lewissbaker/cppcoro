@@ -2,8 +2,8 @@
 // Copyright (c) Lewis Baker
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
-#ifndef CPPCORO_DETAIL_RESUMER_HPP_INCLUDED
-#define CPPCORO_DETAIL_RESUMER_HPP_INCLUDED
+#ifndef CPPCORO_DETAIL_CONTINUATION_HPP_INCLUDED
+#define CPPCORO_DETAIL_CONTINUATION_HPP_INCLUDED
 
 #include <experimental/coroutine>
 
@@ -11,23 +11,23 @@ namespace cppcoro
 {
 	namespace detail
 	{
-		class resumer
+		class continuation
 		{
 		public:
 
 			using callback_t = void(void*);
 
-			resumer() noexcept
+			continuation() noexcept
 				: m_callback(nullptr)
 				, m_state(nullptr)
 			{}
 
-			explicit resumer(std::experimental::coroutine_handle<> awaiter) noexcept
+			explicit continuation(std::experimental::coroutine_handle<> awaiter) noexcept
 				: m_callback(nullptr)
 				, m_state(awaiter.address())
 			{}
 
-			explicit resumer(callback_t* callback, void* state) noexcept
+			explicit continuation(callback_t* callback, void* state) noexcept
 				: m_callback(callback)
 				, m_state(state)
 			{}
