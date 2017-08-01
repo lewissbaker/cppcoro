@@ -446,6 +446,37 @@ namespace cppcoro
 			return awaitable{ m_coroutine };
 		}
 
+		auto get_starter() const noexcept
+		{
+			struct starter
+			{
+			public:
+
+				explicit starter(std::experimental::coroutine_handle<promise_type> coroutine)
+					: m_coroutine(coroutine)
+				{}
+
+				void start(detail::continuation c) noexcept
+				{
+					m_waiter.m_continuation = c;
+
+					if (!m_coroutine ||
+						m_coroutine.promise().is_ready() ||
+						!m_coroutine.promise().try_await(&m_waiter, m_coroutine))
+					{
+						// Task completed synchronously, resume immediately.
+						c.resume();
+					}
+				}
+
+			private:
+				std::experimental::coroutine_handle<promise_type> m_coroutine;
+				detail::shared_lazy_task_waiter m_waiter;
+			};
+
+			return starter{ m_coroutine };
+		}
+
 	private:
 
 		template<typename U>

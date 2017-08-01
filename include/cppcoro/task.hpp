@@ -385,6 +385,34 @@ namespace cppcoro
 			return awaitable{ m_coroutine };
 		}
 
+		auto get_starter() const noexcept
+		{
+			class starter
+			{
+			public:
+
+				starter(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
+					: m_coroutine(coroutine)
+				{}
+
+				void start(detail::continuation c) noexcept
+				{
+					if (!m_coroutine ||
+						m_coroutine.promise().is_ready() ||
+						!m_coroutine.promise().try_await(c))
+					{
+						c.resume();
+					}
+				}
+
+			private:
+
+				std::experimental::coroutine_handle<promise_type> m_coroutine;
+			};
+
+			return starter{ m_coroutine };
+		}
+
 	private:
 
 		void destroy() noexcept

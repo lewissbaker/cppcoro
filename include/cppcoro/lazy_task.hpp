@@ -356,6 +356,38 @@ namespace cppcoro
 			return awaitable{ m_coroutine };
 		}
 
+		// Internal helper method for when_all() implementation.
+		auto get_starter() const noexcept
+		{
+			class starter
+			{
+			public:
+
+				starter(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
+					: m_coroutine(coroutine)
+				{}
+
+				void start(detail::continuation c) noexcept
+				{
+					if (m_coroutine && !m_coroutine.promise().is_ready())
+					{
+						m_coroutine.promise().set_continuation(c);
+						m_coroutine.resume();
+					}
+					else
+					{
+						c.resume();
+					}
+				}
+
+			private:
+
+				std::experimental::coroutine_handle<promise_type> m_coroutine;
+			};
+
+			return starter{ m_coroutine };
+		}
+
 	private:
 
 		std::experimental::coroutine_handle<promise_type> m_coroutine;

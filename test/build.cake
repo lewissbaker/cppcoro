@@ -29,6 +29,8 @@ sources = script.cwd([
   'shared_lazy_task_tests.cpp',
   'shared_task_tests.cpp',
   'task_tests.cpp',
+  'when_all_tests.cpp',
+  'when_all_ready_tests.cpp',
   'io_service_tests.cpp',
   'file_tests.cpp',
 ])
@@ -51,6 +53,7 @@ testExe = compiler.program(
   sources=objects,
 )
 
+test.alwaysRun = True
 testResult = test.run(
   program=testExe,
   results=env.expand('${CPPCORO_BUILD}/test/run.results'),
