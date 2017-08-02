@@ -48,9 +48,10 @@ namespace cppcoro
 
 					bool await_ready() const noexcept { return false; }
 
-					void await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
+					std::experimental::coroutine_handle<>
+					await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
 					{
-						m_continuation.resume();
+						return m_continuation.resume_or_get_coroutine_handle();
 					}
 
 					void await_resume() noexcept {}
@@ -240,10 +241,10 @@ namespace cppcoro
 				return !m_coroutine || m_coroutine.promise().is_ready();
 			}
 
-			void await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+			auto await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
 				m_coroutine.promise().set_continuation(detail::continuation{ awaiter });
-				m_coroutine.resume();
+				return m_coroutine;
 			}
 		};
 

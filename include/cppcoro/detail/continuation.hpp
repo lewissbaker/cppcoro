@@ -49,6 +49,19 @@ namespace cppcoro
 				}
 			}
 
+			std::experimental::coroutine_handle<> resume_or_get_coroutine_handle()
+			{
+				if (m_callback == nullptr)
+				{
+					return std::experimental::coroutine_handle<>::from_address(m_state);
+				}
+				else
+				{
+					m_callback(m_state);
+					return {};
+				}
+			}
+
 		private:
 
 			callback_t* m_callback;
