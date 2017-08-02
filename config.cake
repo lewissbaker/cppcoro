@@ -193,10 +193,10 @@ elif cake.system.isLinux():
   compiler.addLibrary('c++abi')
   compiler.addLibrary('c')
   compiler.addLibrary('pthread')
-  
+
   #compiler.addProgramFlag('-Wl,--trace')
   #compiler.addProgramFlag('-Wl,-v')
-  
+
   clangVariant.tools['compiler'] = compiler
 
   env = clangVariant.tools["env"]
@@ -207,12 +207,12 @@ elif cake.system.isLinux():
 
   clangDebugVariant = clangVariant.clone(release='debug')
   clangDebugVariant.tools["env"]["RELEASE"] = 'debug'
-  
+
   # Configure debug-specific settings here
   compiler = clangDebugVariant.tools["compiler"]
   compiler.addCppFlag('-O0')
   compiler.addCppFlag('-g')
-  
+
   configuration.addVariant(clangDebugVariant)
 
   clangOptimisedVariant = clangVariant.clone(release='optimised')
@@ -225,5 +225,5 @@ elif cake.system.isLinux():
   compiler.addCppFlag('-flto')
   compiler.addProgramFlag('-flto')
   compiler.addModuleFlag('-flto')
-  
+
   configuration.addVariant(clangOptimisedVariant)
