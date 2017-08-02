@@ -9,6 +9,8 @@
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
 
+#include <cppcoro/detail/continuation.hpp>
+
 #include <atomic>
 #include <exception>
 #include <utility>
@@ -28,7 +30,7 @@ namespace cppcoro
 	{
 		struct shared_task_waiter
 		{
-			std::experimental::coroutine_handle<> m_coroutine;
+			cppcoro::detail::continuation m_continuation;
 			shared_task_waiter* m_next;
 		};
 
@@ -74,15 +76,15 @@ namespace cppcoro
 				void* waiters = m_waiters.exchange(static_cast<void*>(this), std::memory_order_acq_rel);
 				if (waiters != nullptr)
 				{
-					shared_task_waiter* next = static_cast<shared_task_waiter*>(waiters);
+					shared_task_waiter* waiter = static_cast<shared_task_waiter*>(waiters);
 					do
 					{
 						// Read the m_next pointer before resuming the coroutine
 						// since resuming the coroutine may destroy the shared_task_waiter value.
-						auto coroutine = next->m_coroutine;
-						next = next->m_next;
-						coroutine.resume();
-					} while (next != nullptr);
+						auto* next = waiter->m_next;
+						waiter->m_continuation.resume();
+						waiter = next;
+					} while (waiter != nullptr);
 				}
 
 				return awaitable{ *this };
@@ -270,6 +272,8 @@ namespace cppcoro
 
 		using promise_type = detail::shared_task_promise<T>;
 
+		using value_type = T;
+
 	private:
 
 		struct awaitable_base
@@ -288,7 +292,7 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_waiter.m_coroutine = awaiter;
+				m_waiter.m_continuation = detail::continuation{ awaiter };
 				return m_coroutine.promise().try_await(&m_waiter);
 			}
 		};
@@ -316,10 +320,10 @@ namespace cppcoro
 		shared_task(const shared_task& other) noexcept
 			: m_coroutine(other.m_coroutine)
 		{
-			if (m_coroutine)
-			{
-				m_coroutine.promise().add_ref();
-			}
+if (m_coroutine)
+{
+	m_coroutine.promise().add_ref();
+}
 		}
 
 		~shared_task()
@@ -404,6 +408,34 @@ namespace cppcoro
 			};
 
 			return awaitable{ m_coroutine };
+		}
+
+		auto get_starter() const noexcept
+		{
+			struct starter
+			{
+			public:
+
+				explicit starter(std::experimental::coroutine_handle<promise_type> coroutine)
+					: m_coroutine(coroutine)
+				{}
+
+				void start(detail::continuation c) noexcept
+				{
+					m_waiter.m_continuation = c;
+					if (!m_coroutine || m_coroutine.promise().is_ready() || !m_coroutine.promise().try_await(&m_waiter))
+					{
+						// Task completed synchronously, resume immediately.
+						c.resume();
+					}
+				}
+
+			private:
+				std::experimental::coroutine_handle<promise_type> m_coroutine;
+				detail::shared_task_waiter m_waiter;
+			};
+
+			return starter{ m_coroutine };
 		}
 
 	private:

@@ -9,6 +9,8 @@
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/lazy_task.hpp>
 
+#include <cppcoro/detail/continuation.hpp>
+
 #include <atomic>
 #include <exception>
 #include <utility>
@@ -25,7 +27,7 @@ namespace cppcoro
 	{
 		struct shared_lazy_task_waiter
 		{
-			std::experimental::coroutine_handle<> m_coroutine;
+			continuation m_continuation;
 			shared_lazy_task_waiter* m_next;
 		};
 
@@ -75,15 +77,15 @@ namespace cppcoro
 				void* waiters = m_waiters.exchange(valueReadyValue, std::memory_order_acq_rel);
 				if (waiters != nullptr)
 				{
-					shared_lazy_task_waiter* next = static_cast<shared_lazy_task_waiter*>(waiters);
+					shared_lazy_task_waiter* waiter = static_cast<shared_lazy_task_waiter*>(waiters);
 					do
 					{
 						// Read the m_next pointer before resuming the coroutine
 						// since resuming the coroutine may destroy the shared_task_waiter value.
-						auto coroutine = next->m_coroutine;
-						next = next->m_next;
-						coroutine.resume();
-					} while (next != nullptr);
+						auto* next = waiter->m_next;
+						waiter->m_continuation.resume();
+						waiter = next;
+					} while (waiter != nullptr);
 				}
 
 				return awaitable{ *this };
@@ -306,6 +308,8 @@ namespace cppcoro
 
 		using promise_type = detail::shared_lazy_task_promise<T>;
 
+		using value_type = T;
+
 	private:
 
 		struct awaitable_base
@@ -324,7 +328,7 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_waiter.m_coroutine = awaiter;
+				m_waiter.m_continuation = detail::continuation{ awaiter };
 				return m_coroutine.promise().try_await(&m_waiter, m_coroutine);
 			}
 		};
@@ -442,6 +446,37 @@ namespace cppcoro
 			return awaitable{ m_coroutine };
 		}
 
+		auto get_starter() const noexcept
+		{
+			struct starter
+			{
+			public:
+
+				explicit starter(std::experimental::coroutine_handle<promise_type> coroutine)
+					: m_coroutine(coroutine)
+				{}
+
+				void start(detail::continuation c) noexcept
+				{
+					m_waiter.m_continuation = c;
+
+					if (!m_coroutine ||
+						m_coroutine.promise().is_ready() ||
+						!m_coroutine.promise().try_await(&m_waiter, m_coroutine))
+					{
+						// Task completed synchronously, resume immediately.
+						c.resume();
+					}
+				}
+
+			private:
+				std::experimental::coroutine_handle<promise_type> m_coroutine;
+				detail::shared_lazy_task_waiter m_waiter;
+			};
+
+			return starter{ m_coroutine };
+		}
+
 	private:
 
 		template<typename U>
@@ -513,7 +548,7 @@ namespace cppcoro
 		co_return co_await std::move(t);
 	}
 
-#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019
+#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019 || CPPCORO_COMPILER_CLANG
 	// HACK: Workaround for broken MSVC that doesn't execute <expr> in 'co_return <expr>;'.
 	inline shared_lazy_task<void> make_shared_task(lazy_task<void> t)
 	{

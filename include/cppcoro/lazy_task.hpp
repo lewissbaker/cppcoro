@@ -8,6 +8,8 @@
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/fmap.hpp>
 
+#include <cppcoro/detail/continuation.hpp>
+
 #include <atomic>
 #include <exception>
 #include <utility>
@@ -26,7 +28,7 @@ namespace cppcoro
 		public:
 
 			lazy_task_promise_base() noexcept
-				: m_awaiter(nullptr)
+				: m_continuation()
 			{}
 
 			auto initial_suspend() noexcept
@@ -38,23 +40,23 @@ namespace cppcoro
 			{
 				struct awaitable
 				{
-					std::experimental::coroutine_handle<> m_awaiter;
+					continuation m_continuation;
 
-					awaitable(std::experimental::coroutine_handle<> awaiter) noexcept
-						: m_awaiter(awaiter)
+					awaitable(continuation c) noexcept
+						: m_continuation(c)
 					{}
 
 					bool await_ready() const noexcept { return false; }
 
 					void await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
 					{
-						m_awaiter.resume();
+						m_continuation.resume();
 					}
 
 					void await_resume() noexcept {}
 				};
 
-				return awaitable{ m_awaiter };
+				return awaitable{ m_continuation };
 			}
 
 			void unhandled_exception() noexcept
@@ -64,12 +66,12 @@ namespace cppcoro
 
 			bool is_ready() const noexcept
 			{
-				return static_cast<bool>(m_awaiter);
+				return static_cast<bool>(m_continuation);
 			}
 
-			void set_awaiter(std::experimental::coroutine_handle<> awaiter)
+			void set_continuation(continuation c)
 			{
-				m_awaiter = awaiter;
+				m_continuation = c;
 			}
 
 		protected:
@@ -89,7 +91,7 @@ namespace cppcoro
 
 		private:
 
-			std::experimental::coroutine_handle<> m_awaiter;
+			continuation m_continuation;
 			std::exception_ptr m_exception;
 
 		};
@@ -221,6 +223,8 @@ namespace cppcoro
 
 		using promise_type = detail::lazy_task_promise<T>;
 
+		using value_type = T;
+
 	private:
 
 		struct awaitable_base
@@ -238,7 +242,7 @@ namespace cppcoro
 
 			void await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_coroutine.promise().set_awaiter(awaiter);
+				m_coroutine.promise().set_continuation(detail::continuation{ awaiter });
 				m_coroutine.resume();
 			}
 		};
@@ -350,6 +354,38 @@ namespace cppcoro
 			};
 
 			return awaitable{ m_coroutine };
+		}
+
+		// Internal helper method for when_all() implementation.
+		auto get_starter() const noexcept
+		{
+			class starter
+			{
+			public:
+
+				starter(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
+					: m_coroutine(coroutine)
+				{}
+
+				void start(detail::continuation c) noexcept
+				{
+					if (m_coroutine && !m_coroutine.promise().is_ready())
+					{
+						m_coroutine.promise().set_continuation(c);
+						m_coroutine.resume();
+					}
+					else
+					{
+						c.resume();
+					}
+				}
+
+			private:
+
+				std::experimental::coroutine_handle<promise_type> m_coroutine;
+			};
+
+			return starter{ m_coroutine };
 		}
 
 	private:
