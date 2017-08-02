@@ -73,7 +73,7 @@ TEST_CASE("result is destroyed when last reference is destroyed"
 
 		[](cppcoro::shared_lazy_task<counted> t) -> cppcoro::task<>
 		{
-			co_await t;
+			co_await t.when_ready();
 		}(t);
 
 		CHECK(counted::active_count() == 1);

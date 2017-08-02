@@ -182,10 +182,10 @@ TEST_CASE("async producer with async consumer"
 	{
 		auto it = co_await producer.begin();
 		CHECK(*it == 1u);
-		co_await ++it;
+		(void)co_await ++it;
 		CHECK(*it == 2u);
 		co_await c1;
-		co_await ++it;
+		(void)co_await ++it;
 		CHECK(it == producer.end());
 	}();
 
