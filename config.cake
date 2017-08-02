@@ -158,17 +158,26 @@ elif cake.system.isLinux():
                                    platform='linux',
                                    architecture='x64')
 
+  # If you have built your own version of Clang, you can modify
+  # this variable to point to the CMAKE_INSTALL_PREFIX for
+  # where you have installed your clang/libcxx build.
+  clangInstallPrefix = '/usr'
+
+  clangBinPath = cake.path.join(clangInstallPrefix, 'bin')
+
   compiler = ClangCompiler(
     configuration=configuration,
-    clangExe='/usr/bin/clang-5.0',
-    llvmArExe='/usr/bin/llvm-ar-5.0',
-    binPaths=['/usr/bin'])
+    clangExe=cake.path.join(clangBinPath, 'clang'),
+    llvmArExe=cake.path.join(clangBinPath, 'llvm-ar'),
+    binPaths=[clangBinPath])
 
   compiler.addCppFlag('-std=c++1z')
   compiler.addCppFlag('-fcoroutines-ts')
   compiler.addCppFlag('-m64')
 
-  # Set this to the install-prefix of where libc++-5.0 is installed.
+  # Set this to the install-prefix of where libc++ is installed.
+  # You only need to set this if it is not installed at the same
+  # location as clang.
   libCxxInstallPrefix = None # '/path/to/install'
 
   if libCxxInstallPrefix:
