@@ -350,4 +350,22 @@ TEST_CASE("chained fmap pipe operations")
 	}();
 }
 
+TEST_CASE("lazy_task resumption uses tail call to avoid stack overflow")
+{
+	bool completedSynchronously = []() -> cppcoro::task<>
+	{
+		auto completesSynchronously = []() -> cppcoro::lazy_task<> { co_return; };
+
+		// Await a large number of synchronously-completing lazy_task values
+    // in a row. If the lazy_task's final_suspend is not doing tail-calls
+		// to resume the awaiter then this will blow the stack.
+		for (int i = 0; i < 100000; ++i)
+    {
+			co_await completesSynchronously();
+    }
+	}().is_ready();
+
+	CHECK(completedSynchronously);
+}
+
 TEST_SUITE_END();
