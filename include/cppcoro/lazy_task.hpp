@@ -51,7 +51,7 @@ namespace cppcoro
 					std::experimental::coroutine_handle<>
 					await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
 					{
-						return m_continuation.resume_or_get_coroutine_handle();
+						return m_continuation.tail_call_resume();
 					}
 
 					void await_resume() noexcept {}

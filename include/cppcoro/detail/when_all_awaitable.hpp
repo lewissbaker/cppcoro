@@ -6,6 +6,7 @@
 #define CPPCORO_DETAIL_WHEN_ALL_AWAITABLE_HPP_INCLUDED
 
 #include <cppcoro/detail/continuation.hpp>
+#include <cppcoro/detail/dummy_coroutine.hpp>
 
 #include <atomic>
 
@@ -17,7 +18,7 @@ namespace cppcoro
 		{
 		public:
 
-			when_all_awaitable(std::size_t count) noexcept
+			explicit when_all_awaitable(std::size_t count) noexcept
 				: m_refCount(count + 1)
 			{}
 
@@ -31,22 +32,33 @@ namespace cppcoro
 				return m_refCount.load(std::memory_order_acquire) == 1;
 			}
 
-			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+			auto await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
 				m_awaiter = awaiter;
-				return m_refCount.fetch_sub(1, std::memory_order_acq_rel) > 1;
+				if (m_refCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
+				{
+					return awaiter;
+				}
+				else
+				{
+					return dummy_coroutine::handle();
+				}
 			}
 
 			void await_resume() noexcept {}
 
 		private:
 
-			static void resumer_callback(void* state) noexcept
+			static std::experimental::coroutine_handle<> resumer_callback(void* state) noexcept
 			{
 				auto* that = static_cast<when_all_awaitable*>(state);
 				if (that->m_refCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
 				{
-					that->m_awaiter.resume();
+					return that->m_awaiter;
+				}
+				else
+				{
+					return dummy_coroutine::handle();
 				}
 			}
 

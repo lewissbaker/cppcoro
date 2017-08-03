@@ -15,7 +15,7 @@ namespace cppcoro
 		{
 		public:
 
-			using callback_t = void(void*);
+			using callback_t = std::experimental::coroutine_handle<>(void*);
 
 			continuation() noexcept
 				: m_callback(nullptr)
@@ -39,17 +39,10 @@ namespace cppcoro
 
 			void resume() noexcept
 			{
-				if (m_callback == nullptr)
-				{
-					std::experimental::coroutine_handle<>::from_address(m_state).resume();
-				}
-				else
-				{
-					m_callback(m_state);
-				}
+				tail_call_resume().resume();
 			}
 
-			std::experimental::coroutine_handle<> resume_or_get_coroutine_handle()
+			std::experimental::coroutine_handle<> tail_call_resume()
 			{
 				if (m_callback == nullptr)
 				{
@@ -57,8 +50,7 @@ namespace cppcoro
 				}
 				else
 				{
-					m_callback(m_state);
-					return {};
+					return m_callback(m_state);
 				}
 			}
 
