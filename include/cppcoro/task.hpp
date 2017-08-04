@@ -9,6 +9,7 @@
 #include <cppcoro/fmap.hpp>
 
 #include <cppcoro/detail/continuation.hpp>
+#include <cppcoro/detail/dummy_coroutine.hpp>
 
 #include <atomic>
 #include <exception>
@@ -53,16 +54,22 @@ namespace cppcoro
 						return m_promise.m_state.load(std::memory_order_acquire) == state::consumer_detached;
 					}
 
-					// If resuming awaiter can potentially throw what state would that leave this coroutine in?
-					bool await_suspend(std::experimental::coroutine_handle<>) noexcept
+					std::experimental::coroutine_handle<> await_suspend(
+						std::experimental::coroutine_handle<> coroutine) noexcept
 					{
 						state oldState = m_promise.m_state.exchange(state::finished, std::memory_order_acq_rel);
 						if (oldState == state::consumer_suspended)
 						{
-							m_promise.m_continuation.resume();
+							return m_promise.m_continuation.tail_call_resume();
 						}
-
-						return oldState != state::consumer_detached;
+						else if (oldState == state::consumer_detached)
+						{
+							return coroutine;
+						}
+						else
+						{
+							return detail::dummy_coroutine::handle();
+						}
 					}
 
 					void await_resume() noexcept
