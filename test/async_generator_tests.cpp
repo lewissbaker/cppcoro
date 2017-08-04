@@ -40,57 +40,57 @@ TEST_CASE("async_generator doesn't start if begin() not called")
 TEST_CASE("enumerate sequence of 1 value")
 {
 	bool startedExecution = false;
-	auto gen = [&]() -> cppcoro::async_generator<std::uint32_t>
+	auto makeGenerator = [&]() -> cppcoro::async_generator<std::uint32_t>
 	{
 		startedExecution = true;
 		co_yield 1;
+	};
+
+	[&]() -> cppcoro::task<>
+	{
+		auto gen = makeGenerator();
+
+		CHECK(!startedExecution);
+
+		auto it = co_await gen.begin();
+		CHECK(startedExecution);
+
+		CHECK(it != gen.end());
+		CHECK(*it == 1u);
 	}();
-
-	CHECK(!startedExecution);
-
-	auto itAwaitable = gen.begin();
-	CHECK(startedExecution);
-	CHECK(itAwaitable.await_ready());
-	auto it = itAwaitable.await_resume();
-	CHECK(it != gen.end());
-	CHECK(*it == 1u);
 }
 
 TEST_CASE("enumerate sequence of multiple values")
 {
 	bool startedExecution = false;
-	auto gen = [&]() -> cppcoro::async_generator<std::uint32_t>
+	auto makeGenerator = [&]() -> cppcoro::async_generator<std::uint32_t>
 	{
 		startedExecution = true;
 		co_yield 1;
 		co_yield 2;
 		co_yield 3;
+	};
+
+	[&]() -> cppcoro::task<>
+	{
+		auto gen = makeGenerator();
+
+		CHECK(!startedExecution);
+
+		auto it = co_await gen.begin();
+		CHECK(startedExecution);
+
+		CHECK(it != gen.end());
+		CHECK(*it == 1u);
+
+		CHECK(co_await ++it != gen.end());
+		CHECK(*it == 2u);
+
+		CHECK(co_await ++it != gen.end());
+		CHECK(*it == 3u);
+		
+		CHECK(co_await ++it == gen.end());
 	}();
-
-	CHECK(!startedExecution);
-
-	auto beginAwaitable = gen.begin();
-	CHECK(startedExecution);
-	CHECK(beginAwaitable.await_ready());
-
-	auto it = beginAwaitable.await_resume();
-	CHECK(it != gen.end());
-	CHECK(*it == 1u);
-
-	auto incrementAwaitable1 = ++it;
-	CHECK(incrementAwaitable1.await_ready());
-	incrementAwaitable1.await_resume();
-	CHECK(*it == 2u);
-
-	auto incrementAwaitable2 = ++it;
-	CHECK(incrementAwaitable2.await_ready());
-	incrementAwaitable2.await_resume();
-	CHECK(*it == 3u);
-
-	auto incrementAwaitable3 = ++it;
-	CHECK(incrementAwaitable3.await_ready());
-	incrementAwaitable3.await_resume();
-	CHECK(it == gen.end());
 }
 
 class set_to_true_on_destruction
@@ -126,30 +126,34 @@ TEST_CASE("destructors of values in scope are called when async_generator destru
 {
 	bool aDestructed = false;
 	bool bDestructed = false;
+
+	auto makeGenerator = [&](set_to_true_on_destruction a) -> cppcoro::async_generator<std::uint32_t>
 	{
-		auto gen = [&](set_to_true_on_destruction a) -> cppcoro::async_generator<std::uint32_t>
+		set_to_true_on_destruction b(&bDestructed);
+		co_yield 1;
+		co_yield 2;
+	};
+
+	CHECK([&]() -> cppcoro::task<>
+	{
 		{
-			set_to_true_on_destruction b(&bDestructed);
-			co_yield 1;
-			co_yield 2;
-		}(&aDestructed);
+			auto gen = makeGenerator(&aDestructed);
 
-		CHECK(!aDestructed);
-		CHECK(!bDestructed);
+			CHECK(!aDestructed);
+			CHECK(!bDestructed);
 
-		auto beginOp = gen.begin();
-		CHECK(beginOp.await_ready());
-		CHECK(!aDestructed);
-		CHECK(!bDestructed);
+			auto it = co_await gen.begin();
+			CHECK(!aDestructed);
+			CHECK(!bDestructed);
 
-		auto it = beginOp.await_resume();
-		CHECK(*it == 1u);
-		CHECK(!aDestructed);
-		CHECK(!bDestructed);
-	}
+			CHECK(*it == 1u);
+			CHECK(!aDestructed);
+			CHECK(!bDestructed);
+		}
 
-	CHECK(aDestructed);
-	CHECK(bDestructed);
+		CHECK(aDestructed);
+		CHECK(bDestructed);
+	}().is_ready());
 }
 
 TEST_CASE("async producer with async consumer"
@@ -200,40 +204,44 @@ TEST_CASE("async producer with async consumer"
 TEST_CASE("exception thrown before first yield is rethrown from begin operation")
 {
 	class TestException {};
-	auto gen = [&](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
+	auto makeGenerator = [](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
 	{
 		if (shouldThrow)
 		{
 			throw TestException();
 		}
 		co_yield 1;
-	}(true);
+	};
 
-	auto beginAwaitable = gen.begin();
-	CHECK(beginAwaitable.await_ready());
-	CHECK_THROWS_AS(beginAwaitable.await_resume(), const TestException&);
+	CHECK([&]() -> cppcoro::task<>
+	{
+		auto gen = makeGenerator(true);
+		CHECK_THROWS_AS(co_await gen.begin(), const TestException&);
+	}().is_ready());
 }
 
 TEST_CASE("exception thrown after first yield is rethrown from increment operator")
 {
 	class TestException {};
-	auto gen = [&](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
+	auto makeGenerator = [](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
 	{
 		co_yield 1;
 		if (shouldThrow)
 		{
 			throw TestException();
 		}
-	}(true);
+	};
 
-	auto beginAwaitable = gen.begin();
-	CHECK(beginAwaitable.await_ready());
-	auto it = beginAwaitable.await_resume();
-	CHECK(*it == 1u);
-	auto incrementAwaitable = ++it;
-	CHECK(incrementAwaitable.await_ready());
-	CHECK_THROWS_AS(incrementAwaitable.await_resume(), const TestException&);
-	CHECK(it == gen.end());
+	CHECK([&]() -> cppcoro::task<>
+	{
+		auto gen = makeGenerator(true);
+		auto it = co_await gen.begin();
+		CHECK(*it == 1u);
+
+		auto incrementAwaitable = ++it;
+		CHECK_THROWS_AS(co_await incrementAwaitable, const TestException&);
+		CHECK(it == gen.end());
+	}().is_ready());
 }
 
 TEST_CASE("large number of synchronous completions doesn't result in stack-overflow")

@@ -8,12 +8,10 @@
 #include <cppcoro/fmap.hpp>
 
 #include <exception>
-#include <atomic>
 #include <iterator>
 #include <type_traits>
 #include <experimental/coroutine>
 #include <functional>
-#include <cassert>
 
 namespace cppcoro
 {
@@ -32,8 +30,7 @@ namespace cppcoro
 		public:
 
 			async_generator_promise_base() noexcept
-				: m_state(state::value_ready_producer_suspended)
-				, m_exception(nullptr)
+				: m_exception(nullptr)
 			{
 				// Other variables left intentionally uninitialised as they're
 				// only referenced in certain states by which time they should
@@ -52,12 +49,7 @@ namespace cppcoro
 
 			void unhandled_exception() noexcept
 			{
-				// Don't bother capturing the exception if we have been cancelled
-				// as there is no consumer that will see it.
-				if (m_state.load(std::memory_order_relaxed) != state::cancelled)
-				{
-					m_exception = std::current_exception();
-				}
+				m_exception = std::current_exception();
 			}
 
 			void return_void() noexcept
@@ -81,30 +73,6 @@ namespace cppcoro
 				}
 			}
 
-			/// Request that the generator cancel generation of new items.
-			///
-			/// \return
-			/// Returns true if the request was completed synchronously and the associated
-			/// producer coroutine is now available to be destroyed. In which case the caller
-			/// is expected to call destroy() on the coroutine_handle.
-			/// Returns false if the producer coroutine was not at a suitable suspend-point.
-			/// The coroutine will be destroyed when it next reaches a co_yield or co_return
-			/// statement.
-			bool request_cancellation() noexcept
-			{
-				const auto previousState = m_state.exchange(state::cancelled, std::memory_order_acq_rel);
-
-				// Not valid to destroy async_generator<T> object if consumer coroutine still suspended
-				// in a co_await for next item.
-				assert(previousState != state::value_not_ready_consumer_suspended);
-
-				// A coroutine should only ever be cancelled once, from the destructor of the
-				// owning async_generator<T> object.
-				assert(previousState != state::cancelled);
-
-				return previousState == state::value_ready_producer_suspended;
-			}
-
 		protected:
 
 			async_generator_yield_operation internal_yield_value() noexcept;
@@ -113,38 +81,6 @@ namespace cppcoro
 
 			friend class async_generator_yield_operation;
 			friend class async_generator_advance_operation;
-
-			// State transition diagram
-			//   VNRCA - value_not_ready_consumer_active
-			//   VNRCS - value_not_ready_consumer_suspended
-			//   VRPA  - value_ready_consumer_active
-			//   VRPS  - value_ready_consumer_suspended
-			//
-			//       A         +---  VNRCA --[C]--> VNRCS   yield_value()
-			//       |         |     |  A           |  A       |   .
-			//       |        [C]   [P] |          [P] |       |   .
-			//       |         |     | [C]          | [C]      |   .
-			//       |         |     V  |           V  |       |   .
-			//  operator++/    |     VRPS <--[P]--- VRPA       V   |
-			//  begin()        |      |              |             |
-			//                 |     [C]            [C]            |
-			//                 |      +----+     +---+             |
-			//                 |           |     |                 |
-			//                 |           V     V                 V
-			//                 +--------> cancelled         ~async_generator()
-			//
-			// [C] - Consumer performs this transition
-			// [P] - Producer performs this transition
-			enum class state
-			{
-				value_not_ready_consumer_active,
-				value_not_ready_consumer_suspended,
-				value_ready_producer_active,
-				value_ready_producer_suspended,
-				cancelled
-			};
-
-			std::atomic<state> m_state;
 
 			std::exception_ptr m_exception;
 
@@ -157,27 +93,28 @@ namespace cppcoro
 
 		class async_generator_yield_operation final
 		{
-			using state = async_generator_promise_base::state;
-
 		public:
 
-			async_generator_yield_operation(async_generator_promise_base& promise, state initialState) noexcept
-				: m_promise(promise)
-				, m_initialState(initialState)
+			async_generator_yield_operation(std::experimental::coroutine_handle<> consumer) noexcept
+				: m_consumer(consumer)
 			{}
 
 			bool await_ready() const noexcept
 			{
-				return m_initialState == state::value_not_ready_consumer_suspended;
+				return false;
 			}
 
-			bool await_suspend(std::experimental::coroutine_handle<> producer) noexcept;
+			std::experimental::coroutine_handle<>
+			await_suspend(std::experimental::coroutine_handle<> producer) noexcept
+			{
+				return m_consumer;
+			}
 
 			void await_resume() noexcept {}
 
 		private:
-			async_generator_promise_base& m_promise;
-			state m_initialState;
+
+			std::experimental::coroutine_handle<> m_consumer;
 
 		};
 
@@ -189,112 +126,11 @@ namespace cppcoro
 
 		inline async_generator_yield_operation async_generator_promise_base::internal_yield_value() noexcept
 		{
-			state currentState = m_state.load(std::memory_order_acquire);
-			assert(currentState != state::value_ready_producer_active);
-			assert(currentState != state::value_ready_producer_suspended);
-
-			if (currentState == state::value_not_ready_consumer_suspended)
-			{
-				// Only need relaxed memory order since we're resuming the
-				// consumer on the same thread.
-				m_state.store(state::value_ready_producer_active, std::memory_order_relaxed);
-
-				// Resume the consumer.
-				// It might ask for another value before returning, in which case it'll
-				// transition to value_not_ready_consumer_suspended and we can return from
-				// yield_value without suspending, otherwise we should try to suspend
-				// the producer in which case the consumer will wake us up again
-				// when it wants the next value.
-				m_consumerCoroutine.resume();
-
-				// Need to use acquire semantics here since it's possible that the
-				// consumer might have asked for the next value on a different thread
-				// which executed concurrently with the call to m_consumerCoro on the
-				// current thread above.
-				currentState = m_state.load(std::memory_order_acquire);
-			}
-
-			return async_generator_yield_operation{ *this, currentState };
-		}
-
-		inline bool async_generator_yield_operation::await_suspend(
-			std::experimental::coroutine_handle<> producer) noexcept
-		{
-			state currentState = m_initialState;
-			if (currentState == state::value_not_ready_consumer_active)
-			{
-				bool producerSuspended = m_promise.m_state.compare_exchange_strong(
-					currentState,
-					state::value_ready_producer_suspended,
-					std::memory_order_release,
-					std::memory_order_acquire);
-				if (producerSuspended)
-				{
-					return true;
-				}
-
-				if (currentState == state::value_not_ready_consumer_suspended)
-				{
-					// Can get away with using relaxed memory semantics here since we're
-					// resuming the consumer on the current thread.
-					m_promise.m_state.store(state::value_ready_producer_active, std::memory_order_relaxed);
-
-					m_promise.m_consumerCoroutine.resume();
-
-					// The consumer might have asked for another value before returning, in which case
-					// it'll transition to value_not_ready_consumer_suspended and we can return without
-					// suspending, otherwise we should try to suspend the producer, in which case the
-					// consumer will wake us up again when it wants the next value.
-					//
-					// Need to use acquire semantics here since it's possible that the consumer might
-					// have asked for the next value on a different thread which executed concurrently
-					// with the call to m_consumerCoro.resume() above.
-					currentState = m_promise.m_state.load(std::memory_order_acquire);
-					if (currentState == state::value_not_ready_consumer_suspended)
-					{
-						return false;
-					}
-				}
-			}
-
-			// By this point the consumer has been resumed if required and is now active.
-
-			if (currentState == state::value_ready_producer_active)
-			{
-				// Try to suspend the producer.
-				// If we failed to suspend then it's either because the consumer destructed, transitioning
-				// the state to cancelled, or requested the next item, transitioning the state to value_not_ready_consumer_suspended.
-				const bool suspendedProducer = m_promise.m_state.compare_exchange_strong(
-					currentState,
-					state::value_ready_producer_suspended,
-					std::memory_order_release,
-					std::memory_order_acquire);
-				if (suspendedProducer)
-				{
-					return true;
-				}
-
-				if (currentState == state::value_not_ready_consumer_suspended)
-				{
-					// Consumer has asked for the next value.
-					return false;
-				}
-			}
-
-			assert(currentState == state::cancelled);
-
-			// async_generator object has been destroyed and we're now at a
-			// co_yield/co_return suspension point so we can just destroy
-			// the coroutine.
-			producer.destroy();
-
-			return true;
+			return async_generator_yield_operation{ m_consumerCoroutine };
 		}
 
 		class async_generator_advance_operation
 		{
-			using state = async_generator_promise_base::state;
-
 		protected:
 
 			async_generator_advance_operation(std::nullptr_t) noexcept
@@ -308,87 +144,23 @@ namespace cppcoro
 				: m_promise(std::addressof(promise))
 				, m_producerCoroutine(producerCoroutine)
 			{
-				state initialState = promise.m_state.load(std::memory_order_acquire);
-				if (initialState == state::value_ready_producer_suspended)
-				{
-					// Can use relaxed memory order here as we will be resuming the producer
-					// on the same thread.
-					promise.m_state.store(state::value_not_ready_consumer_active, std::memory_order_relaxed);
-
-					producerCoroutine.resume();
-
-					// Need to use acquire memory order here since it's possible that the
-					// coroutine may have transferred execution to another thread and
-					// completed on that other thread before the call to resume() returns.
-					initialState = promise.m_state.load(std::memory_order_acquire);
-				}
-
-				m_initialState = initialState;
 			}
 
 		public:
 
-			bool await_ready() const noexcept
-			{
-				return m_initialState == state::value_ready_producer_suspended;
-			}
+			bool await_ready() const noexcept { return false; }
 
-			bool await_suspend(std::experimental::coroutine_handle<> consumerCoroutine) noexcept
+			std::experimental::coroutine_handle<>
+			await_suspend(std::experimental::coroutine_handle<> consumerCoroutine) noexcept
 			{
 				m_promise->m_consumerCoroutine = consumerCoroutine;
-
-				auto currentState = m_initialState;
-				if (currentState == state::value_ready_producer_active)
-				{
-					// A potential race between whether consumer or producer coroutine
-					// suspends first. Resolve the race using a compare-exchange.
-					if (m_promise->m_state.compare_exchange_strong(
-						currentState,
-						state::value_not_ready_consumer_suspended,
-						std::memory_order_release,
-						std::memory_order_acquire))
-					{
-						return true;
-					}
-
-					assert(currentState == state::value_ready_producer_suspended);
-
-					m_promise->m_state.store(state::value_not_ready_consumer_active, std::memory_order_relaxed);
-
-					m_producerCoroutine.resume();
-
-					currentState = m_promise->m_state.load(std::memory_order_acquire);
-					if (currentState == state::value_ready_producer_suspended)
-					{
-						// Producer coroutine produced a value synchronously.
-						return false;
-					}
-				}
-
-				assert(currentState == state::value_not_ready_consumer_active);
-
-				// Try to suspend consumer coroutine, transitioning to value_not_ready_consumer_suspended.
-				// This could be racing with producer making the next value available and suspending
-				// (transition to value_ready_producer_suspended) so we use compare_exchange to decide who
-				// wins the race.
-				// If compare_exchange succeeds then consumer suspended (and we return true).
-				// If it fails then producer yielded next value and suspended and we can return
-				// synchronously without suspended (ie. return false).
-				return m_promise->m_state.compare_exchange_strong(
-					currentState,
-					state::value_not_ready_consumer_suspended,
-					std::memory_order_release,
-					std::memory_order_acquire);
+				return m_producerCoroutine;
 			}
 
 		protected:
 
 			async_generator_promise_base* m_promise;
 			std::experimental::coroutine_handle<> m_producerCoroutine;
-
-		private:
-
-			state m_initialState;
 
 		};
 
@@ -594,10 +366,7 @@ namespace cppcoro
 		{
 			if (m_coroutine)
 			{
-				if (m_coroutine.promise().request_cancellation())
-				{
-					m_coroutine.destroy();
-				}
+				m_coroutine.destroy();
 			}
 		}
 
