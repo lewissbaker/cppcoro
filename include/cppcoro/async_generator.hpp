@@ -671,7 +671,7 @@ namespace cppcoro
 			while (it != itEnd)
 			{
 				co_yield std::invoke(func, *it);
-				co_await ++it;
+				(void)co_await ++it;
 			}
 		}
 	}

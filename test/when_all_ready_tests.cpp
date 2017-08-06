@@ -38,7 +38,7 @@ TEST_CASE("when_all_ready() with no args")
 {
 	auto run = []() -> cppcoro::task<>
 	{
-		co_await cppcoro::when_all_ready();
+		(void)co_await cppcoro::when_all_ready();
 	};
 	CHECK(run().is_ready());
 }
@@ -366,7 +366,7 @@ TEST_CASE("when_all_ready() doesn't rethrow exceptions")
 		{
 			auto[t0, t1] = co_await cppcoro::when_all_ready(makeTask(true), makeTask(false));
 
-			CHECK_THROWS_AS(co_await t0, const std::exception&);
+			CHECK_THROWS_AS((void)co_await t0, const std::exception&);
 			CHECK(co_await t1 == 123);
 		}
 		catch (...)

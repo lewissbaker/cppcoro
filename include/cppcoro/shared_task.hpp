@@ -5,6 +5,7 @@
 #ifndef CPPCORO_SHARED_TASK_HPP_INCLUDED
 #define CPPCORO_SHARED_TASK_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
 

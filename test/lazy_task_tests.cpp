@@ -9,6 +9,7 @@
 
 #include "counted.hpp"
 
+#include <ostream>
 #include <string>
 #include <type_traits>
 
@@ -112,7 +113,7 @@ TEST_CASE("lazy_task destructor destroys result")
 
 		[](cppcoro::lazy_task<counted>& t) -> cppcoro::task<>
 		{
-			co_await t;
+			co_await t.when_ready();
 			CHECK(t.is_ready());
 			CHECK(counted::active_count() == 1);
 		}(t);

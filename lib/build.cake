@@ -58,15 +58,6 @@ sources = script.cwd([
   'cancellation_token.cpp',
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
-  'io_service.cpp',
-  'file.cpp',
-  'readable_file.cpp',
-  'writable_file.cpp',
-  'read_only_file.cpp',
-  'write_only_file.cpp',
-  'read_write_file.cpp',
-  'file_read_operation.cpp',
-  'file_write_operation.cpp',
   ])
 
 extras = script.cwd([
@@ -80,6 +71,15 @@ if variant.platform == "windows":
     ]))
   sources.extend(script.cwd([
     'win32.cpp',
+    'io_service.cpp',
+    'file.cpp',
+    'readable_file.cpp',
+    'writable_file.cpp',
+    'read_only_file.cpp',
+    'write_only_file.cpp',
+    'read_write_file.cpp',
+    'file_read_operation.cpp',
+    'file_write_operation.cpp',
     ]))
 
 buildDir = env.expand('${CPPCORO_BUILD}')

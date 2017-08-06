@@ -149,3 +149,81 @@ if cake.system.isWindows() or cake.system.isCygwin():
 
     except CompilerNotFoundError, e:
       print str(e)
+
+elif cake.system.isLinux():
+
+  from cake.library.compilers.clang import ClangCompiler
+
+  clangVariant = baseVariant.clone(compiler='clang',
+                                   platform='linux',
+                                   architecture='x64')
+
+  # If you have built your own version of Clang, you can modify
+  # this variable to point to the CMAKE_INSTALL_PREFIX for
+  # where you have installed your clang/libcxx build.
+  clangInstallPrefix = '/usr'
+
+  # Set this to the install-prefix of where libc++ is installed.
+  # You only need to set this if it is not installed at the same
+  # location as clangInstallPrefix.
+  libCxxInstallPrefix = None # '/path/to/install'
+
+  clangBinPath = cake.path.join(clangInstallPrefix, 'bin')
+
+  compiler = ClangCompiler(
+    configuration=configuration,
+    clangExe=cake.path.join(clangBinPath, 'clang'),
+    llvmArExe=cake.path.join(clangBinPath, 'llvm-ar'),
+    binPaths=[clangBinPath])
+
+  compiler.addCppFlag('-std=c++1z')
+  compiler.addCppFlag('-fcoroutines-ts')
+  compiler.addCppFlag('-m64')
+
+  if libCxxInstallPrefix:
+    compiler.addCppFlag('-nostdinc++')
+    compiler.addIncludePath(cake.path.join(
+      libCxxInstallPrefix, 'include', 'c++', 'v1'))
+    compiler.addLibraryPath(cake.path.join(
+      libCxxInstallPrefix, 'lib'))
+  else:
+    compiler.addCppFlag('-stdlib=libc++')
+
+  compiler.addLibrary('c++')
+  compiler.addLibrary('c++abi')
+  compiler.addLibrary('c')
+  compiler.addLibrary('pthread')
+
+  #compiler.addProgramFlag('-Wl,--trace')
+  #compiler.addProgramFlag('-Wl,-v')
+
+  clangVariant.tools['compiler'] = compiler
+
+  env = clangVariant.tools["env"]
+  env["COMPILER"] = "clang"
+  env["COMPILER_VERSION"] = "5.0"
+  env["PLATFORM"] = "linux"
+  env["ARCHITECTURE"] = "x64"
+
+  clangDebugVariant = clangVariant.clone(release='debug')
+  clangDebugVariant.tools["env"]["RELEASE"] = 'debug'
+
+  # Configure debug-specific settings here
+  compiler = clangDebugVariant.tools["compiler"]
+  compiler.addCppFlag('-O0')
+  compiler.addCppFlag('-g')
+
+  configuration.addVariant(clangDebugVariant)
+
+  clangOptimisedVariant = clangVariant.clone(release='optimised')
+  clangOptimisedVariant.tools["env"]["RELEASE"] = 'optimised'
+
+  # Configure optimised-specific settings here
+  compiler = clangOptimisedVariant.tools["compiler"]
+  compiler.addCppFlag('-O2')
+  compiler.addCppFlag('-g')
+  compiler.addCppFlag('-flto')
+  compiler.addProgramFlag('-flto')
+  compiler.addModuleFlag('-flto')
+
+  configuration.addVariant(clangOptimisedVariant)

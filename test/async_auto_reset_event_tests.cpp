@@ -5,12 +5,17 @@
 
 #include <cppcoro/async_auto_reset_event.hpp>
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/task.hpp>
-#include <cppcoro/io_service.hpp>
 #include <cppcoro/on_scope_exit.hpp>
+
+#if CPPCORO_OS_WINNT
+# include <cppcoro/io_service.hpp>
+#endif
 
 #include <thread>
 #include <cassert>
+#include <vector>
 
 #include "doctest/doctest.h"
 
@@ -65,6 +70,7 @@ TEST_CASE("multiple waiters")
 	CHECK(t2.is_ready());
 }
 
+#if CPPCORO_OS_WINNT
 TEST_CASE("multi-threaded")
 {
 	cppcoro::io_service ioService;
@@ -140,5 +146,6 @@ TEST_CASE("multi-threaded")
 	joinOnExit2.call_now();
 	joinOnExit3.call_now();
 }
+#endif
 
 TEST_SUITE_END();
