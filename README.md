@@ -35,6 +35,12 @@ proposal.
 It has been open-sourced in the hope that others will find it useful and that the C++ community
 can provide feedback on it and ways to improve it.
 
+It requires a compiler that supports the coroutines TS:
+- Windows + Visual Studio 2017
+- Linux + Clang 5.0/6.0 + libc++
+
+The Linux version is functional except for the `io_context` and file I/O related classes which have not yet been implemented for Linux (see issue [#15](https://github.com/lewissbaker/cppcoro/issues/15) for more info).
+
 # Class Details
 
 ## `task<T>`
@@ -1458,19 +1464,26 @@ Given a type, `S`, that implements the `DelayedScheduler` and an instance, `s` o
 
 # Building
 
+The cppcoro library supports building under Windows with Visual Studio 2017 and Linux with Clang 5.0+.
+
 This library makes use of the [Cake build system](https://github.com/lewissbaker/cake) (no, not the [C# one](http://cakebuild.net/)).
+
+The cake build system is checked out automatically as a git submodule so you don't need to download or install it separately.
+
+## Building on Windows
 
 This library currently requires Visual Studio 2017 or later and the Windows 10 SDK.
 
 Support for Clang ([#3](https://github.com/lewissbaker/cppcoro/issues/3)) and Linux ([#15](https://github.com/lewissbaker/cppcoro/issues/15)) is planned.
 
-## Prerequisites
+### Prerequisites
 
 The Cake build-system is implemented in Python and requires Python 2.7 to be installed.
 
 Ensure Python 2.7 interpreter is in your PATH and available as 'python'.
 
-Ensure Visual Studio 2017 is installed (preferably the latest update).
+Ensure Visual Studio 2017 Update 2 or later is installed.
+Note that there are some known issues with coroutines in Update 2 that have been fixed in the latest Update 3 preview.
 
 You can also use an experimental version of the Visual Studio compiler by downloading a NuGet package from https://vcppdogfooding.azurewebsites.net/ and unzipping the .nuget file to a directory.
 Just update the `config.cake` file to point at the unzipped location by modifying and uncommenting the following line:
@@ -1481,13 +1494,13 @@ nugetPath = None # r'C:\Path\To\VisualCppTools.14.0.25224-Pre'
 Ensure that you have the Windows 10 SDK installed.
 It will use the latest Windows 10 SDK and Universal C Runtime version by default.
 
-## Cloning the repository
+### Cloning the repository
 
 The cppcoro repository makes use of git submodules to pull in the source for the Cake build system.
 
 This means you need to pass the `--recursive` flag to the `git clone` command. eg.
 ```
-c:\Code> git clone --recursive https://github.com/lewissbaker/cppcoro
+c:\Code> git clone --recursive https://github.com/lewissbaker/cppcoro.git
 ```
 
 If you have already cloned cppcoro, then you should update the submodules after pulling changes.
@@ -1495,7 +1508,7 @@ If you have already cloned cppcoro, then you should update the submodules after 
 c:\Code\cppcoro> git submodule update --init --recursive
 ```
 
-## Building from the command-line
+### Building from the command-line
 
 To build from the command-line just run 'cake.bat' in the workspace root.
 
@@ -1510,6 +1523,7 @@ Compiling test\main.cpp
 Compiling test\main.cpp
 Compiling test\main.cpp
 Compiling test\main.cpp
+...
 Linking build\windows_x86_msvc14.10_debug\test\run.exe
 Linking build\windows_x64_msvc14.10_optimised\test\run.exe
 Linking build\windows_x86_msvc14.10_optimised\test\run.exe
@@ -1522,7 +1536,7 @@ Build succeeded.
 Build took 0:00:02.419.
 ```
 
-By default this will build all projects with all build variants and execute the unit-tests.
+By default, running `cake` with no arguments will build all projects with all build variants and execute the unit-tests.
 You can narrow what is built by passing additional command-line arguments.
 eg.
 ```
@@ -1535,9 +1549,9 @@ Build took 0:00:00.321.
 
 You can run `cake --help` to list available command-line options.
 
-## Building Visual Studio project files
+### Building Visual Studio project files
 
-To develop from within Visual Studio you can build .vcproj/.sln files by running `cake -p`.
+To develop from within Visual Studio you can build .vcproj/.sln files by running `cake.bat -p`.
 
 eg.
 ```
@@ -1556,3 +1570,197 @@ Build took 0:00:00.247.
 ```
 
 When you build these projects from within Visual Studio it will call out to cake to perform the compilation.
+
+## Building on Linux
+
+The cppcoro project can also be built under Linux using Clang + libc++ 5.0 or later.
+
+Building cppcoro has been tested under Ubuntu 17.04.
+
+### Prerequisities
+
+Ensure you have the following packages installed:
+* Python 2.7
+* Clang >= 5.0
+* LLD >= 5.0
+* libc++ >= 5.0
+
+
+### Building cppcoro
+
+This is assuming you have Clang and libc++ built and installed.
+
+If you don't have Clang configured yet, see the following sections
+for details on setting up Clang for building with cppcoro.
+
+Checkout cppcoro and its submodules:
+```
+git clone --recursive https://github.com/lewissbaker/cppcoro.git cppcoro
+```
+
+Run `init.sh` to setup the `cake` bash function:
+```
+cd cppcoro
+source init.sh
+```
+
+Then you can run `cake` from the workspace root to build cppcoro and run tests:
+```
+$ cake
+```
+
+You can specify additional command-line arguments to customise the build:
+* `--help` will print out help for command-line arguments
+* `--debug=run` will show the build command-lines being run
+* `release=debug` or `release=optimised` will limit the build variant to
+   either debug or optimised (by default it will build both).
+* `lib/build.cake` will just build the cppcoro library and not the tests.
+* `test/build.cake@task_tests.cpp` will just compile a particular source file
+
+For example:
+```
+$ cake --debug=run release=debug lib/build.cake
+```
+
+### Customising location of Clang
+
+If your clang compiler is not located at `/usr/bin/clang` then you need to
+modify the `config.cake` file to tell cake where to find clang.
+
+Edit the following line in `config.cake`:
+```python
+  # If you have built your own version of Clang, you can modify
+  # this variable to point to the CMAKE_INSTALL_PREFIX for
+  # where you have installed your clang/libcxx build.
+  clangInstallPrefix = '/usr'
+```
+
+If you have `libc++` installed in a different location then you can
+customise its location by modifying the following line in `config.cake`.
+```python
+  # Set this to the install-prefix of where libc++ is installed.
+  # You only need to set this if it is not installed at the same
+  # location as clangInstallPrefix.
+  libCxxInstallPrefix = None # '/path/to/install'
+```
+
+If the install location has multiple versions of Clang installed and
+the one you want to use is not `<install-prefix>/bin/clang` then you
+can explicitly specify which one to use by modifying the `config.cake`
+file to specify the name of the clang binaries:
+```python
+  compiler = ClangCompiler(
+    configuration=configuration,
+    clangExe=cake.path.join(clangBinPath, 'clang-6.0'),
+    llvmArExe=cake.path.join(clangBinPath, 'llvm-ar-6.0'),
+    binPaths=[clangBinPath])
+```
+
+### Using a snapshot build of Clang
+
+If your Linux distribution does not have a version of Clang 5.0 or later
+available, you can install a snapshot build from the LLVM project.
+
+Follow instructions at http://apt.llvm.org/ to setup your package manager
+to support pulling from the LLVM package manager.
+
+For example, for Ubuntu 17.04 Zesty:
+
+Edit `/etc/apt/sources.list` and add the following lines:
+```
+deb http://apt.llvm.org/zesty/ llvm-toolchain-zesty main
+deb-src http://apt.llvm.org/zesty/ llvm-toolchain-zesty main
+```
+
+Install the PGP key for those packages:
+```
+$ wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+```
+
+Install Clang and LLD:
+```
+$ sudo apt-get install clang-6.0 lld-6.0
+```
+
+The LLVM snapshot builds do not include libc++ versions so you'll need to build that yourself.
+See below.
+
+### Building your own Clang
+
+You can also use the bleeding-edge Clang version by building Clang from source yourself.
+
+See instructions here: 
+
+To do this you will need to install the following pre-requisites:
+```
+$ sudo apt-get install git cmake ninja-build clang lld
+```
+
+Note that we are using your distribution's version of clang to build
+clang from source. GCC could also be used here instead.
+
+
+Checkout LLVM + Clang + LLD + libc++ repositories:
+```
+mkdir llvm
+cd llvm
+git clone --depth=1 https://github.com/llvm-mirror/llvm.git llvm
+git clone --depth=1 https://github.com/llvm-mirror/clang.git llvm/tools/clang
+git clone --depth=1 https://github.com/llvm-mirror/lld.git llvm/tools/lld
+git clone --depth=1 https://github.com/llvm-mirror/libcxx.git llvm/projects/libcxx
+ln -s llvm/tools/clang clang
+ln -s llvm/tools/lld lld
+ln -s llvm/projects/libcxx libcxx
+```
+
+Configure and build Clang:
+```
+mkdir clang-build
+cd clang-build
+cmake -GNinja \
+      -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+      -DCMAKE_C_COMPILER=/usr/bin/clang \
+      -DCMAKE_BUILD_TYPE=MinSizeRel \
+      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install"
+      -DCMAKE_BUILD_WITH_INSTALL_RPATH="yes" \
+      -DLLVM_TARGETS_TO_BUILD=X86 \
+      -DLLVM_ENABLE_PROJECTS="lld;clang" \
+      ../llvm
+ninja install-clang \
+      install-clang-headers \
+      install-llvm-ar \
+      install-lld
+```
+
+### Building libc++
+
+The cppcoro project requires libc++ as it contains the `<experimental/coroutine>`
+header required to use C++ coroutines under Clang.
+
+Checkout `libc++` + `llvm`:
+```
+mkdir llmv
+cd llvm
+git clone --depth=1 https://github.com/llvm-mirror/llvm.git llvm
+git clone --depth=1 https://github.com/llvm-mirror/libcxx.git llvm/projects/libcxx
+ln -s llvm/projects/libcxx libcxx
+```
+
+Build `libc++`:
+```
+mkdir libcxx-build
+cd libcxx-build
+cmake -GNinja \
+      -DCMAKE_CXX_COMPILER="/path/to/clang/install/bin/clang++" \
+      -DCMAKE_C_COMPILER="/path/to/clang/install/bin/clang" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install"
+      -DLLVM_PATH="../llvm" \
+      -DLIBCXX_CXX_ABI=libstdc++ \
+      -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/usr/include/c++/6.3.0/;/usr/include/x86_64-linux-gnu/c++/6.3.0/" \
+      ../libcxx
+ninja cxx
+ninja install
+```
+
+This will build and install libc++ into the same install directory where you have clang installed.
