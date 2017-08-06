@@ -5,6 +5,8 @@
 #ifndef CPPCORO_GENERATOR_HPP_INCLUDED
 #define CPPCORO_GENERATOR_HPP_INCLUDED
 
+#include <cppcoro/detail/dummy_coroutine.hpp>
+
 #include <experimental/coroutine>
 #include <type_traits>
 #include <utility>
@@ -41,9 +43,52 @@ namespace cppcoro
 				return {};
 			}
 
-			std::experimental::suspend_always final_suspend() noexcept
+			auto final_suspend() noexcept
 			{
-				return {};
+				class awaitable
+				{
+				public:
+
+					awaitable(promise_type* promise) noexcept
+						: m_promise(promise)
+					{}
+
+					constexpr bool await_ready() noexcept { return false; }
+
+					std::experimental::coroutine_handle<> await_suspend(
+						std::experimental::coroutine_handle<> coroutine)
+					{
+						// If we are the root generator then just suspend without
+						// resuming anything else to return control back to operator++().
+						// Otherwise, we resume the parent generator.
+						auto* const root = m_promise->m_root;
+						if (m_promise == root)
+						{
+							return detail::dummy_coroutine::handle();
+						}
+
+						// Set the leaf of the root generator to be the parent generator
+						// we're about to resume.
+						auto* parent = m_promise->m_parentOrLeaf;
+						root->m_parentOrLeaf = parent;
+
+						// Reset our root/leaf to be self-contained.
+						m_promise->m_root = m_promise;
+						m_promise->m_parentOrLeaf = m_promise;
+
+						// Resume the parent now that we're suspended.
+						return parent->handle();
+					}
+
+					void await_resume() noexcept {}
+
+				private:
+
+					promise_type* m_promise;
+
+				};
+
+				return awaitable{ this };
 			}
 
 			void unhandled_exception() noexcept
@@ -55,13 +100,13 @@ namespace cppcoro
 
 			std::experimental::suspend_always yield_value(T& value) noexcept
 			{
-				m_value = std::addressof(value);
+				m_root->m_value = std::addressof(value);
 				return {};
 			}
 
 			std::experimental::suspend_always yield_value(T&& value) noexcept
 			{
-				m_value = std::addressof(value);
+				m_root->m_value = std::addressof(value);
 				return {};
 			}
 
@@ -81,17 +126,25 @@ namespace cppcoro
 
 					bool await_ready() noexcept
 					{
-						return this->m_childPromise == nullptr;
+						return m_childPromise == nullptr || m_childPromise->is_complete();
 					}
 
-					void await_suspend(std::experimental::coroutine_handle<promise_type>) noexcept
-					{}
+					std::experimental::coroutine_handle<> await_suspend(
+						std::experimental::coroutine_handle<promise_type> parentHandle) noexcept
+					{
+						auto& parentPromise = parentHandle.promise();
+						auto* rootPromise = parentPromise.m_root;
+						m_childPromise->m_root = rootPromise;
+						m_childPromise->m_parentOrLeaf = &parentPromise;
+						rootPromise->m_parentOrLeaf = m_childPromise;
+						return m_childPromise->handle();
+					}
 
 					void await_resume()
 					{
-						if (this->m_childPromise != nullptr)
+						if (m_childPromise != nullptr)
 						{
-							this->m_childPromise->throw_if_exception();
+							m_childPromise->throw_if_exception();
 						}
 					}
 
@@ -99,22 +152,7 @@ namespace cppcoro
 					promise_type* m_childPromise;
 				};
 
-				if (generator.m_promise != nullptr)
-				{
-					m_root->m_parentOrLeaf = generator.m_promise;
-					generator.m_promise->m_root = m_root;
-					generator.m_promise->m_parentOrLeaf = this;
-					generator.m_promise->resume();
-
-					if (!generator.m_promise->is_complete())
-					{
-						return awaitable{ generator.m_promise };
-					}
-
-					m_root->m_parentOrLeaf = this;
-				}
-
-				return awaitable{ nullptr };
+				return awaitable{ generator.m_promise };
 			}
 
 			// Don't allow any use of 'co_await' inside the recursive_generator coroutine.
@@ -123,7 +161,7 @@ namespace cppcoro
 
 			void destroy() noexcept
 			{
-				std::experimental::coroutine_handle<promise_type>::from_promise(*this).destroy();
+				handle().destroy();
 			}
 
 			void throw_if_exception()
@@ -136,35 +174,33 @@ namespace cppcoro
 
 			bool is_complete() noexcept
 			{
-				return std::experimental::coroutine_handle<promise_type>::from_promise(*this).done();
+				return handle().done();
 			}
 
 			T& value() noexcept
 			{
 				assert(this == m_root);
 				assert(!is_complete());
-				return *(m_parentOrLeaf->m_value);
+				return *m_value;
 			}
 
 			void pull() noexcept
 			{
 				assert(this == m_root);
 				assert(!m_parentOrLeaf->is_complete());
-
 				m_parentOrLeaf->resume();
-
-				while (m_parentOrLeaf != this && m_parentOrLeaf->is_complete())
-				{
-					m_parentOrLeaf = m_parentOrLeaf->m_parentOrLeaf;
-					m_parentOrLeaf->resume();
-				}
 			}
 
 		private:
 
+			auto handle() noexcept
+			{
+				return std::experimental::coroutine_handle<promise_type>::from_promise(*this);
+			}
+
 			void resume() noexcept
 			{
-				std::experimental::coroutine_handle<promise_type>::from_promise(*this).resume();
+				handle().resume();
 			}
 
 			T* m_value;
