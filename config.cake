@@ -163,6 +163,11 @@ elif cake.system.isLinux():
   # where you have installed your clang/libcxx build.
   clangInstallPrefix = '/usr'
 
+  # Set this to the install-prefix of where libc++ is installed.
+  # You only need to set this if it is not installed at the same
+  # location as clangInstallPrefix.
+  libCxxInstallPrefix = None # '/path/to/install'
+
   clangBinPath = cake.path.join(clangInstallPrefix, 'bin')
 
   compiler = ClangCompiler(
@@ -174,11 +179,6 @@ elif cake.system.isLinux():
   compiler.addCppFlag('-std=c++1z')
   compiler.addCppFlag('-fcoroutines-ts')
   compiler.addCppFlag('-m64')
-
-  # Set this to the install-prefix of where libc++ is installed.
-  # You only need to set this if it is not installed at the same
-  # location as clang.
-  libCxxInstallPrefix = None # '/path/to/install'
 
   if libCxxInstallPrefix:
     compiler.addCppFlag('-nostdinc++')
