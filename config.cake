@@ -180,6 +180,9 @@ elif cake.system.isLinux():
   compiler.addCppFlag('-fcoroutines-ts')
   compiler.addCppFlag('-m64')
 
+  compiler.addModuleFlag('-fuse-ld=lld')
+  compiler.addProgramFlag('-fuse-ld=lld')
+  
   if libCxxInstallPrefix:
     compiler.addCppFlag('-nostdinc++')
     compiler.addIncludePath(cake.path.join(
