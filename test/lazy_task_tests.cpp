@@ -350,7 +350,42 @@ TEST_CASE("chained fmap pipe operations")
 	}();
 }
 
-TEST_CASE("lazy_task resumption uses tail call to avoid stack overflow")
+cppcoro::lazy_task<int> recursive_sum(int n, int sum = 0)
+{
+	if (n > 0) co_return recursive_sum(n - 1, sum + n);
+	else co_return sum;
+}
+
+TEST_CASE("lazy_task tail recursion")
+{
+	CHECK([]() -> cppcoro::task<>
+  {
+		int sum = co_await recursive_sum(100);
+		CHECK(sum == 5050);
+	}().is_ready());
+}
+
+TEST_CASE("lazy_task tail recursion of already-completed task")
+{
+	CHECK([]() -> cppcoro::task<>
+	{
+		auto t = []() -> cppcoro::lazy_task<int>
+		{
+			auto t = []() -> cppcoro::lazy_task<int> { co_return 123; }();
+
+			// Await the task first so it runs to completion before
+			// performing tail-recursive co_return.
+			(void)co_await t;
+
+			co_return std::move(t);
+		}();
+
+		CHECK(co_await t == 123);
+	}().is_ready());
+}
+
+TEST_CASE("lazy_task resumption uses tail call to avoid stack overflow"
+					* doctest::skip{ true })
 {
 	bool completedSynchronously = []() -> cppcoro::task<>
 	{

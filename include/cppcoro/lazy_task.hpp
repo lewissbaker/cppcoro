@@ -14,6 +14,7 @@
 #include <exception>
 #include <utility>
 #include <type_traits>
+#include <cassert>
 
 #include <experimental/coroutine>
 
@@ -23,96 +24,43 @@ namespace cppcoro
 
 	namespace detail
 	{
-		class lazy_task_promise_base
-		{
-		public:
-
-			lazy_task_promise_base() noexcept
-				: m_continuation()
-			{}
-
-			auto initial_suspend() noexcept
-			{
-				return std::experimental::suspend_always{};
-			}
-
-			auto final_suspend() noexcept
-			{
-				struct awaitable
-				{
-					continuation m_continuation;
-
-					awaitable(continuation c) noexcept
-						: m_continuation(c)
-					{}
-
-					bool await_ready() const noexcept { return false; }
-
-					std::experimental::coroutine_handle<>
-					await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
-					{
-						return m_continuation.tail_call_resume();
-					}
-
-					void await_resume() noexcept {}
-				};
-
-				return awaitable{ m_continuation };
-			}
-
-			void unhandled_exception() noexcept
-			{
-				m_exception = std::current_exception();
-			}
-
-			bool is_ready() const noexcept
-			{
-				return static_cast<bool>(m_continuation);
-			}
-
-			void set_continuation(continuation c)
-			{
-				m_continuation = c;
-			}
-
-		protected:
-
-			bool completed_with_unhandled_exception()
-			{
-				return m_exception != nullptr;
-			}
-
-			void rethrow_if_unhandled_exception()
-			{
-				if (m_exception != nullptr)
-				{
-					std::rethrow_exception(m_exception);
-				}
-			}
-
-		private:
-
-			continuation m_continuation;
-			std::exception_ptr m_exception;
-
-		};
-
 		template<typename T>
-		class lazy_task_promise : public lazy_task_promise_base
+		class lazy_task_promise final
 		{
 		public:
 
-			lazy_task_promise() noexcept = default;
+			lazy_task_promise() noexcept
+				: m_valueState(value_state::empty)
+			{}
 
 			~lazy_task_promise()
 			{
-				if (is_ready() && !completed_with_unhandled_exception())
+				switch (m_valueState)
 				{
-					reinterpret_cast<T*>(&m_valueStorage)->~T();
+					case value_state::value:
+						value().~T();
+						break;
+
+					case value_state::exception:
+						exception().~exception_ptr();
+						break;
+
+					case value_state::empty:
+						break;
 				}
 			}
 
 			lazy_task<T> get_return_object() noexcept;
+
+			std::experimental::suspend_always initial_suspend() noexcept { return{}; }
+
+			auto final_suspend() noexcept;
+
+			void unhandled_exception() noexcept
+			{
+				new (&m_valueStorage) std::exception_ptr(std::current_exception());
+				m_valueState = value_state::exception;
+			}
 
 			template<
 				typename VALUE,
@@ -121,50 +69,147 @@ namespace cppcoro
 				noexcept(std::is_nothrow_constructible_v<T, VALUE&&>)
 			{
 				new (&m_valueStorage) T(std::forward<VALUE>(value));
+				m_valueState = value_state::value;
+			}
+
+			// Support tail-call co_return
+			void return_value(lazy_task<T>&& tailTask) noexcept;
+
+			// Disallow tail-call by returning l-value reference.
+			void return_value(const lazy_task<T>&) = delete;
+
+			void set_continuation(detail::continuation continuation, const lazy_task<T>* awaitingTask) noexcept
+			{
+				m_continuation = continuation;
+				m_awaitingTask = awaitingTask;
 			}
 
 			T& result() &
 			{
 				rethrow_if_unhandled_exception();
-				return *reinterpret_cast<T*>(&m_valueStorage);
+				return value();
 			}
 
 			T&& result() &&
 			{
 				rethrow_if_unhandled_exception();
-				return std::move(*reinterpret_cast<T*>(&m_valueStorage));
+				return std::move(value());
 			}
 
 		private:
 
+			T& value() noexcept
+			{
+				assert(m_valueState == value_state::value);
+				return *reinterpret_cast<T*>(&m_valueStorage);
+			}
+
+			std::exception_ptr& exception() noexcept
+			{
+				assert(m_valueState == value_state::exception);
+				return *reinterpret_cast<std::exception_ptr*>(&m_valueStorage);
+			}
+
+			void rethrow_if_unhandled_exception()
+			{
+				if (m_valueState == value_state::exception)
+				{
+					std::rethrow_exception(exception());
+				}
+			}
+
+			static constexpr size_t value_size =
+				sizeof(T) > sizeof(std::exception_ptr) ?
+				sizeof(T) : sizeof(std::exception_ptr);
+			static constexpr size_t value_alignment =
+				alignof(T) > alignof(std::exception_ptr) ?
+				alignof(T) : alignof(std::exception_ptr);
+
+			enum class value_state
+			{
+				empty,
+				value,
+				exception
+			};
+			
+			detail::continuation m_continuation;
+			const lazy_task<T>* m_awaitingTask;
+			value_state m_valueState;
+
 			// Not using std::aligned_storage here due to bug in MSVC 2015 Update 2
 			// that means it doesn't work for types with alignof(T) > 8.
 			// See MS-Connect bug #2658635.
-			alignas(T) char m_valueStorage[sizeof(T)];
+			alignas(value_alignment) char m_valueStorage[value_size];
 
 		};
 
 		template<>
-		class lazy_task_promise<void> : public lazy_task_promise_base
+		class lazy_task_promise<void> final
 		{
 		public:
 
 			lazy_task_promise() noexcept = default;
 
+			~lazy_task_promise() = default;
+
 			lazy_task<void> get_return_object() noexcept;
+
+			std::experimental::suspend_always initial_suspend() noexcept { return{}; }
+
+			auto final_suspend() noexcept
+			{
+				struct awaitable
+				{
+					bool await_ready() noexcept { return false; }
+
+					std::experimental::coroutine_handle<> await_suspend(
+						std::experimental::coroutine_handle<lazy_task_promise<void>> coroutine) noexcept
+					{
+						return coroutine.promise().m_continuation.tail_call_resume();
+					}
+
+					void await_resume() noexcept {}
+				};
+
+				return awaitable{};
+			}
 
 			void return_void() noexcept
 			{}
 
+			void unhandled_exception()
+			{
+				m_exception = std::current_exception();
+			}
+
+			void set_continuation(
+				detail::continuation continuation,
+				[[maybe_unused]] const lazy_task<void>* awaitingTask) noexcept
+			{
+				m_continuation = continuation;
+			}
+
 			void result()
 			{
-				rethrow_if_unhandled_exception();
+				if (m_exception)
+				{
+					std::rethrow_exception(m_exception);
+				}
 			}
+
+		private:
+
+			// TODO: Support tail-calls for lazy_task<void>
+			// We currently can't since Coroutines TS doesn't allow both
+			// return_void() and return_value() on same promise_type.
+
+			detail::continuation m_continuation;
+			std::exception_ptr m_exception;
 
 		};
 
 		template<typename T>
-		class lazy_task_promise<T&> : public lazy_task_promise_base
+		class lazy_task_promise<T&>
 		{
 		public:
 
@@ -172,19 +217,43 @@ namespace cppcoro
 
 			lazy_task<T&> get_return_object() noexcept;
 
+			std::experimental::suspend_always initial_suspend() noexcept { return {}; }
+
+			auto final_suspend() noexcept;
+
 			void return_value(T& value) noexcept
 			{
 				m_value = std::addressof(value);
 			}
 
+			void return_value(lazy_task<T&>&& tailCallTask) noexcept;
+
+			void unhandled_exception() noexcept
+			{
+				m_exception = std::current_exception();
+			}
+
+			void set_continuation(detail::continuation continuation, const lazy_task<T&>* awaitingTask) noexcept
+			{
+				m_continuation = continuation;
+				m_awaitingTask = awaitingTask;
+			}
+
 			T& result()
 			{
-				rethrow_if_unhandled_exception();
+				if (m_exception)
+				{
+					std::rethrow_exception(m_exception);
+				}
+
 				return *m_value;
 			}
 
 		private:
 
+			detail::continuation m_continuation;
+			const lazy_task<T&>* m_awaitingTask;
+			std::exception_ptr m_exception;
 			T* m_value;
 
 		};
@@ -208,15 +277,6 @@ namespace cppcoro
 	/// The awaiting coroutine is suspended prior to the lazy_task being started
 	/// which means that when the lazy_task completes it can unconditionally
 	/// resume the awaiter.
-	///
-	/// One limitation of this approach is that if the lazy_task completes
-	/// synchronously then, unless the compiler is able to perform tail-calls,
-	/// the awaiting coroutine will be resumed inside a nested stack-frame.
-	/// This call lead to stack-overflow if long chains of lazy_tasks complete
-	/// synchronously.
-	///
-	/// The task<T> type does not have this issue as the awaiting coroutine is
-	/// not suspended in the case that the task completes synchronously.
 	template<typename T = void>
 	class lazy_task
 	{
@@ -228,24 +288,29 @@ namespace cppcoro
 
 	private:
 
+    struct awaitable_base;
+		friend struct awaitable_base;
+
 		struct awaitable_base
 		{
-			std::experimental::coroutine_handle<promise_type> m_coroutine;
+			const lazy_task* m_task;
 
-			awaitable_base(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
-				: m_coroutine(coroutine)
+			awaitable_base(const lazy_task& task) noexcept
+				: m_task(std::addressof(task))
 			{}
 
 			bool await_ready() const noexcept
 			{
-				return !m_coroutine || m_coroutine.promise().is_ready();
+				return m_task->is_ready();
 			}
 
 			auto await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_coroutine.promise().set_continuation(detail::continuation{ awaiter });
-				return m_coroutine;
+				auto coroutineHandle = m_task->m_coroutine;
+				coroutineHandle.promise().set_continuation(detail::continuation{ awaiter }, m_task);
+				return coroutineHandle;
 			}
+
 		};
 
 	public:
@@ -299,7 +364,7 @@ namespace cppcoro
 		/// Awaiting a task that is ready will not block.
 		bool is_ready() const noexcept
 		{
-			return !m_coroutine || m_coroutine.promise().is_ready();
+			return !m_coroutine || m_coroutine.done();
 		}
 
 		auto operator co_await() const & noexcept
@@ -310,16 +375,17 @@ namespace cppcoro
 
 				decltype(auto) await_resume()
 				{
-					if (!this->m_coroutine)
+					auto coroutine = this->m_task->m_coroutine;
+					if (!coroutine)
 					{
 						throw broken_promise{};
 					}
 
-					return this->m_coroutine.promise().result();
+					return coroutine.promise().result();
 				}
 			};
 
-			return awaitable{ m_coroutine };
+			return awaitable{ *this };
 		}
 
 		auto operator co_await() const && noexcept
@@ -330,16 +396,17 @@ namespace cppcoro
 
 				decltype(auto) await_resume()
 				{
-					if (!this->m_coroutine)
+					auto coroutine = this->m_task->m_coroutine;
+					if (!coroutine)
 					{
 						throw broken_promise{};
 					}
 
-					return std::move(this->m_coroutine.promise()).result();
+					return std::move(coroutine.promise()).result();
 				}
 			};
 
-			return awaitable{ m_coroutine };
+			return awaitable{ *this };
 		}
 
 		/// \brief
@@ -354,7 +421,7 @@ namespace cppcoro
 				void await_resume() const noexcept {}
 			};
 
-			return awaitable{ m_coroutine };
+			return awaitable{ *this };
 		}
 
 		// Internal helper method for when_all() implementation.
@@ -364,16 +431,16 @@ namespace cppcoro
 			{
 			public:
 
-				starter(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
-					: m_coroutine(coroutine)
+				explicit starter(const lazy_task<T>& task) noexcept
+					: m_task(std::addressof(task))
 				{}
 
 				void start(detail::continuation c) noexcept
 				{
-					if (m_coroutine && !m_coroutine.promise().is_ready())
+					if (!m_task->is_ready())
 					{
-						m_coroutine.promise().set_continuation(c);
-						m_coroutine.resume();
+						m_task->m_coroutine.promise().set_continuation(c, m_task);
+						m_task->m_coroutine.resume();
 					}
 					else
 					{
@@ -383,15 +450,17 @@ namespace cppcoro
 
 			private:
 
-				std::experimental::coroutine_handle<promise_type> m_coroutine;
+				const lazy_task<T>* m_task;
 			};
 
-			return starter{ m_coroutine };
+			return starter{ *this };
 		}
 
 	private:
 
-		std::experimental::coroutine_handle<promise_type> m_coroutine;
+		friend class detail::lazy_task_promise<T>;
+
+		mutable std::experimental::coroutine_handle<promise_type> m_coroutine;
 
 	};
 
@@ -403,6 +472,66 @@ namespace cppcoro
 			return lazy_task<T>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
 		}
 
+		template<typename T>
+		void lazy_task_promise<T>::return_value(lazy_task<T>&& tailCallTask) noexcept
+		{
+			assert(m_awaitingTask != nullptr);
+			assert(m_awaitingTask->m_coroutine);
+			assert(std::addressof(m_awaitingTask->m_coroutine.promise()) == this);
+
+			// Transfer ownership of the tail call task's coroutine to the
+			// awaiting task which was previously pointing to this coroutine.
+			// We will detect this case in final_suspend() where we will destroy
+			// this coroutine before resuming the tail-call one.
+			// We can't destroy this coroutine here because it's not yet suspended.
+
+			m_awaitingTask->m_coroutine = tailCallTask.m_coroutine;
+			tailCallTask.m_coroutine = std::experimental::coroutine_handle<lazy_task_promise>{};
+		}
+
+		template<typename T>
+		auto lazy_task_promise<T>::final_suspend() noexcept
+		{
+			struct awaitable
+			{
+				bool await_ready() noexcept { return false; }
+
+				std::experimental::coroutine_handle<> await_suspend(std::experimental::coroutine_handle<lazy_task_promise> coroutine) noexcept
+				{
+					auto& promise = coroutine.promise();
+					auto* awaitingTask = promise.m_awaitingTask;
+					if (awaitingTask->m_coroutine == coroutine)
+					{
+						// Normal completion (non tail-call)
+						return promise.m_continuation.tail_call_resume();
+					}
+					else
+					{
+						// Tail-call completion
+
+						// Take a copy of the continuation before destroying the coroutine.
+						auto continuation = promise.m_continuation;
+
+						coroutine.destroy();
+						
+						if (awaitingTask->is_ready())
+						{
+							return continuation.tail_call_resume();
+						}
+						else
+						{
+							awaitingTask->m_coroutine.promise().set_continuation(continuation, awaitingTask);
+							return awaitingTask->m_coroutine;
+						}
+					}
+				}
+
+				void await_resume() noexcept {}
+			};
+
+			return awaitable{};
+		}
+
 		inline lazy_task<void> lazy_task_promise<void>::get_return_object() noexcept
 		{
 			return lazy_task<void>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
@@ -412,6 +541,66 @@ namespace cppcoro
 		lazy_task<T&> lazy_task_promise<T&>::get_return_object() noexcept
 		{
 			return lazy_task<T&>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
+		}
+
+		template<typename T>
+		void lazy_task_promise<T&>::return_value(lazy_task<T&>&& tailCallTask) noexcept
+		{
+			assert(m_awaitingTask != nullptr);
+			assert(m_awaitingTask->m_coroutine);
+			assert(std::addressof(m_awaitingTask->m_coroutine.promise()) == this);
+
+			// Transfer ownership of the tail call task's coroutine to the
+			// awaiting task which was previously pointing to this coroutine.
+			// We will detect this case in final_suspend() where we will destroy
+			// this coroutine before resuming the tail-call one.
+			// We can't destroy this coroutine here because it's not yet suspended.
+
+			m_awaitingTask->m_coroutine = tailCallTask.m_coroutine;
+			tailCallTask.m_coroutine = std::experimental::coroutine_handle<lazy_task_promise>{};
+		}
+
+		template<typename T>
+		auto lazy_task_promise<T&>::final_suspend() noexcept
+		{
+			struct awaitable
+			{
+				bool await_ready() noexcept { return false; }
+
+				std::experimental::coroutine_handle<> await_suspend(std::experimental::coroutine_handle<lazy_task_promise> coroutine) noexcept
+				{
+					auto& promise = coroutine.promise();
+					auto* awaitingTask = promise.m_awaitingTask;
+					if (awaitingTask->m_coroutine == coroutine)
+					{
+						// Normal completion (non tail-call)
+						return promise.m_continuation.tail_call_resume();
+					}
+					else
+					{
+						// Tail-call completion
+
+						// Take a copy of the continuation before destroying the coroutine.
+						auto continuation = promise.m_continuation;
+
+						coroutine.destroy();
+						
+						if (awaitingTask->is_ready())
+						{
+							return continuation.tail_call_resume();
+						}
+						else
+						{
+							awaitingTask->m_coroutine.promise().set_continuation(continuation, awaitingTask);
+							return awaitingTask->m_coroutine;
+						}
+					}
+				}
+
+				void await_resume() noexcept {}
+			};
+
+			return awaitable{};
 		}
 	}
 
