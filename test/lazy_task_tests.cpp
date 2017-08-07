@@ -359,7 +359,7 @@ cppcoro::lazy_task<int> recursive_sum(int n, int sum = 0)
 TEST_CASE("lazy_task tail recursion")
 {
 	CHECK([]() -> cppcoro::task<>
-  {
+	{
 		int sum = co_await recursive_sum(100);
 		CHECK(sum == 5050);
 	}().is_ready());
@@ -392,12 +392,12 @@ TEST_CASE("lazy_task resumption uses tail call to avoid stack overflow"
 		auto completesSynchronously = []() -> cppcoro::lazy_task<> { co_return; };
 
 		// Await a large number of synchronously-completing lazy_task values
-    // in a row. If the lazy_task's final_suspend is not doing tail-calls
+		// in a row. If the lazy_task's final_suspend is not doing tail-calls
 		// to resume the awaiter then this will blow the stack.
 		for (int i = 0; i < 100000; ++i)
-    {
+		{
 			co_await completesSynchronously();
-    }
+		}
 	}().is_ready();
 
 	CHECK(completedSynchronously);
