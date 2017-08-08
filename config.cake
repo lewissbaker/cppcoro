@@ -106,6 +106,8 @@ if cake.system.isWindows() or cake.system.isCygwin():
 
       # Enable experimental C++ coroutines via command-line flag.
       compiler.addCppFlag('/await')
+
+      # Enable static analysis warnings (not as errors)
       compiler.addCppFlag('/analyze:WX-')
       compiler.addCppFlag('/analyze:max_paths')
       compiler.addCppFlag('512')
@@ -141,6 +143,10 @@ if cake.system.isWindows() or cake.system.isCygwin():
       compiler.useFunctionLevelLinking = True
       compiler.optimisation = compiler.FULL_OPTIMISATION
       compiler.runtimeLibraries = 'release-dll'
+
+      # Enable compiler to optimise-out heap allocations for coroutine frames
+      compiler.addCppFlag('/await:heapelide')
+
       compiler.addDefine('NDEBUG')
       project = msvcOptVariant.tools["project"]
       project.projectConfigName = "Windows (" + arch + ") Msvc (Optimised)"
