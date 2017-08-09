@@ -115,6 +115,9 @@ if cake.system.isWindows() or cake.system.isCygwin():
       # Enable C++17 features like std::optional<>
       compiler.addCppFlag('/std:c++latest')
 
+      compiler.addProgramFlag('/nodefaultlib')
+      compiler.addModuleFlag('/nodefaultlib')
+
       env = msvcVariant.tools["env"]
       env["COMPILER"] = "msvc"
       env["COMPILER_VERSION"] = "15"
@@ -128,10 +131,18 @@ if cake.system.isWindows() or cake.system.isCygwin():
       compiler.debugSymbols = True
       compiler.useIncrementalLinking = True
       compiler.optimisation = compiler.NO_OPTIMISATION
+
       compiler.runtimeLibraries = 'debug-dll'
+      compiler.addLibrary('msvcrtd')
+      compiler.addLibrary('msvcprtd')
+      compiler.addLibrary('msvcurtd')
+      compiler.addLibrary('ucrtd')
+      compiler.addLibrary('oldnames')
+
       project = msvcDebugVariant.tools["project"]
       project.projectConfigName = "Windows (" + arch + ") Msvc (Debug)"
       project.solutionConfigName = "Msvc Debug"
+
       configuration.addVariant(msvcDebugVariant)
 
       # Visual Studio - Optimised
@@ -142,12 +153,19 @@ if cake.system.isWindows() or cake.system.isCygwin():
       compiler.useIncrementalLinking = False
       compiler.useFunctionLevelLinking = True
       compiler.optimisation = compiler.FULL_OPTIMISATION
+
       compiler.runtimeLibraries = 'release-dll'
+      compiler.addLibrary('msvcrt')
+      compiler.addLibrary('msvcprt')
+      compiler.addLibrary('msvcurt')
+      compiler.addLibrary('ucrt')
+      compiler.addLibrary('oldnames')
 
       # Enable compiler to optimise-out heap allocations for coroutine frames
       compiler.addCppFlag('/await:heapelide')
 
       compiler.addDefine('NDEBUG')
+
       project = msvcOptVariant.tools["project"]
       project.projectConfigName = "Windows (" + arch + ") Msvc (Optimised)"
       project.solutionConfigName = "Msvc Optimised"
