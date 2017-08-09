@@ -44,6 +44,7 @@ detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 
   'continuation.hpp',
   'when_all_awaitable.hpp',
   'unwrap_reference.hpp',
+  'lightweight_manual_reset_event.hpp',
   ])
 
 privateHeaders = script.cwd([
@@ -58,6 +59,7 @@ sources = script.cwd([
   'cancellation_token.cpp',
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
+  'lightweight_manual_reset_event.cpp',
   ])
 
 extras = script.cwd([

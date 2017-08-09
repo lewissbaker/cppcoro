@@ -13,5 +13,6 @@ buildScript = script.get(script.cwd('build.cake'))
 compiler.addLibrary(buildScript.getResult('library'))
 
 if variant.platform == "windows":
+  compiler.addLibrary("Synchronization")
   compiler.addLibrary("kernel32")
 
