@@ -21,34 +21,32 @@ cppcoro::detail::lightweight_manual_reset_event::~lightweight_manual_reset_event
 {
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::set()
+void cppcoro::detail::lightweight_manual_reset_event::set() noexcept
 {
 	m_value.store(1, std::memory_order_release);
 	::WakeByAddressAll(&m_value);
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::reset()
+void cppcoro::detail::lightweight_manual_reset_event::reset() noexcept
 {
 	m_value.store(0, std::memory_order_relaxed);
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::wait()
+void cppcoro::detail::lightweight_manual_reset_event::wait() noexcept
 {
 	// Wait in a loop as WaitOnAddress() can have spurious wake-ups.
 	int value = m_value.load(std::memory_order_acquire);
+	BOOL ok = TRUE;
 	while (value == 0)
 	{
-		const BOOL ok = ::WaitOnAddress(&m_value, &value, sizeof(m_value), INFINITE);
 		if (!ok)
 		{
-			const DWORD errorCode = ::GetLastError();
-			throw std::system_error
-			{
-				static_cast<int>(errorCode),
-				std::system_category()
-			};
+			// Previous call to WaitOnAddress() failed for some reason.
+			// Put thread to sleep to avoid sitting in a busy loop if it keeps failing.
+			::Sleep(1);
 		}
 
+		ok = ::WaitOnAddress(&m_value, &value, sizeof(m_value), INFINITE);
 		value = m_value.load(std::memory_order_acquire);
 	}
 }
@@ -56,7 +54,7 @@ void cppcoro::detail::lightweight_manual_reset_event::wait()
 # else
 
 cppcoro::detail::lightweight_manual_reset_event::lightweight_manual_reset_event(bool initiallySet)
-	: m_eventHandle(::CreateEvent(nullptr, TRUE, initiallySet, nullptr))
+	: m_eventHandle(::CreateEventW(nullptr, TRUE, initiallySet, nullptr))
 {
 	if (m_eventHandle == NULL)
 	{
@@ -76,48 +74,32 @@ cppcoro::detail::lightweight_manual_reset_event::~lightweight_manual_reset_event
 	(void)::CloseHandle(m_eventHandle);
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::set()
+void cppcoro::detail::lightweight_manual_reset_event::set() noexcept
 {
-	const BOOL ok = ::SetEvent(m_eventHandle);
-	if (!ok)
+	if (!::SetEvent(m_eventHandle))
 	{
-		const DWORD errorCode = ::GetLastError();
-		throw std::system_error
-		{
-			static_cast<int>(errorCode),
-			std::system_category()
-		};
+		std::abort();
 	}
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::reset()
+void cppcoro::detail::lightweight_manual_reset_event::reset() noexcept
 {
-	const BOOL ok = ::ResetEvent(m_eventHandle);
-	if (!ok)
+	if (!::ResetEvent(m_eventHandle))
 	{
-		const DWORD errorCode = ::GetLastError();
-		throw std::system_error
-		{
-			static_cast<int>(errorCode),
-			std::system_category()
-		};
+		std::abort();
 	}
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::wait()
+void cppcoro::detail::lightweight_manual_reset_event::wait() noexcept
 {
-	const BOOL alertable = FALSE;
-	const DWORD waitResult = ::WaitForSingleObjectEx(m_eventHandle, INFINITE, alertable);
+	constexpr BOOL alertable = FALSE;
+	DWORD waitResult = ::WaitForSingleObjectEx(m_eventHandle, INFINITE, alertable);
 	if (waitResult == WAIT_FAILED)
 	{
-		const DWORD errorCode = ::GetLastError();
-		throw std::system_error
-		{
-			static_cast<int>(errorCode),
-			std::system_category()
-		};
+		std::abort();
 	}
 }
+
 # endif
 
 #elif CPPCORO_OS_LINUX
@@ -163,25 +145,23 @@ cppcoro::detail::lightweight_manual_reset_event::~lightweight_manual_reset_event
 {
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::set()
+void cppcoro::detail::lightweight_manual_reset_event::set() noexcept
 {
 	m_value.store(1, std::memory_order_release);
 
 	constexpr int numberOfWaitersToWakeUp = INT_MAX;
 
-	int numberOfWaitersWokenUp = local::futex(
+	[[maybe_unused]] int numberOfWaitersWokenUp = local::futex(
 		reinterpret_cast<int*>(&m_value),
 		FUTEX_WAKE_PRIVATE,
 		numberOfWaitersToWakeUp,
 		nullptr,
 		nullptr,
 		0);
-	if (numberOfWaitersWokenUp == -1)
-	{
-		// There are no errors expected here unless this class (or the caller)
-		// has done something wrong.
-		throw std::system_error{ errno, std::system_category() };
-	}
+
+	// There are no errors expected here unless this class (or the caller)
+	// has done something wrong.
+	assert(numberOfWaitersWokenUp != -1);
 }
 
 void cppcoro::detail::lightweight_manual_reset_event::reset()
@@ -202,33 +182,20 @@ void cppcoro::detail::lightweight_manual_reset_event::wait()
 			nullptr,
 			nullptr,
 			0);
-		if (result == 0)
+		if (result == -1)
 		{
-			// We were blocked and subsequently woken up.
-			// This could have been a spurious wake-up so we need to
-			// check the value again.
-			oldValue = m_value.load(std::memory_order_acquire);
-		}
-		else
-		{
-			// An error occurred.
-			switch (errno)
+			if (errno == EAGAIN)
 			{
-			case EAGAIN:
-				// The state was changed from zero before we could wait
+				// The state was changed from zero before we could wait.
 				// Must have been changed to 1.
 				return;
-
-			case EINTR:
-				// Wait operation was interrupted by a signal.
-				// Go around the loop again.
-				break;
-
-			default:
-				// Some other, more serious error occurred.
-				throw std::system_error{ errno, std::system_category() };
 			}
+
+			// Other errors we'll treat as transient and just read the
+			// value and go around the loop again.
 		}
+
+		oldValue = m_value.load(std::memory_order_acquire);
 	}
 }
 

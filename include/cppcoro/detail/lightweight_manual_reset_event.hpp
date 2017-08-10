@@ -26,11 +26,11 @@ namespace cppcoro
 
 			~lightweight_manual_reset_event();
 
-			void set();
+			void set() noexcept;
 
-			void reset();
+			void reset() noexcept;
 
-			void wait();
+			void wait() noexcept;
 
 		private:
 
@@ -38,7 +38,7 @@ namespace cppcoro
 			std::atomic<int> m_value;
 #elif CPPCORO_OS_WINNT >= 0x0602
 			// Windows 8 or newer we can use WaitOnAddress()
-			std::atomic<int> m_value;
+			std::atomic<std::uint8_t> m_value;
 #elif CPPCORO_OS_WINNT
 			// Before Windows 8 we need to use a WIN32 manual reset event.
 			cppcoro::detail::win32::handle_t m_eventHandle;
