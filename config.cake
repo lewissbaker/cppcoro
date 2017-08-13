@@ -162,7 +162,9 @@ if cake.system.isWindows() or cake.system.isCygwin():
       compiler.addLibrary('oldnames')
 
       # Enable compiler to optimise-out heap allocations for coroutine frames
-      compiler.addCppFlag('/await:heapelide')
+      # Only supported on X64
+      if arch == 'x64':
+        compiler.addCppFlag('/await:heapelide')
 
       compiler.addDefine('NDEBUG')
 
