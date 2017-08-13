@@ -7,8 +7,8 @@
 #include <cppcoro/read_only_file.hpp>
 #include <cppcoro/write_only_file.hpp>
 #include <cppcoro/read_write_file.hpp>
-#include <cppcoro/task.hpp>
 #include <cppcoro/lazy_task.hpp>
+#include <cppcoro/sync_wait.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
 #include <random>
@@ -68,15 +68,9 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 {
 	cppcoro::io_service ioService;
 
-	std::thread ioThread([&]
-	{
-		ioService.process_events();
-	});
-
-	auto waitForThreadOnExit = cppcoro::on_scope_exit([&]
-	{
-		ioThread.join();
-	});
+	std::thread ioThread([&] { ioService.process_events(); });
+	auto waitForThreadOnExit = cppcoro::on_scope_exit([&] { ioThread.join(); });
+	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
 
 	auto filePath = temp_dir() / "foo";
 
@@ -118,33 +112,24 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 		}
 	};
 
-	auto run = [&]() -> cppcoro::task<>
+	auto run = [&]() -> cppcoro::lazy_task<>
 	{
-		try
-		{
-			cppcoro::io_work_scope scope{ ioService };
-			co_await write(ioService);
-			co_await read(ioService);
-		}
-		catch (...)
-		{
-			FAIL("threw an exception");
-			throw;
-		}
+		co_await write(ioService);
+		co_await read(ioService);
 	};
 
-	auto t = run();
-
-	waitForThreadOnExit.call_now();
-
-	REQUIRE(t.is_ready());
+	cppcoro::sync_wait(run());
 }
 
 TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
 {
 	cppcoro::io_service ioService;
 
-	auto run = [&]() -> cppcoro::task<>
+	std::thread ioThread([&] { ioService.process_events(); });
+	auto waitForThreadOnExit = cppcoro::on_scope_exit([&] { ioThread.join(); });
+	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
+
+	auto run = [&]() -> cppcoro::lazy_task<>
 	{
 		cppcoro::io_work_scope ioScope{ ioService };
 		auto f = cppcoro::read_write_file::open(ioService, temp_dir() / "foo.txt");
@@ -164,11 +149,7 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
 		CHECK(std::memcmp(buffer1 + 50, buffer2, 50) == 0);
 	};
 
-	auto t = run();
-
-	ioService.process_events();
-
-	CHECK(t.is_ready());
+	cppcoro::sync_wait(run());
 }
 
 TEST_SUITE_END();

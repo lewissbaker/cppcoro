@@ -5,7 +5,9 @@
 
 #include <cppcoro/async_generator.hpp>
 #include <cppcoro/single_consumer_event.hpp>
-#include <cppcoro/task.hpp>
+#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/when_all.hpp>
 
 #include "doctest/doctest.h"
 
@@ -13,14 +15,14 @@ TEST_SUITE_BEGIN("async_generator");
 
 TEST_CASE("default-constructed async_generator is an empty sequence")
 {
-	[]() -> cppcoro::task<>
+	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
 	{
 		// Iterating over default-constructed async_generator just
 		// gives an empty sequence.
 		cppcoro::async_generator<int> g;
 		auto it = co_await g.begin();
 		CHECK(it == g.end());
-	}();
+	}());
 }
 
 TEST_CASE("async_generator doesn't start if begin() not called")
@@ -39,63 +41,66 @@ TEST_CASE("async_generator doesn't start if begin() not called")
 
 TEST_CASE("enumerate sequence of 1 value")
 {
-	bool startedExecution = false;
-	auto gen = [&]() -> cppcoro::async_generator<std::uint32_t>
+	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
 	{
-		startedExecution = true;
-		co_yield 1;
-	}();
+		bool startedExecution = false;
+		auto makeGenerator = [&]() -> cppcoro::async_generator<std::uint32_t>
+		{
+			startedExecution = true;
+			co_yield 1;
+		};
 
-	CHECK(!startedExecution);
+		auto gen = makeGenerator();
 
-	auto itAwaitable = gen.begin();
-	CHECK(startedExecution);
-	CHECK(itAwaitable.await_ready());
-	auto it = itAwaitable.await_resume();
-	CHECK(it != gen.end());
-	CHECK(*it == 1u);
+		CHECK(!startedExecution);
+
+		auto it = co_await gen.begin();
+
+		CHECK(startedExecution);
+		CHECK(it != gen.end());
+		CHECK(*it == 1u);
+		CHECK(co_await ++it == gen.end());
+	}());
 }
 
 TEST_CASE("enumerate sequence of multiple values")
 {
-	bool startedExecution = false;
-	auto gen = [&]() -> cppcoro::async_generator<std::uint32_t>
+	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
 	{
-		startedExecution = true;
-		co_yield 1;
-		co_yield 2;
-		co_yield 3;
-	}();
+		bool startedExecution = false;
+		auto makeGenerator = [&]() -> cppcoro::async_generator<std::uint32_t>
+		{
+			startedExecution = true;
+			co_yield 1;
+			co_yield 2;
+			co_yield 3;
+		};
 
-	CHECK(!startedExecution);
+		auto gen = makeGenerator();
 
-	auto beginAwaitable = gen.begin();
-	CHECK(startedExecution);
-	CHECK(beginAwaitable.await_ready());
+		CHECK(!startedExecution);
 
-	auto it = beginAwaitable.await_resume();
-	CHECK(it != gen.end());
-	CHECK(*it == 1u);
+		auto it = co_await gen.begin();
 
-	auto incrementAwaitable1 = ++it;
-	CHECK(incrementAwaitable1.await_ready());
-	incrementAwaitable1.await_resume();
-	CHECK(*it == 2u);
+		CHECK(startedExecution);
 
-	auto incrementAwaitable2 = ++it;
-	CHECK(incrementAwaitable2.await_ready());
-	incrementAwaitable2.await_resume();
-	CHECK(*it == 3u);
+		CHECK(it != gen.end());
+		CHECK(*it == 1u);
 
-	auto incrementAwaitable3 = ++it;
-	CHECK(incrementAwaitable3.await_ready());
-	incrementAwaitable3.await_resume();
-	CHECK(it == gen.end());
+		CHECK(co_await ++it != gen.end());
+		CHECK(*it == 2u);
+
+		CHECK(co_await ++it != gen.end());
+		CHECK(*it == 3u);
+
+		CHECK(co_await ++it == gen.end());
+	}());
 }
 
 class set_to_true_on_destruction
 {
 public:
+
 	set_to_true_on_destruction(bool* value)
 		: m_value(value)
 	{}
@@ -124,32 +129,33 @@ private:
 
 TEST_CASE("destructors of values in scope are called when async_generator destructed early")
 {
-	bool aDestructed = false;
-	bool bDestructed = false;
+	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
 	{
-		auto gen = [&](set_to_true_on_destruction a) -> cppcoro::async_generator<std::uint32_t>
+		bool aDestructed = false;
+		bool bDestructed = false;
+
+		auto makeGenerator = [&](set_to_true_on_destruction a) -> cppcoro::async_generator<std::uint32_t>
 		{
 			set_to_true_on_destruction b(&bDestructed);
 			co_yield 1;
 			co_yield 2;
-		}(&aDestructed);
+		};
 
-		CHECK(!aDestructed);
-		CHECK(!bDestructed);
+		{
+			auto gen = makeGenerator(&aDestructed);
 
-		auto beginOp = gen.begin();
-		CHECK(beginOp.await_ready());
-		CHECK(!aDestructed);
-		CHECK(!bDestructed);
+			CHECK(!aDestructed);
+			CHECK(!bDestructed);
 
-		auto it = beginOp.await_resume();
-		CHECK(*it == 1u);
-		CHECK(!aDestructed);
-		CHECK(!bDestructed);
-	}
+			auto it = co_await gen.begin();
+			CHECK(!aDestructed);
+			CHECK(!bDestructed);
+			CHECK(*it == 1u);
+		}
 
-	CHECK(aDestructed);
-	CHECK(bDestructed);
+		CHECK(aDestructed);
+		CHECK(bDestructed);
+	}());
 }
 
 TEST_CASE("async producer with async consumer"
@@ -169,38 +175,48 @@ TEST_CASE("async producer with async consumer"
 	cppcoro::single_consumer_event p3;
 	cppcoro::single_consumer_event c1;
 
-	auto producer = [&]() -> cppcoro::async_generator<std::uint32_t>
+	auto produce = [&]() -> cppcoro::async_generator<std::uint32_t>
 	{
 		co_await p1;
 		co_yield 1;
 		co_await p2;
 		co_yield 2;
 		co_await p3;
-	}();
+	};
 
-	auto consumer = [&]() -> cppcoro::task<>
+	bool consumerFinished = false;
+
+	auto consume = [&]() -> cppcoro::lazy_task<>
 	{
-		auto it = co_await producer.begin();
+		auto generator = produce();
+		auto it = co_await generator.begin();
 		CHECK(*it == 1u);
 		(void)co_await ++it;
 		CHECK(*it == 2u);
 		co_await c1;
 		(void)co_await ++it;
-		CHECK(it == producer.end());
-	}();
+		CHECK(it == generator.end());
+		consumerFinished = true;
+	};
 
-	p1.set();
-	p2.set();
-	c1.set();
-	CHECK(!consumer.is_ready());
-	p3.set();
-	CHECK(consumer.is_ready());
+	auto unblock = [&]() -> cppcoro::lazy_task<>
+	{
+		p1.set();
+		p2.set();
+		c1.set();
+		CHECK(!consumerFinished);
+		p3.set();
+		CHECK(consumerFinished);
+		co_return;
+	};
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(consume(), unblock()));
 }
 
 TEST_CASE("exception thrown before first yield is rethrown from begin operation")
 {
 	class TestException {};
-	auto gen = [&](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
+	auto gen = [](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
 	{
 		if (shouldThrow)
 		{
@@ -217,7 +233,7 @@ TEST_CASE("exception thrown before first yield is rethrown from begin operation"
 TEST_CASE("exception thrown after first yield is rethrown from increment operator")
 {
 	class TestException {};
-	auto gen = [&](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
+	auto gen = [](bool shouldThrow) -> cppcoro::async_generator<std::uint32_t>
 	{
 		co_yield 1;
 		if (shouldThrow)
@@ -238,18 +254,17 @@ TEST_CASE("exception thrown after first yield is rethrown from increment operato
 
 TEST_CASE("large number of synchronous completions doesn't result in stack-overflow")
 {
-	cppcoro::single_consumer_event event;
 
-	auto sequence = [](cppcoro::single_consumer_event& event) -> cppcoro::async_generator<std::uint32_t>
+	auto makeSequence = [](cppcoro::single_consumer_event& event) -> cppcoro::async_generator<std::uint32_t>
 	{
 		for (std::uint32_t i = 0; i < 1'000'000u; ++i)
 		{
 			if (i == 500'000u) co_await event;
 			co_yield i;
 		}
-	}(event);
+	};
 
-	auto consumerTask = [](cppcoro::async_generator<std::uint32_t> sequence) -> cppcoro::task<>
+	auto consumer = [](cppcoro::async_generator<std::uint32_t> sequence) -> cppcoro::lazy_task<>
 	{
 		std::uint32_t expected = 0;
 		for co_await(std::uint32_t i : sequence)
@@ -258,18 +273,26 @@ TEST_CASE("large number of synchronous completions doesn't result in stack-overf
 		}
 
 		CHECK(expected == 1'000'000u);
-	}(std::move(sequence));
+	};
 
-	CHECK(!consumerTask.is_ready());
+	auto unblocker = [](cppcoro::single_consumer_event& event) -> cppcoro::lazy_task<>
+	{
+		// Should have processed the first 500'000 elements synchronously with consumer driving
+		// iteraction before producer suspends and thus consumer suspends.
+		// Then we resume producer in call to set() below and it continues processing remaining
+		// 500'000 elements, this time with producer driving the interaction.
 
-	// Should have processed the first 500'000 elements synchronously with consumer driving
-	// iteraction before producer suspends and thus consumer suspends.
-	// Then we resume producer in call to set() below and it continues processing remaining
-	// 500'000 elements, this time with producer driving the interaction.
+		event.set();
 
-	event.set();
+		co_return;
+	};
 
-	CHECK(consumerTask.is_ready());
+	cppcoro::single_consumer_event event;
+
+	cppcoro::sync_wait(
+		cppcoro::when_all_ready(
+			consumer(makeSequence(event)),
+			unblocker(event)));
 }
 
 TEST_CASE("fmap")
@@ -287,7 +310,7 @@ TEST_CASE("fmap")
 
 	auto squares = iota(5) | fmap([](auto x) { return x * x; });
 
-	[&]() -> cppcoro::task<>
+	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
 	{
 		auto it = co_await squares.begin();
 		CHECK(*it == 0);
@@ -296,7 +319,7 @@ TEST_CASE("fmap")
 		CHECK(*co_await ++it == 9);
 		CHECK(*co_await ++it == 16);
 		CHECK(co_await ++it == squares.end());
-	}();
+	}());
 }
 
 TEST_SUITE_END();

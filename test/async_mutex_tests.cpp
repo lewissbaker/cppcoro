@@ -5,7 +5,9 @@
 
 #include <cppcoro/async_mutex.hpp>
 #include <cppcoro/single_consumer_event.hpp>
-#include <cppcoro/task.hpp>
+#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/when_all_ready.hpp>
+#include <cppcoro/sync_wait.hpp>
 
 #include "doctest/doctest.h"
 
@@ -33,42 +35,53 @@ TEST_CASE("multiple lockers")
 	cppcoro::single_consumer_event c;
 	cppcoro::single_consumer_event d;
 
-	auto f = [&](cppcoro::single_consumer_event& e) -> cppcoro::task<>
+	auto f = [&](cppcoro::single_consumer_event& e) -> cppcoro::lazy_task<>
 	{
 		auto lock = co_await mutex.scoped_lock_async();
 		co_await e;
 		++value;
 	};
 
-	auto t1 = f(a);
-	CHECK(!t1.is_ready());
-	CHECK(value == 0);
+	auto check = [&]() -> cppcoro::lazy_task<>
+	{
+		CHECK(value == 0);
 
-	auto t2 = f(b);
-	auto t3 = f(c);
+		a.set();
 
-	a.set();
+		CHECK(value == 1);
 
-	CHECK(value == 1);
+		auto check2 = [&]() -> cppcoro::lazy_task<>
+		{
+			b.set();
 
-	auto t4 = f(d);
+			CHECK(value == 2);
 
-	b.set();
+			c.set();
 
-	CHECK(value == 2);
+			CHECK(value == 3);
 
-	c.set();
+			d.set();
 
-	CHECK(value == 3);
+			CHECK(value == 4);
 
-	d.set();
+			co_return;
+		};
+
+		// Now that we've queued some waiters and released one waiter this will
+		// have acquired the list of pending waiters in the local cache.
+		// We'lll now queue up another one before releasing any more waiters
+		// to test the code-path that looks at the newly queued waiter list
+		// when the cache of waiters is exhausted.
+		co_await cppcoro::when_all_ready(f(d), check2());
+	};
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		f(a),
+		f(b),
+		f(c),
+		check()));
 
 	CHECK(value == 4);
-
-	CHECK(t1.is_ready());
-	CHECK(t2.is_ready());
-	CHECK(t3.is_ready());
-	CHECK(t4.is_ready());
 }
 
 TEST_SUITE_END();

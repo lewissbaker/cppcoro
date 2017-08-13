@@ -6,7 +6,10 @@
 #include <cppcoro/async_auto_reset_event.hpp>
 
 #include <cppcoro/config.hpp>
-#include <cppcoro/task.hpp>
+#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/when_all.hpp>
+#include <cppcoro/when_all_ready.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
 #if CPPCORO_OS_WINNT
@@ -27,50 +30,67 @@ TEST_CASE("single waiter")
 
 	bool started = false;
 	bool finished = false;
-	auto run = [&]() -> cppcoro::task<>
+	auto run = [&]() -> cppcoro::lazy_task<>
 	{
 		started = true;
 		co_await event;
 		finished = true;
 	};
 
-	auto t = run();
+	auto check = [&]() -> cppcoro::lazy_task<>
+	{
+		CHECK(started);
+		CHECK(!finished);
 
-	CHECK(started);
-	CHECK(!finished);
+		event.set();
 
-	event.set();
+		CHECK(finished);
 
-	CHECK(finished);
+		co_return;
+	};
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(run(), check()));
 }
 
 TEST_CASE("multiple waiters")
 {
 	cppcoro::async_auto_reset_event event;
 
-	auto run = [&]() -> cppcoro::task<>
+	
+	auto run = [&](bool& flag) -> cppcoro::lazy_task<>
 	{
 		co_await event;
+		flag = true;
 	};
 
-	auto t1 = run();
-	auto t2 = run();
+	bool completed1 = false;
+	bool completed2 = false;
 
-	CHECK(!t1.is_ready());
-	CHECK(!t2.is_ready());
+	auto check = [&]() -> cppcoro::lazy_task<>
+	{
+		CHECK(!completed1);
+		CHECK(!completed2);
 
-	event.set();
+		event.set();
 
-	CHECK(t1.is_ready());
-	CHECK(!t2.is_ready());
+		CHECK(completed1);
+		CHECK(!completed2);
 
-	event.set();
+		event.set();
 
-	CHECK(t1.is_ready());
-	CHECK(t2.is_ready());
+		CHECK(completed2);
+
+		co_return;
+	};
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		run(completed1),
+		run(completed2),
+		check()));
 }
 
 #if CPPCORO_OS_WINNT
+
 TEST_CASE("multi-threaded")
 {
 	cppcoro::io_service ioService;
@@ -84,13 +104,15 @@ TEST_CASE("multi-threaded")
 	std::thread thread3{ [&] { ioService.process_events(); } };
 	auto joinOnExit3 = cppcoro::on_scope_exit([&] { thread3.join(); });
 
-	auto run = [&]() -> cppcoro::task<>
+	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
+
+	auto run = [&]() -> cppcoro::lazy_task<>
 	{
 		cppcoro::async_auto_reset_event event;
 
 		int value = 0;
 
-		auto startWaiter = [&]() -> cppcoro::task<>
+		auto startWaiter = [&]() -> cppcoro::lazy_task<>
 		{
 			co_await ioService.schedule();
 			co_await event;
@@ -98,54 +120,38 @@ TEST_CASE("multi-threaded")
 			event.set();
 		};
 
-		auto startSignaller = [&]() -> cppcoro::task<>
+		auto startSignaller = [&]() -> cppcoro::lazy_task<>
 		{
 			co_await ioService.schedule();
 			value = 5;
 			event.set();
 		};
 
-		std::vector<cppcoro::task<>> waiters;
+		std::vector<cppcoro::lazy_task<>> tasks;
+
+		tasks.emplace_back(startSignaller());
 
 		for (int i = 0; i < 1000; ++i)
 		{
-			waiters.emplace_back(startWaiter());
+			tasks.emplace_back(startWaiter());
 		}
 
-		co_await startSignaller();
-
-		for (auto& waiter : waiters)
-		{
-			co_await waiter;
-		}
+		co_await cppcoro::when_all(std::move(tasks));
 
 		// NOTE: Can't use CHECK() here because it's not thread-safe
 		assert(value == 1005);
 	};
 
-	auto runMany = [&]() -> cppcoro::task<>
+	std::vector<cppcoro::lazy_task<>> tasks;
+
+	for (int i = 0; i < 1000; ++i)
 	{
-		std::vector<cppcoro::task<>> tasks;
+		tasks.emplace_back(run());
+	}
 
-		for (int i = 0; i < 1000; ++i)
-		{
-			tasks.emplace_back(run());
-		}
-
-		for (auto& t : tasks)
-		{
-			co_await t;
-		}
-
-		ioService.stop();
-	};
-
-	auto t = runMany();
-
-	joinOnExit1.call_now();
-	joinOnExit2.call_now();
-	joinOnExit3.call_now();
+	cppcoro::sync_wait(cppcoro::when_all(std::move(tasks)));
 }
+
 #endif
 
 TEST_SUITE_END();

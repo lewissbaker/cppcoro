@@ -4,7 +4,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <cppcoro/io_service.hpp>
-#include <cppcoro/task.hpp>
+#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/when_all.hpp>
+#include <cppcoro/when_all_ready.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 #include <cppcoro/operation_cancelled.hpp>
 #include <cppcoro/cancellation_source.hpp>
@@ -41,28 +44,26 @@ TEST_CASE("schedule coroutine")
 
 	bool reachedPointA = false;
 	bool reachedPointB = false;
-	auto startTask = [&](cppcoro::io_service& ioService) -> cppcoro::task<>
+	auto startTask = [&](cppcoro::io_service& ioService) -> cppcoro::lazy_task<>
 	{
-		cppcoro::io_work_scope ioScope(ioService);
 		reachedPointA = true;
 		co_await ioService.schedule();
 		reachedPointB = true;
 	};
 
-	{
-		auto t = startTask(service);
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		startTask(service),
+		[&]() -> cppcoro::lazy_task<>
+		{
+			CHECK(reachedPointA);
+			CHECK_FALSE(reachedPointB);
 
-		CHECK_FALSE(t.is_ready());
-		CHECK(reachedPointA);
-		CHECK_FALSE(reachedPointB);
+			service.process_pending_events();
 
-		service.process_pending_events();
+			CHECK(reachedPointB);
 
-		CHECK(reachedPointB);
-		CHECK(t.is_ready());
-
-		CHECK(service.is_stop_requested());
-	}
+			co_return;
+		}()));
 }
 
 TEST_CASE("multiple I/O threads servicing events")
@@ -71,46 +72,40 @@ TEST_CASE("multiple I/O threads servicing events")
 
 	std::thread t1{ [&] { ioService.process_events(); } };
 	auto waitForT1 = cppcoro::on_scope_exit([&] { t1.join(); });
+	auto stopIoServiceOnExit1 = cppcoro::on_scope_exit([&] { ioService.stop();  });
 
 	std::thread t2{ [&] { ioService.process_events(); } };
 	auto waitForT2 = cppcoro::on_scope_exit([&] { t2.join(); });
+	auto stopIoServiceOnExit2 = cppcoro::on_scope_exit([&] { ioService.stop();  });
 
-	auto runOnIoThread = [&]() -> cppcoro::task<>
+	std::atomic<int> completedCount = 0;
+
+	auto runOnIoThread = [&]() -> cppcoro::lazy_task<>
 	{
-		cppcoro::io_work_scope ioScope(ioService);
 		co_await ioService.schedule();
+		++completedCount;
 	};
 
-	std::vector<cppcoro::task<>> tasks;
+	std::vector<cppcoro::lazy_task<>> tasks;
 	{
-		cppcoro::io_work_scope ioScope(ioService);
 		for (int i = 0; i < 1000; ++i)
 		{
 			tasks.emplace_back(runOnIoThread());
 		}
 	}
 
-	waitForT1.call_now();
-	waitForT2.call_now();
+	cppcoro::sync_wait(cppcoro::when_all(std::move(tasks)));
 
-	// Thread won't have exited until all tasks complete
-	// and io_context objects destruct.
-
-	for (auto& task : tasks)
-	{
-		CHECK(task.is_ready());
-	}
+	CHECK(completedCount == 1000);
 }
 
 TEST_CASE("Multiple concurrent timers")
 {
 	cppcoro::io_service ioService;
 
-	auto start = [&](std::chrono::milliseconds duration)
-		-> cppcoro::task<std::chrono::high_resolution_clock::duration>
+	auto startTimer = [&](std::chrono::milliseconds duration)
+		-> cppcoro::lazy_task<std::chrono::high_resolution_clock::duration>
 	{
-		cppcoro::io_work_scope scope(ioService);
-
 		auto start = std::chrono::high_resolution_clock::now();
 
 		co_await ioService.schedule_after(duration);
@@ -120,34 +115,36 @@ TEST_CASE("Multiple concurrent timers")
 		co_return end - start;
 	};
 
-	using namespace std::literals::chrono_literals;
-	auto t1 = start(100ms);
-	auto t2 = start(120ms);
-	auto t3 = start(50ms);
-
-	ioService.process_events();
-
-	REQUIRE(t1.is_ready());
-	REQUIRE(t2.is_ready());
-	REQUIRE(t3.is_ready());
-
-	auto test = [&]() -> cppcoro::task<>
+	auto test = [&]() -> cppcoro::lazy_task<>
 	{
 		using namespace std::chrono;
-		auto time1 = duration_cast<microseconds>(co_await t1);
-		auto time2 = duration_cast<microseconds>(co_await t2);
-		auto time3 = duration_cast<microseconds>(co_await t3);
+		using namespace std::chrono_literals;
 
-		MESSAGE("Waiting 100ms took " << time1.count() << "us");
-		MESSAGE("Waiting 120ms took " << time2.count() << "us");
-		MESSAGE("Waiting 50ms took " << time3.count() << "us");
+		auto[time1, time2, time3] = co_await cppcoro::when_all(
+			startTimer(100ms),
+			startTimer(120ms),
+			startTimer(50ms));
+
+		MESSAGE("Waiting 100ms took " << duration_cast<microseconds>(time1).count() << "us");
+		MESSAGE("Waiting 120ms took " << duration_cast<microseconds>(time2).count() << "us");
+		MESSAGE("Waiting 50ms took " << duration_cast<microseconds>(time3).count() << "us");
 
 		CHECK(time1 >= 100ms);
 		CHECK(time2 >= 120ms);
 		CHECK(time3 >= 50ms);
 	};
 
-	test();
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
+		{
+			auto stopIoOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
+			co_await test();
+		}(),
+		[&]() -> cppcoro::lazy_task<>
+		{
+			ioService.process_events();
+			co_return;
+		}()));
 }
 
 TEST_CASE("Timer cancellation"
@@ -157,40 +154,48 @@ TEST_CASE("Timer cancellation"
 
 	cppcoro::io_service ioService;
 
-	auto longWait = [&](cppcoro::cancellation_token ct) -> cppcoro::task<>
+	auto longWait = [&](cppcoro::cancellation_token ct) -> cppcoro::lazy_task<>
 	{
 		co_await ioService.schedule_after(20'000ms, ct);
 	};
 
-
-	auto test = [&]() -> cppcoro::task<>
+	auto cancelAfter = [&](cppcoro::cancellation_source source, auto duration) -> cppcoro::lazy_task<>
 	{
-		cppcoro::io_work_scope scope(ioService);
-
-
-		{
-			cppcoro::cancellation_source source;
-			auto t = longWait(source.token());
-			co_await ioService.schedule_after(1ms);
-			source.request_cancellation();
-			CHECK_THROWS_AS(co_await t, cppcoro::operation_cancelled);
-		}
-
-		// Check that a second timer cancellation is also promptly responded-to.
-		{
-			cppcoro::cancellation_source source;
-			auto t = longWait(source.token());
-			co_await ioService.schedule_after(1ms);
-			source.request_cancellation();
-			CHECK_THROWS_AS(co_await t, cppcoro::operation_cancelled);
-		}
+		co_await ioService.schedule_after(duration);
+		source.request_cancellation();
 	};
 
-	auto t = test();
+	auto test = [&]() -> cppcoro::lazy_task<>
+	{
+		cppcoro::cancellation_source source;
+		co_await cppcoro::when_all_ready(
+			[&](cppcoro::cancellation_token ct) -> cppcoro::lazy_task<>
+		{
+			CHECK_THROWS_AS(co_await longWait(std::move(ct)), const cppcoro::operation_cancelled&);
+		}(source.token()),
+			cancelAfter(source, 1ms));
+	};
 
-	ioService.process_events();
+	auto testTwice = [&]() -> cppcoro::lazy_task<>
+	{
+		co_await test();
+		co_await test();
+	};
 
-	REQUIRE(t.is_ready());
+	auto stopIoServiceAfter = [&](cppcoro::lazy_task<> task) -> cppcoro::lazy_task<>
+	{
+		co_await task.when_ready();
+		ioService.stop();
+		co_return co_await task.when_ready();
+	};
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		stopIoServiceAfter(testTwice()),
+		[&]() -> cppcoro::lazy_task<>
+		{
+			ioService.process_events();
+			co_return;
+		}()));
 }
 
 TEST_CASE("Many concurrent timers")
@@ -199,8 +204,9 @@ TEST_CASE("Many concurrent timers")
 
 	std::thread workerThread{ [&] { ioService.process_events(); } };
 	auto joinOnExit = cppcoro::on_scope_exit([&] { workerThread.join(); });
+	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
 
-	auto startTimer = [&]() -> cppcoro::task<>
+	auto startTimer = [&]() -> cppcoro::lazy_task<>
 	{
 		using namespace std::literals::chrono_literals;
 		co_await ioService.schedule_after(50ms);
@@ -208,11 +214,9 @@ TEST_CASE("Many concurrent timers")
 
 	constexpr std::uint32_t taskCount = 10'000;
 
-	auto runManyTimers = [&]() -> cppcoro::task<>
+	auto runManyTimers = [&]() -> cppcoro::lazy_task<>
 	{
-		cppcoro::io_work_scope scope(ioService);
-
-		std::vector<cppcoro::task<>> tasks;
+		std::vector<cppcoro::lazy_task<>> tasks;
 
 		tasks.reserve(taskCount);
 
@@ -221,17 +225,12 @@ TEST_CASE("Many concurrent timers")
 			tasks.emplace_back(startTimer());
 		}
 
-		for (auto& t : tasks)
-		{
-			co_await t;
-		}
+		co_await cppcoro::when_all(std::move(tasks));
 	};
 
 	auto start = std::chrono::high_resolution_clock::now();
 
-	auto t = runManyTimers();
-
-	joinOnExit.call_now();
+	cppcoro::sync_wait(runManyTimers());
 
 	auto end = std::chrono::high_resolution_clock::now();
 

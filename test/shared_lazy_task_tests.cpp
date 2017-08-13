@@ -4,7 +4,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <cppcoro/shared_lazy_task.hpp>
-#include <cppcoro/task.hpp>
+#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/when_all_ready.hpp>
 #include <cppcoro/single_consumer_event.hpp>
 
 #include "counted.hpp"
@@ -17,12 +19,10 @@ TEST_SUITE_BEGIN("shared_lazy_task");
 
 TEST_CASE("awaiting default-constructed task throws broken_promise")
 {
-	auto t = []() -> cppcoro::task<>
+	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
 	{
 		CHECK_THROWS_AS(co_await cppcoro::shared_lazy_task<>{}, const cppcoro::broken_promise&);
-	}();
-
-	CHECK(t.is_ready());
+	}());
 }
 
 TEST_CASE("coroutine doesn't start executing until awaited")
@@ -39,27 +39,16 @@ TEST_CASE("coroutine doesn't start executing until awaited")
 	CHECK(!t.is_ready());
 	CHECK(!startedExecuting);
 
-	auto waiter = [](cppcoro::shared_lazy_task<> t) -> cppcoro::task<>
+	cppcoro::sync_wait([](cppcoro::shared_lazy_task<> t) -> cppcoro::lazy_task<>
 	{
 		co_await t;
-	}(t);
+	}(t));
 
-	CHECK(waiter.is_ready());
 	CHECK(t.is_ready());
 	CHECK(startedExecuting);
 }
 
-static constexpr bool is_msvc_2015_x86_optimised =
-#if defined(_MSC_VER) && _MSC_VER < 1910 && defined(CPPCORO_RELEASE_OPTIMISED)
-	true;
-#else
-	false;
-#endif
-
-// Skip running under MSVC 2015 x86 opt due to compiler bug which causes this test
-// to crash with an access violation inside shared_lazy_task_promise_base::try_await().
-TEST_CASE("result is destroyed when last reference is destroyed"
-	* doctest::skip{ is_msvc_2015_x86_optimised })
+TEST_CASE("result is destroyed when last reference is destroyed")
 {
 	counted::reset_counts();
 
@@ -71,10 +60,7 @@ TEST_CASE("result is destroyed when last reference is destroyed"
 
 		CHECK(counted::active_count() == 0);
 
-		[](cppcoro::shared_lazy_task<counted> t) -> cppcoro::task<>
-		{
-			co_await t.when_ready();
-		}(t);
+		cppcoro::sync_wait(t);
 
 		CHECK(counted::active_count() == 1);
 	}
@@ -93,7 +79,7 @@ TEST_CASE("multiple awaiters")
 		co_return 1;
 	};
 
-	auto consume = [](cppcoro::shared_lazy_task<int> t) -> cppcoro::task<>
+	auto consume = [](cppcoro::shared_lazy_task<int> t) -> cppcoro::lazy_task<>
 	{
 		int result = co_await t;
 		CHECK(result == 1);
@@ -101,34 +87,21 @@ TEST_CASE("multiple awaiters")
 
 	auto sharedTask = produce();
 
-	CHECK(!sharedTask.is_ready());
-	CHECK(!startedExecution);
-
-	auto t1 = consume(sharedTask);
-
-	CHECK(!t1.is_ready());
-	CHECK(startedExecution);
-	CHECK(!sharedTask.is_ready());
-
-	auto t2 = consume(sharedTask);
-
-	CHECK(!t2.is_ready());
-	CHECK(!sharedTask.is_ready());
-
-	auto t3 = consume(sharedTask);
-
-	event.set();
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		consume(sharedTask),
+		consume(sharedTask),
+		consume(sharedTask),
+		[&]() -> cppcoro::lazy_task<>
+		{
+			event.set();
+			CHECK(sharedTask.is_ready());
+			co_return;
+		}()));
 
 	CHECK(sharedTask.is_ready());
-	CHECK(t1.is_ready());
-	CHECK(t2.is_ready());
-	CHECK(t3.is_ready());
 }
 
-// Skip running under MSVC 2015 x86 opt due to compiler bug which causes this test
-// to crash with an access violation inside shared_lazy_task_promise_base::try_await().
-TEST_CASE("waiting on shared_lazy_task in loop doesn't cause stack-overflow"
-	* doctest::skip{ is_msvc_2015_x86_optimised })
+TEST_CASE("waiting on shared_lazy_task in loop doesn't cause stack-overflow")
 {
 	// This test checks that awaiting a shared_lazy_task that completes
 	// synchronously doesn't recursively resume the awaiter inside the
@@ -140,7 +113,7 @@ TEST_CASE("waiting on shared_lazy_task in loop doesn't cause stack-overflow"
 		co_return 1;
 	};
 
-	auto run = [&]() -> cppcoro::task<>
+	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
 	{
 		int result = 0;
 		for (int i = 0; i < 1'000'000; ++i)
@@ -148,10 +121,7 @@ TEST_CASE("waiting on shared_lazy_task in loop doesn't cause stack-overflow"
 			result += co_await completesSynchronously();
 		}
 		CHECK(result == 1'000'000);
-	};
-
-	auto t = run();
-	CHECK(t.is_ready());
+	}());
 }
 
 TEST_CASE("make_shared_task")
@@ -172,21 +142,19 @@ TEST_CASE("make_shared_task")
 	CHECK(!sharedT.is_ready());
 	CHECK(!startedExecution);
 
-	auto consume = [](cppcoro::shared_lazy_task<std::string> t) -> cppcoro::task<>
+	auto consume = [](cppcoro::shared_lazy_task<std::string> t) -> cppcoro::lazy_task<>
 	{
 		auto x = co_await std::move(t);
 		CHECK(x == "test");
 	};
 
-	auto c1 = consume(sharedT);
-	auto c2 = consume(sharedT);
-
-	CHECK(c1.is_ready());
-	CHECK(c2.is_ready());
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		consume(sharedT),
+		consume(sharedT)));
 }
 
 TEST_CASE("make_shared_task of void"
-	* doctest::description{ "Tests that workaround for MSVC 2017.1 bug is operational" })
+	* doctest::description{ "Tests that workaround for 'co_return <void-expr>' bug is operational if required" })
 {
 	bool startedExecution = false;
 
@@ -203,15 +171,18 @@ TEST_CASE("make_shared_task of void"
 	CHECK(!sharedT.is_ready());
 	CHECK(!startedExecution);
 
-	auto consume = [](cppcoro::shared_lazy_task<> t) -> cppcoro::task<>
+	auto consume = [](cppcoro::shared_lazy_task<> t) -> cppcoro::lazy_task<>
 	{
 		co_await t;
 	};
 
 	auto c1 = consume(sharedT);
+	cppcoro::sync_wait(c1);
+
 	CHECK(startedExecution);
 
 	auto c2 = consume(sharedT);
+	cppcoro::sync_wait(c2);
 
 	CHECK(c1.is_ready());
 	CHECK(c2.is_ready());
