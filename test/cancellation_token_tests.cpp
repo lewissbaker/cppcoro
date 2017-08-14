@@ -150,97 +150,97 @@ TEST_CASE("concurrent registration and cancellation")
 		std::thread waiter1{ [token = source.token()]
 		{
 			std::atomic<bool> cancelled = false;
-		while (!cancelled)
-		{
-			cppcoro::cancellation_registration registration{ token, [&]
+			while (!cancelled)
 			{
-				cancelled = true;
-			} };
+				cppcoro::cancellation_registration registration{ token, [&]
+				{
+					cancelled = true;
+				} };
 
-			cppcoro::cancellation_registration reg0{ token, [] {} };
-			cppcoro::cancellation_registration reg1{ token, [] {} };
-			cppcoro::cancellation_registration reg2{ token, [] {} };
-			cppcoro::cancellation_registration reg3{ token, [] {} };
-			cppcoro::cancellation_registration reg4{ token, [] {} };
-			cppcoro::cancellation_registration reg5{ token, [] {} };
-			cppcoro::cancellation_registration reg6{ token, [] {} };
-			cppcoro::cancellation_registration reg7{ token, [] {} };
-			cppcoro::cancellation_registration reg8{ token, [] {} };
-			cppcoro::cancellation_registration reg9{ token, [] {} };
-			cppcoro::cancellation_registration reg10{ token, [] {} };
-			cppcoro::cancellation_registration reg11{ token, [] {} };
-			cppcoro::cancellation_registration reg12{ token, [] {} };
-			cppcoro::cancellation_registration reg13{ token, [] {} };
-			cppcoro::cancellation_registration reg14{ token, [] {} };
-			cppcoro::cancellation_registration reg15{ token, [] {} };
-			cppcoro::cancellation_registration reg17{ token, [] {} };
+				cppcoro::cancellation_registration reg0{ token, [] {} };
+				cppcoro::cancellation_registration reg1{ token, [] {} };
+				cppcoro::cancellation_registration reg2{ token, [] {} };
+				cppcoro::cancellation_registration reg3{ token, [] {} };
+				cppcoro::cancellation_registration reg4{ token, [] {} };
+				cppcoro::cancellation_registration reg5{ token, [] {} };
+				cppcoro::cancellation_registration reg6{ token, [] {} };
+				cppcoro::cancellation_registration reg7{ token, [] {} };
+				cppcoro::cancellation_registration reg8{ token, [] {} };
+				cppcoro::cancellation_registration reg9{ token, [] {} };
+				cppcoro::cancellation_registration reg10{ token, [] {} };
+				cppcoro::cancellation_registration reg11{ token, [] {} };
+				cppcoro::cancellation_registration reg12{ token, [] {} };
+				cppcoro::cancellation_registration reg13{ token, [] {} };
+				cppcoro::cancellation_registration reg14{ token, [] {} };
+				cppcoro::cancellation_registration reg15{ token, [] {} };
+				cppcoro::cancellation_registration reg17{ token, [] {} };
 
-			std::this_thread::yield();
-		}
+				std::this_thread::yield();
+			}
 		} };
 
 		std::thread waiter2{ [token = source.token()]
 		{
 			std::atomic<bool> cancelled = false;
-		while (!cancelled)
-		{
-			cppcoro::cancellation_registration registration{ token, [&]
+			while (!cancelled)
 			{
-				cancelled = true;
-			} };
+				cppcoro::cancellation_registration registration{ token, [&]
+				{
+					cancelled = true;
+				} };
 
-			cppcoro::cancellation_registration reg0{ token, [] {} };
-			cppcoro::cancellation_registration reg1{ token, [] {} };
-			cppcoro::cancellation_registration reg2{ token, [] {} };
-			cppcoro::cancellation_registration reg3{ token, [] {} };
-			cppcoro::cancellation_registration reg4{ token, [] {} };
-			cppcoro::cancellation_registration reg5{ token, [] {} };
-			cppcoro::cancellation_registration reg6{ token, [] {} };
-			cppcoro::cancellation_registration reg7{ token, [] {} };
-			cppcoro::cancellation_registration reg8{ token, [] {} };
-			cppcoro::cancellation_registration reg9{ token, [] {} };
-			cppcoro::cancellation_registration reg10{ token, [] {} };
-			cppcoro::cancellation_registration reg11{ token, [] {} };
-			cppcoro::cancellation_registration reg12{ token, [] {} };
-			cppcoro::cancellation_registration reg13{ token, [] {} };
-			cppcoro::cancellation_registration reg14{ token, [] {} };
-			cppcoro::cancellation_registration reg15{ token, [] {} };
-			cppcoro::cancellation_registration reg16{ token, [] {} };
+				cppcoro::cancellation_registration reg0{ token, [] {} };
+				cppcoro::cancellation_registration reg1{ token, [] {} };
+				cppcoro::cancellation_registration reg2{ token, [] {} };
+				cppcoro::cancellation_registration reg3{ token, [] {} };
+				cppcoro::cancellation_registration reg4{ token, [] {} };
+				cppcoro::cancellation_registration reg5{ token, [] {} };
+				cppcoro::cancellation_registration reg6{ token, [] {} };
+				cppcoro::cancellation_registration reg7{ token, [] {} };
+				cppcoro::cancellation_registration reg8{ token, [] {} };
+				cppcoro::cancellation_registration reg9{ token, [] {} };
+				cppcoro::cancellation_registration reg10{ token, [] {} };
+				cppcoro::cancellation_registration reg11{ token, [] {} };
+				cppcoro::cancellation_registration reg12{ token, [] {} };
+				cppcoro::cancellation_registration reg13{ token, [] {} };
+				cppcoro::cancellation_registration reg14{ token, [] {} };
+				cppcoro::cancellation_registration reg15{ token, [] {} };
+				cppcoro::cancellation_registration reg16{ token, [] {} };
 
-			std::this_thread::yield();
-		}
+				std::this_thread::yield();
+			}
 		} };
 
 		std::thread waiter3{ [token = source.token()]
 		{
 			std::atomic<bool> cancelled = false;
-		while (!cancelled)
-		{
-			cppcoro::cancellation_registration registration{ token, [&]
+			while (!cancelled)
 			{
-				cancelled = true;
-			} };
+				cppcoro::cancellation_registration registration{ token, [&]
+				{
+					cancelled = true;
+				} };
 
-			cppcoro::cancellation_registration reg0{ token, [] {} };
-			cppcoro::cancellation_registration reg1{ token, [] {} };
-			cppcoro::cancellation_registration reg2{ token, [] {} };
-			cppcoro::cancellation_registration reg3{ token, [] {} };
-			cppcoro::cancellation_registration reg4{ token, [] {} };
-			cppcoro::cancellation_registration reg5{ token, [] {} };
-			cppcoro::cancellation_registration reg6{ token, [] {} };
-			cppcoro::cancellation_registration reg7{ token, [] {} };
-			cppcoro::cancellation_registration reg8{ token, [] {} };
-			cppcoro::cancellation_registration reg9{ token, [] {} };
-			cppcoro::cancellation_registration reg10{ token, [] {} };
-			cppcoro::cancellation_registration reg11{ token, [] {} };
-			cppcoro::cancellation_registration reg12{ token, [] {} };
-			cppcoro::cancellation_registration reg13{ token, [] {} };
-			cppcoro::cancellation_registration reg14{ token, [] {} };
-			cppcoro::cancellation_registration reg15{ token, [] {} };
-			cppcoro::cancellation_registration reg16{ token, [] {} };
+				cppcoro::cancellation_registration reg0{ token, [] {} };
+				cppcoro::cancellation_registration reg1{ token, [] {} };
+				cppcoro::cancellation_registration reg2{ token, [] {} };
+				cppcoro::cancellation_registration reg3{ token, [] {} };
+				cppcoro::cancellation_registration reg4{ token, [] {} };
+				cppcoro::cancellation_registration reg5{ token, [] {} };
+				cppcoro::cancellation_registration reg6{ token, [] {} };
+				cppcoro::cancellation_registration reg7{ token, [] {} };
+				cppcoro::cancellation_registration reg8{ token, [] {} };
+				cppcoro::cancellation_registration reg9{ token, [] {} };
+				cppcoro::cancellation_registration reg10{ token, [] {} };
+				cppcoro::cancellation_registration reg11{ token, [] {} };
+				cppcoro::cancellation_registration reg12{ token, [] {} };
+				cppcoro::cancellation_registration reg13{ token, [] {} };
+				cppcoro::cancellation_registration reg14{ token, [] {} };
+				cppcoro::cancellation_registration reg15{ token, [] {} };
+				cppcoro::cancellation_registration reg16{ token, [] {} };
 
-			std::this_thread::yield();
-		}
+				std::this_thread::yield();
+			}
 		} };
 
 		std::thread canceller{ [&source]
