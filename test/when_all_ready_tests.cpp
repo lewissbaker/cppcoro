@@ -9,6 +9,7 @@
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/shared_lazy_task.hpp>
+#include <cppcoro/sync_wait.hpp>
 #include <cppcoro/async_manual_reset_event.hpp>
 
 #include "counted.hpp"
@@ -28,19 +29,9 @@ TASK<T> when_event_set_return(cppcoro::async_manual_reset_event& event, T value)
 	co_return std::move(value);
 }
 
-template<typename T>
-cppcoro::task<T> start(cppcoro::lazy_task<T> t)
-{
-	co_return co_await std::move(t);
-}
-
 TEST_CASE("when_all_ready() with no args")
 {
-	auto run = []() -> cppcoro::task<>
-	{
-		(void)co_await cppcoro::when_all_ready();
-	};
-	CHECK(run().is_ready());
+	[[maybe_unused]] std::tuple<> result = cppcoro::sync_wait(cppcoro::when_all_ready());
 }
 
 TEST_CASE("when_all_ready() with one lazy_task")
@@ -56,20 +47,19 @@ TEST_CASE("when_all_ready() with one lazy_task")
 	auto whenAllTask = cppcoro::when_all_ready(f(event));
 	CHECK(!started);
 
-	auto g = [&]() -> cppcoro::task<>
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
-		auto& [t] = co_await whenAllTask;
+		auto&[t] = co_await whenAllTask;
 		CHECK(t.is_ready());
-	};
-
-	auto whenAllAwaiterTask = g();
-
-	CHECK(started);
-	CHECK(!whenAllAwaiterTask.is_ready());
-
-	event.set();
-
-	CHECK(whenAllAwaiterTask.is_ready());
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		CHECK(started);
+		event.set();
+		CHECK(whenAllTask.is_ready());
+		co_return;
+	}()));
 }
 
 TEST_CASE("when_all_ready() with multiple lazy_task")
@@ -90,26 +80,31 @@ TEST_CASE("when_all_ready() with multiple lazy_task")
 	CHECK(!started1);
 	CHECK(!started2);
 
-	auto g = [&]() -> cppcoro::task<>
+	bool whenAllTaskFinished = false;
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
 		auto[t1, t2] = co_await std::move(whenAllTask);
+		whenAllTaskFinished = true;
 		CHECK(t1.is_ready());
 		CHECK(t2.is_ready());
-	};
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		CHECK(started1);
+		CHECK(started2);
 
-	auto whenAllAwaiterTask = g();
+		event2.set();
 
-	CHECK(started1);
-	CHECK(started2);
-	CHECK(!whenAllAwaiterTask.is_ready());
+		CHECK(!whenAllTaskFinished);
 
-	event2.set();
+		event1.set();
 
-	CHECK(!whenAllAwaiterTask.is_ready());
+		CHECK(whenAllTaskFinished);
 
-	event1.set();
-
-	CHECK(whenAllAwaiterTask.is_ready());
+		co_return;
+	}()));
 }
 
 TEST_CASE("when_all_ready() with all task types")
@@ -120,22 +115,28 @@ TEST_CASE("when_all_ready() with all task types")
 	auto t2 = when_event_set_return<cppcoro::shared_task>(event, 2);
 	auto t3 = when_event_set_return<cppcoro::shared_lazy_task>(event, 3);
 
-	auto allTask = start(cppcoro::when_all_ready(std::move(t0), std::move(t1), t2, t3));
+	auto allTask = cppcoro::when_all_ready(std::move(t0), std::move(t1), t2, t3);
 
-	CHECK(!allTask.is_ready());
-
-	event.set();
-
-	CHECK(allTask.is_ready());
-
-	CHECK([&]() -> cppcoro::task<>
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
 		auto [t0, t1, t2, t3] = co_await std::move(allTask);
+
+		CHECK(t0.is_ready());
+		CHECK(t1.is_ready());
+		CHECK(t2.is_ready());
+		CHECK(t3.is_ready());
+
 		CHECK(co_await t0 == 0);
 		CHECK(co_await t1 == 1);
 		CHECK(co_await t2 == 2);
 		CHECK(co_await t3 == 3);
-	}().is_ready());
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		event.set();
+		co_return;
+	}()));
 }
 
 TEST_CASE("when_all_ready() with all task types passed by ref")
@@ -146,19 +147,14 @@ TEST_CASE("when_all_ready() with all task types passed by ref")
 	auto t2 = when_event_set_return<cppcoro::shared_task>(event, 2);
 	auto t3 = when_event_set_return<cppcoro::shared_lazy_task>(event, 3);
 
-	auto allTask = start(cppcoro::when_all_ready(
+	auto allTask = cppcoro::when_all_ready(
 		std::ref(t0),
 		std::ref(t1),
 		std::ref(t2),
-		std::ref(t3)));
+		std::ref(t3));
 
-	CHECK(!allTask.is_ready());
-
-	event.set();
-
-	CHECK(allTask.is_ready());
-
-	CHECK([&]() -> cppcoro::task<>
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
 		auto[u0, u1, u2, u3] = co_await allTask;
 
@@ -172,7 +168,14 @@ TEST_CASE("when_all_ready() with all task types passed by ref")
 		CHECK(co_await t1 == 1);
 		CHECK(co_await t2 == 2);
 		CHECK(co_await t3 == 3);
-	}().is_ready());
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		event.set();
+		co_return;
+	}()));
+
+	CHECK(allTask.is_ready());
 }
 
 TEST_CASE("when_all_ready() with std::vector<lazy_task<T>>")
@@ -180,11 +183,13 @@ TEST_CASE("when_all_ready() with std::vector<lazy_task<T>>")
 	cppcoro::async_manual_reset_event event;
 
 	std::uint32_t startedCount = 0;
+	std::uint32_t finishedCount = 0;
 
 	auto makeTask = [&]() -> cppcoro::lazy_task<>
 	{
 		++startedCount;
 		co_await event;
+		++finishedCount;
 	};
 
 	std::vector<cppcoro::lazy_task<>> tasks;
@@ -199,26 +204,28 @@ TEST_CASE("when_all_ready() with std::vector<lazy_task<T>>")
 	// Shouldn't have started any tasks yet.
 	CHECK(startedCount == 0u);
 
-	auto startedAllTask = start(std::move(allTask));
-
-	CHECK(startedCount == 10u);
-
-	CHECK(!startedAllTask.is_ready());
-
-	event.set();
-
-	CHECK(startedAllTask.is_ready());
-
-	CHECK([&]() -> cppcoro::task<>
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
-		auto tasks = co_await std::move(startedAllTask);
-		CHECK(tasks.size() == 10u);
+		auto resultTasks = co_await std::move(allTask);
+		CHECK(resultTasks .size() == 10u);
 
-		for (auto& t : tasks)
+		for (auto& t : resultTasks)
 		{
 			CHECK(t.is_ready());
 		}
-	}().is_ready());
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		CHECK(startedCount == 10u);
+		CHECK(finishedCount == 0u);
+
+		event.set();
+
+		CHECK(finishedCount == 10u);
+
+		co_return;
+	}()));
 }
 
 TEST_CASE("when_all_ready() with std::vector<shared_lazy_task<T>>")
@@ -226,11 +233,13 @@ TEST_CASE("when_all_ready() with std::vector<shared_lazy_task<T>>")
 	cppcoro::async_manual_reset_event event;
 
 	std::uint32_t startedCount = 0;
+	std::uint32_t finishedCount = 0;
 
 	auto makeTask = [&]() -> cppcoro::shared_lazy_task<>
 	{
 		++startedCount;
 		co_await event;
+		++finishedCount;
 	};
 
 	std::vector<cppcoro::shared_lazy_task<>> tasks;
@@ -242,29 +251,31 @@ TEST_CASE("when_all_ready() with std::vector<shared_lazy_task<T>>")
 	cppcoro::lazy_task<std::vector<cppcoro::shared_lazy_task<>>> allTask =
 		cppcoro::when_all_ready(std::move(tasks));
 
-	// Shouldn't have started any tasks yet as allTask is a lazy_task
+	// Shouldn't have started any tasks yet.
 	CHECK(startedCount == 0u);
 
-	auto startedAllTask = start(std::move(allTask));
-
-	CHECK(startedCount == 10u);
-
-	CHECK(!startedAllTask.is_ready());
-
-	event.set();
-
-	CHECK(startedAllTask.is_ready());
-
-	CHECK([&]() -> cppcoro::task<>
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
-		auto tasks = co_await std::move(startedAllTask);
-		CHECK(tasks.size() == 10u);
+		auto resultTasks = co_await std::move(allTask);
+		CHECK(resultTasks.size() == 10u);
 
-		for (auto& t : tasks)
+		for (auto& t : resultTasks)
 		{
 			CHECK(t.is_ready());
 		}
-	}().is_ready());
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		CHECK(startedCount == 10u);
+		CHECK(finishedCount == 0u);
+
+		event.set();
+
+		CHECK(finishedCount == 10u);
+
+		co_return;
+	}()));
 }
 
 TEST_CASE("when_all_ready() with std::vector<task<T>>")
@@ -281,69 +292,87 @@ TEST_CASE("when_all_ready() with std::vector<task<T>>")
 	tasks.emplace_back(makeTask());
 	tasks.emplace_back(makeTask());
 
-	auto startedAllTask = start(cppcoro::when_all_ready(std::move(tasks)));
+	auto allTask = cppcoro::when_all_ready(std::move(tasks));
 
-	CHECK(!startedAllTask.is_ready());
+	CHECK(!allTask.is_ready());
 
-	event.set();
-
-	CHECK(startedAllTask.is_ready());
-
-	CHECK([&]() -> cppcoro::task<>
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
-		auto tasks = co_await std::move(startedAllTask);
+		auto resultTasks = co_await std::move(allTask);
+		CHECK(resultTasks.size());
 
-		CHECK(tasks.size() == 3u);
-
-		for (auto& t : tasks)
+		for (auto& t : resultTasks)
 		{
 			CHECK(t.is_ready());
 		}
-	}().is_ready());
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		event.set();
+		co_return;
+	}()));
 }
 
 TEST_CASE("when_all_ready() with std::vector<shared_task<T>>")
 {
-	auto makeTask = [](cppcoro::async_manual_reset_event& event) -> cppcoro::shared_task<>
+	auto makeTask = [](cppcoro::async_manual_reset_event& event, bool& finishedFlag) -> cppcoro::shared_task<>
 	{
 		co_await event;
+		finishedFlag = true;
 	};
 
 	cppcoro::async_manual_reset_event event1;
 	cppcoro::async_manual_reset_event event2;
 	cppcoro::async_manual_reset_event event3;
 
-	std::vector<cppcoro::shared_task<>> tasks = { makeTask(event1), makeTask(event2), makeTask(event3) };
+	bool finished1 = false;
+	bool finished2 = false;
+	bool finished3 = false;
+
+	std::vector<cppcoro::shared_task<>> tasks = {
+		makeTask(event1, finished1),
+		makeTask(event2, finished2),
+		makeTask(event3, finished3)
+	};
 
 	// We can pass the vector by copy into when_all_ready as we're using shared_task
 	// which support copy-construction.
-	auto startedAllTask = start(cppcoro::when_all_ready(tasks));
+	auto allTask = cppcoro::when_all_ready(tasks);
 
-	CHECK(!startedAllTask.is_ready());
+	bool allTaskFinished = false;
 
-	event2.set();
-	CHECK(!startedAllTask.is_ready());
-	CHECK(tasks[1].is_ready());
-
-	event3.set();
-	CHECK(!startedAllTask.is_ready());
-	CHECK(tasks[2].is_ready());
-
-	event1.set();
-	CHECK(startedAllTask.is_ready());
-	CHECK(tasks[0].is_ready());
-
-	CHECK([&]() -> cppcoro::task<>
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::lazy_task<>
 	{
-		auto& resultTasks = co_await startedAllTask;
+		auto resultTasks = co_await std::move(allTask);
+		allTaskFinished = true;
 
-		CHECK(resultTasks.size() == 3u);
+		CHECK(resultTasks.size());
 
-		for (auto& t : tasks)
+		for (auto& t : resultTasks)
 		{
 			CHECK(t.is_ready());
 		}
-	}().is_ready());
+	}(),
+		[&]() -> cppcoro::lazy_task<>
+	{
+		event2.set();
+		CHECK(!allTaskFinished);
+		CHECK(finished2);
+
+		event3.set();
+		CHECK(!allTaskFinished);
+		CHECK(finished3);
+
+		event1.set();
+		CHECK(allTaskFinished);
+		CHECK(finished1);
+
+		co_return;
+	}()));
+
+	CHECK(allTaskFinished);
 }
 
 TEST_CASE("when_all_ready() doesn't rethrow exceptions")
@@ -360,7 +389,7 @@ TEST_CASE("when_all_ready() doesn't rethrow exceptions")
 		}
 	};
 
-	CHECK([&]() -> cppcoro::task<>
+	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
 	{
 		try
 		{
@@ -373,7 +402,7 @@ TEST_CASE("when_all_ready() doesn't rethrow exceptions")
 		{
 			FAIL("Shouldn't throw");
 		}
-	}().is_ready());
+	}());
 }
 
 TEST_SUITE_END();
