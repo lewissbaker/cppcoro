@@ -16,6 +16,8 @@
 #include <thread>
 #include <type_traits>
 
+#include "io_service_fixture.hpp"
+
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("sync_wait");
@@ -79,7 +81,7 @@ TEST_CASE("sync_wait(shared_task<T>)")
 	CHECK(cppcoro::sync_wait(makeTask()) == "foo");
 }
 
-TEST_CASE("multiple threads")
+TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "multiple threads")
 {
 	// We are creating a new task and starting it inside the sync_wait().
 	// The task will reschedule itself for resumption on an I/O thread
@@ -87,16 +89,11 @@ TEST_CASE("multiple threads")
 	// inside sync_wait(). Thus we're roughly testing the thread-safety of
 	// sync_wait().
 
-	cppcoro::io_service ioService;
-	std::thread thread{ [&] { ioService.process_events(); } };
-	auto joinThreadOnExit = cppcoro::on_scope_exit([&] { thread.join(); });
-	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
-
 	{
 		int value = 0;
 		auto createLazyTask = [&]() -> cppcoro::lazy_task<int>
 		{
-			co_await ioService.schedule();
+			co_await io_service().schedule();
 			co_return value++;
 		};
 
@@ -110,7 +107,7 @@ TEST_CASE("multiple threads")
 		int value = 0;
 		auto createTask = [&]() -> cppcoro::task<int>
 		{
-			co_await ioService.schedule();
+			co_await io_service().schedule();
 			co_return value++;
 		};
 

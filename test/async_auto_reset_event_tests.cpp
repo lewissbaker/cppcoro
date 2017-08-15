@@ -14,6 +14,7 @@
 
 #if CPPCORO_OS_WINNT
 # include <cppcoro/io_service.hpp>
+# include "io_service_fixture.hpp"
 #endif
 
 #include <thread>
@@ -91,21 +92,8 @@ TEST_CASE("multiple waiters")
 
 #if CPPCORO_OS_WINNT
 
-TEST_CASE("multi-threaded")
+TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 {
-	cppcoro::io_service ioService;
-
-	std::thread thread1{ [&] { ioService.process_events(); } };
-	auto joinOnExit1 = cppcoro::on_scope_exit([&] { thread1.join(); });
-
-	std::thread thread2{ [&] { ioService.process_events(); } };
-	auto joinOnExit2 = cppcoro::on_scope_exit([&] { thread2.join(); });
-
-	std::thread thread3{ [&] { ioService.process_events(); } };
-	auto joinOnExit3 = cppcoro::on_scope_exit([&] { thread3.join(); });
-
-	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
-
 	auto run = [&]() -> cppcoro::lazy_task<>
 	{
 		cppcoro::async_auto_reset_event event;
@@ -114,7 +102,7 @@ TEST_CASE("multi-threaded")
 
 		auto startWaiter = [&]() -> cppcoro::lazy_task<>
 		{
-			co_await ioService.schedule();
+			co_await io_service().schedule();
 			co_await event;
 			++value;
 			event.set();
@@ -122,7 +110,7 @@ TEST_CASE("multi-threaded")
 
 		auto startSignaller = [&]() -> cppcoro::lazy_task<>
 		{
-			co_await ioService.schedule();
+			co_await io_service().schedule();
 			value = 5;
 			event.set();
 		};

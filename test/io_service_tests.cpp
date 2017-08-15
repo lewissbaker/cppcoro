@@ -12,6 +12,8 @@
 #include <cppcoro/operation_cancelled.hpp>
 #include <cppcoro/cancellation_source.hpp>
 
+#include "io_service_fixture.hpp"
+
 #include <thread>
 #include <vector>
 
@@ -66,23 +68,13 @@ TEST_CASE("schedule coroutine")
 		}()));
 }
 
-TEST_CASE("multiple I/O threads servicing events")
+TEST_CASE_FIXTURE(io_service_fixture_with_threads<2>, "multiple I/O threads servicing events")
 {
-	cppcoro::io_service ioService;
-
-	std::thread t1{ [&] { ioService.process_events(); } };
-	auto waitForT1 = cppcoro::on_scope_exit([&] { t1.join(); });
-	auto stopIoServiceOnExit1 = cppcoro::on_scope_exit([&] { ioService.stop();  });
-
-	std::thread t2{ [&] { ioService.process_events(); } };
-	auto waitForT2 = cppcoro::on_scope_exit([&] { t2.join(); });
-	auto stopIoServiceOnExit2 = cppcoro::on_scope_exit([&] { ioService.stop();  });
-
 	std::atomic<int> completedCount = 0;
 
 	auto runOnIoThread = [&]() -> cppcoro::lazy_task<>
 	{
-		co_await ioService.schedule();
+		co_await io_service().schedule();
 		++completedCount;
 	};
 
@@ -198,18 +190,12 @@ TEST_CASE("Timer cancellation"
 		}()));
 }
 
-TEST_CASE("Many concurrent timers")
+TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "Many concurrent timers")
 {
-	cppcoro::io_service ioService;
-
-	std::thread workerThread{ [&] { ioService.process_events(); } };
-	auto joinOnExit = cppcoro::on_scope_exit([&] { workerThread.join(); });
-	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
-
 	auto startTimer = [&]() -> cppcoro::lazy_task<>
 	{
 		using namespace std::literals::chrono_literals;
-		co_await ioService.schedule_after(50ms);
+		co_await io_service().schedule_after(50ms);
 	};
 
 	constexpr std::uint32_t taskCount = 10'000;

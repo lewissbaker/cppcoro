@@ -15,13 +15,15 @@
 #include <thread>
 #include <cassert>
 
+#include "io_service_fixture.hpp"
+
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("file");
 
 namespace fs = std::experimental::filesystem;
 
-class temp_dir_fixture
+class temp_dir_fixture : public io_service_fixture
 {
 public:
 
@@ -66,12 +68,6 @@ private:
 
 TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 {
-	cppcoro::io_service ioService;
-
-	std::thread ioThread([&] { ioService.process_events(); });
-	auto waitForThreadOnExit = cppcoro::on_scope_exit([&] { ioThread.join(); });
-	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
-
 	auto filePath = temp_dir() / "foo";
 
 	auto write = [&](cppcoro::io_service& ioService) -> cppcoro::lazy_task<>
@@ -114,8 +110,8 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 
 	auto run = [&]() -> cppcoro::lazy_task<>
 	{
-		co_await write(ioService);
-		co_await read(ioService);
+		co_await write(io_service());
+		co_await read(io_service());
 	};
 
 	cppcoro::sync_wait(run());
@@ -123,16 +119,10 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 
 TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
 {
-	cppcoro::io_service ioService;
-
-	std::thread ioThread([&] { ioService.process_events(); });
-	auto waitForThreadOnExit = cppcoro::on_scope_exit([&] { ioThread.join(); });
-	auto stopIoServiceOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
-
 	auto run = [&]() -> cppcoro::lazy_task<>
 	{
-		cppcoro::io_work_scope ioScope{ ioService };
-		auto f = cppcoro::read_write_file::open(ioService, temp_dir() / "foo.txt");
+		cppcoro::io_work_scope ioScope{ io_service() };
+		auto f = cppcoro::read_write_file::open(io_service(), temp_dir() / "foo.txt");
 
 		char buffer1[100];
 		std::memset(buffer1, 0xAB, sizeof(buffer1));

@@ -13,6 +13,7 @@ script.include([
 
 headers = script.cwd([
   "counted.hpp",
+  "io_service_fixture.hpp",
   ])
 
 sources = script.cwd([
