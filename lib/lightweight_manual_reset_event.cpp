@@ -110,6 +110,7 @@ void cppcoro::detail::lightweight_manual_reset_event::wait() noexcept
 #include <linux/futex.h>
 #include <cerrno>
 #include <climits>
+#include <cassert>
 
 namespace
 {
@@ -164,12 +165,12 @@ void cppcoro::detail::lightweight_manual_reset_event::set() noexcept
 	assert(numberOfWaitersWokenUp != -1);
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::reset()
+void cppcoro::detail::lightweight_manual_reset_event::reset() noexcept
 {
 	m_value.store(0, std::memory_order_relaxed);
 }
 
-void cppcoro::detail::lightweight_manual_reset_event::wait()
+void cppcoro::detail::lightweight_manual_reset_event::wait() noexcept
 {
 	// Wait in a loop as futex() can have spurious wake-ups.
 	int oldValue = m_value.load(std::memory_order_acquire);
