@@ -5,18 +5,20 @@
 
 #include <cppcoro/sync_wait.hpp>
 
-#include <cppcoro/io_service.hpp>
+#include <cppcoro/config.hpp>
 #include <cppcoro/task.hpp>
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/shared_lazy_task.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
-#include <string>
-#include <thread>
-#include <type_traits>
+#if CPPCORO_OS_WINNT
+# include <cppcoro/io_service.hpp>
+# include "io_service_fixture.hpp"
+#endif
 
-#include "io_service_fixture.hpp"
+#include <string>
+#include <type_traits>
 
 #include "doctest/doctest.h"
 
@@ -81,6 +83,8 @@ TEST_CASE("sync_wait(shared_task<T>)")
 	CHECK(cppcoro::sync_wait(makeTask()) == "foo");
 }
 
+#if CPPCORO_OS_WINNT
+
 TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "multiple threads")
 {
 	// We are creating a new task and starting it inside the sync_wait().
@@ -117,5 +121,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "multiple threads")
 		}
 	}
 }
+
+#endif
 
 TEST_SUITE_END();
