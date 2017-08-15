@@ -249,7 +249,7 @@ elif cake.system.isLinux():
 
   # Configure optimised-specific settings here
   compiler = clangOptimisedVariant.tools["compiler"]
-  compiler.addCppFlag('-O2')
+  compiler.addCppFlag('-O3')
   compiler.addCppFlag('-g')
   compiler.addCppFlag('-flto')
   compiler.addProgramFlag('-flto')
