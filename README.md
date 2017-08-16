@@ -15,7 +15,8 @@ These include:
   * `async_manual_reset_event`
   * `async_auto_reset_event`
 * Functions
-  * `when_all()` (coming)
+  * `when_all()`
+  * `when_all_ready()`
 * Cancellation
   * `cancellation_token`
   * `cancellation_source`
@@ -1303,6 +1304,190 @@ namespace cppcoro
 ```
 
 All `open()` functions throw `std::system_error` on failure.
+
+# Functions
+
+## `when_all_ready()`
+
+The `when_all_ready()` function can be used to create a new `lazy_task` that will
+complete when all of the specified input tasks have completed.
+
+Input tasks can either be `lazy_task<T>` or `shared_lazy_task<T>`.
+
+When the returned `lazy_task` is `co_await`ed it will start executing each of the input
+tasks in turn on the awaiting thread in the order they are passed to the `when_all_ready()`
+function. If these tasks to not complete synchronously then they will execute concurrently.
+
+Once all of the input tasks have run to completion the returned `lazy_task` will complete
+and resume the awaiting coroutine. The awaiting coroutine will be resumed on the thread
+of the input task that is last to complete.
+
+The returned `lazy_task` is guaranteed not to throw an exception when `co_await`ed,
+even if some of the input tasks fail with an unhandled exception.
+
+Note, however, that the `when_all_ready()` call itself may throw `std::bad_alloc` if it
+was unable to allocate memory for the returned `lazy_task`'s coroutine frame.
+
+The input tasks are returned back to the awaiting coroutine upon completion.
+This allows the caller to execute the coroutines concurrently and synchronise their
+completion while still retaining the ability to subsequently inspect the results of
+each of the input tasks for success/failure.
+
+This differs from `when_all()` in a similar way that `co_await`ing `lazy_task<T>::when_ready()`
+differs from `co_await'ing the `lazy_task<T>` directly.
+
+API summary:
+```c++
+// <cppcoro/when_all_ready.hpp>
+namespace cppcoro
+{
+  template<typename... TASKS>
+  lazy_task<std::tuple<TASKS...>> when_all_ready(TASKS... tasks);
+
+  template<typename T>
+  lazy_task<std::vector<lazy_task<T>> when_all_ready(
+    std::vector<lazy_task<T>> tasks);
+
+  template<typename T>
+  lazy_task<std::vector<shared_lazy_task<T>> when_all_ready(
+    std::vector<shared_lazy_task<T>> tasks);
+}
+```
+
+Example usage:
+```c++
+lazy_task<std::string> get_record(int id);
+
+lazy_task<> example1()
+{
+  // Run 3 get_record() operations concurrently and wait until they're all ready.
+  // Returns a std::tuple of tasks that can be unpacked using structured bindings.
+  auto [task1, task2, task3] = co_await when_all_ready(
+    get_record(123),
+    get_record(456),
+    get_record(789));
+
+  // Unpack the result of each task (this will complete immediately)
+  std::string& record1 = co_await task1;
+  std::string& record2 = co_await task2;
+  std::string& record3 = co_await task3;
+
+  // Use records....
+}
+
+lazy_task<> example2()
+{
+  // Create the input tasks. They don't start executing yet.
+  std::vector<lazy_task<std::string>> tasks;
+  for (int i = 0; i < 1000; ++i)
+  {
+    tasks.emplace_back(get_record(i));
+  }
+
+  // Execute all tasks concurrently.
+  // Returns the input vector of tasks.
+  tasks = co_await when_all_ready(std::move(tasks));
+
+  // Unpack and handle each result individually once they're all complete.
+  for (int i = 0; i < 1000; ++i)
+  {
+    try
+    {
+      std::string& record = co_await tasks[i];
+      std::cout << i << " = " << record << std::endl;
+    }
+    catch (const std::exception& ex)
+    {
+      std::cout << i << " : " << ex.what() << std::endl;
+    }
+  }
+}
+```
+
+## `when_all()`
+
+The `when_all()` function can be used to create a new `lazy_task` that will complete
+when all of the input tasks have completed, and will return an aggregate of all of the
+individual results.
+
+When the returned `lazy_task` is awaited, it will start execution of all of the input
+tasks on the current thread. Once the first task suspends, the second task will be started,
+and so on. The tasks execute concurrently until they have all run to completion.
+
+Once all input tasks have run to completion, an aggregate of the results is constructed
+from each individual task result. If an exception is thrown by any of the input tasks
+or if the construction of the aggregate result throws an exception then the exception
+will propagate out of the `co_await` of the returned `lazy_task`.
+
+If multiple tasks fail with an exception then one of the exceptions will propagate out
+of the `when_all()` task and the other exceptions will be silently ignored. It is not
+specified which task's exception will be chosen. If it is important to know which task(s)
+failed then you should use `when_all_ready()` instead and `co_await` the result of each
+task individually.
+
+API Summary:
+```c++
+// <cppcoro/when_all.hpp>
+namespace cppcoro
+{
+  // Variadic version.
+  template<typename... TASKS>
+  lazy_task<std::tuple<typename TASKS::value_type...>> when_all(TASKS... tasks);
+
+  // Overloads for vector of value-returning tasks
+  template<typename T>
+  lazy_task<std::vector<T>> when_all(std::vector<lazy_task<T>> tasks);
+  template<typename T>
+  lazy_task<std::vector<T>> when_all(std::vector<shared_lazy_task<T>> tasks);
+
+  // Overloads for vector of reference-returning tasks
+  template<typename T>
+  lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<lazy_task<T&>> tasks);
+  template<typename T>
+  lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_lazy_task<T&>> tasks);
+
+  // Overloads for vector of void-returning tasks
+  lazy_task<> when_all(std::vector<lazy_task<>> tasks);
+  lazy_task<> when_all(std::vector<shared_lazy_task<>> tasks);
+}
+```
+
+Examples:
+```c++
+lazy_task<A> get_a();
+lazy_task<B> get_b();
+
+lazy_task<> example1()
+{
+  // Run get_a() and get_b() concurrently.
+  // Task yields a std::tuple<A, B> which can be unpacked using structured bindings.
+  auto [a, b] = co_await when_all(get_a(), get_b());
+
+  // use a, b
+}
+
+lazy_task<std::string> get_record(int id);
+
+lazy_task<> example2()
+{
+  std::vector<lazy_task<std::string>> tasks;
+  for (int i = 0; i < 1000; ++i)
+  {
+    tasks.emplace_back(get_record(i));
+  }
+
+  // Concurrently execute all get_record() tasks.
+  // If any of them fail with an exception then the exception will propagate
+  // out of the co_await expression once they have all completed.
+  std::vector<std::string> records = co_await when_all(std::move(tasks));
+
+  // Process results
+  for (int i = 0; i < 1000; ++i)
+  {
+    std::cout << i << " = " << records[i] << std::endl;
+  }
+}
+```
 
 # Concepts
 
