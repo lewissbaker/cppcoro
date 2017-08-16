@@ -7,8 +7,6 @@
 
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/shared_lazy_task.hpp>
-#include <cppcoro/shared_task.hpp>
-#include <cppcoro/task.hpp>
 
 #include <cppcoro/detail/when_all_awaitable.hpp>
 
@@ -78,19 +76,6 @@ namespace cppcoro
 
 	template<typename T>
 	[[nodiscard]]
-	lazy_task<std::vector<task<T>>> when_all_ready(std::vector<task<T>> tasks)
-	{
-		// All tasks already started, so just wait until they're all done.
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
-		}
-
-		co_return std::move(tasks);
-	}
-
-	template<typename T>
-	[[nodiscard]]
 	lazy_task<std::vector<shared_lazy_task<T>>> when_all_ready(std::vector<shared_lazy_task<T>> tasks)
 	{
 		if (!tasks.empty())
@@ -112,19 +97,6 @@ namespace cppcoro
 			}
 
 			co_await awaitable;
-		}
-
-		co_return std::move(tasks);
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	lazy_task<std::vector<shared_task<T>>> when_all_ready(std::vector<shared_task<T>> tasks)
-	{
-		// All tasks already started, so just wait until each one of them is done.
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
 		}
 
 		co_return std::move(tasks);

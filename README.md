@@ -4,9 +4,7 @@ The 'cppcoro' library provides a set of general-purpose primitives for making us
 
 These include:
 * Coroutine Types
-  * `task<T>`
   * `lazy_task<T>`
-  * `shared_task<T>`
   * `shared_lazy_task<T>`
   * `generator<T>`
   * `recursive_generator<T>`
@@ -43,148 +41,36 @@ The Linux version is functional except for the `io_context` and file I/O related
 
 # Class Details
 
-## `task<T>`
-
-The `task<T>` type represents a computation that completes asynchronously,
-yielding either a result of type `T` or an exception.
-
-API Overview:
-```c++
-// <cppcoro/task.hpp>
-namespace cppcoro
-{
-  template<typename T = void>
-  class task
-  {
-  public:
-    using promise_type = <unspecified>;
-
-    // Construct to a detached task.
-    task() noexcept;
-
-    task(task&& other) noexcept;
-    task& operator=(task&&) noexcept;
-
-    // Task must either be detached or ready.
-    ~task();
-
-    // task is move-only
-    task(const task&) = delete;
-    task& operator=(const task&) = delete;
-
-    // Query if the task result is ready yet.
-    bool is_ready() const noexcept;
-
-    // Detach the task from the coroutine.
-    //
-    // You will not be able to retrieve the result of a task
-    // once it has been detached.
-    void detach() noexcept;
-
-    // Result of 'co_await task' has type:
-    // - void if T is void
-    // - T if T is a reference type
-    // - T& if T is not a reference and task is an l-value reference
-    // - T&& if T is not a reference and task is an r-value reference
-    //
-    // Either returns the result of the task or rethrows the
-    // uncaught exception if the coroutine terminated due to
-    // an unhandled exception.
-    // Attempting to await a detached task results in the
-    // cppcoro::broken_promsise exception being thrown.
-    <unspecified> operator co_await() const & noexcept;
-    <unspecified> operator co_await() const && noexcept;
-
-    // Await this instead of awaiting directly on the task if
-    // you just want to synchronise with the task and don't
-    // need the result.
-    //
-    // Result of 'co_await t.when_ready()' expression has type
-    // 'void' and is guaranteed not to throw an exception.
-    <unspecified> when_ready() noexcept;
-  };
-}
-```
-
-Example:
-```c++
-#include <cppcoro/task.hpp>
-
-cppcoro::task<std::string> get_name(int id)
-{
-  auto database = co_await open_database();
-  auto record = co_await database.load_record_by_id(id);
-  co_return record.name;
-}
-
-cppcoro::task<> usage_example()
-{
-  // Calling get_name() creates a new task and starts it immediately.
-  cppcoro::task<std::string> nameTask = get_name(123);
-
-  // The get_name() coroutine is now potentially executing concurrently
-  // with the current coroutine.
-
-  // We can later co_await the task to suspend the current coroutine
-  // until the task completes. The result of the co_await expression
-  // is the return value of the get_name() function.
-  std::string name = co_await nameTask;
-}
-```
-
-You create a `task<T>` object by calling a coroutine function that returns
-a `task<T>`.
-
-When a coroutine that returns a `task<T>` is called the coroutine starts
-executing immediately and continues until the coroutine reaches the first
-suspend point or runs to completion. Execution then returns to the caller
-and a `task<T>` value representing the asynchronous computation is returned
-from the function call.
-
-Note that while execution returns to the caller on the current thread,
-the coroutine/task should be considered to be still executing concurrently
-with the current thread.
-
-You must either `co_await` the task or otherwise ensure it has run to
-completion or you must call `task.detach()` to detach the task from
-the asynchronous computation before the returned task object is destroyed.
-Failure to do so will result in the task<T> destructor calling std::terminate().
-
-If the task is not yet ready when it is co_await'ed then the awaiting coroutine
-will be suspended and will later be resumed on the thread that completes
-execution of the coroutine.
-
 ## `lazy_task<T>`
 
 A lazy_task represents an asynchronous computation that is executed lazily in
 that the execution of the coroutine does not start until the task is awaited.
 
-A lazy_task<T> has lower overhead than task<T> as it does not need to use
-atomic operations to synchronise between consumer and producer coroutines
-since the consumer coroutine suspends before the producer coroutine starts.
-
 Example:
 ```c++
+#include <cppcoro/read_only_file.hpp>
 #include <cppcoro/lazy_task.hpp>
 
 cppcoro::lazy_task<int> count_lines(std::string path)
 {
-  auto file = co_await open_file_async(path);
+  auto file = co_await cppcoro::read_only_file::open(path);
 
   int lineCount = 0;
 
   char buffer[1024];
   size_t bytesRead;
+  std::uint64_t offset = 0;
   do
   {
-    bytesRead = co_await file.read_async(buffer, sizeof(buffer));
+    bytesRead = co_await file.read(offset, buffer, sizeof(buffer));
     lineCount += std::count(buffer, buffer + bytesRead, '\n');
+    offset += bytesRead;
   } while (bytesRead > 0);
   
   co_return lineCount;
 }
 
-cppcoro::task<> usage_example()
+cppcoro::lazy_task<> usage_example()
 {
   // Calling function creates a new lazy_task but doesn't start
   // executing the coroutine yet.
@@ -208,19 +94,74 @@ namespace cppcoro
   class lazy_task
   {
   public:
+
     using promise_type = <unspecified>;
+    using value_type = T;
+
     lazy_task() noexcept;
+
     lazy_task(lazy_task&& other) noexcept;
-    lazy_task(const lazy_task& other) = delete;
     lazy_task& operator=(lazy_task&& other);
+
+    // lazy_task is a move-only type.
+    lazy_task(const lazy_task& other) = delete;
     lazy_task& operator=(const lazy_task& other) = delete;
+
+    // Query if the task result is ready.
     bool is_ready() const noexcept;
+
+    // Wait for the task to complete and return the result or rethrow the
+    // exception if the operation completed with an unhandled exception.
+    //
+    // If the task is not yet ready then the awaiting coroutine will be
+    // suspended until the task completes. If the the task is_ready() then
+    // this operation will return the result synchronously without suspending.
     <unspecified> operator co_await() const & noexcept;
     <unspecified> operator co_await() const && noexcept;
+
+    // Returns an awaitable that can be co_await'ed to suspend the current
+    // coroutine until the task completes.
+    //
+    // The 'co_await t.when_ready()' expression differs from 'co_await t' in
+    // that when_ready() only performs synchronisation, it does not return
+    // the result or rethrow the exception.
+    //
+    // This can be useful if you want to synchronise with the task without
+    // the possibility of it throwing an exception.
     <unspecified> when_ready() const noexcept;
   };
 }
 ```
+
+You create a `lazy_task<T>` object by calling a coroutine function that returns
+a `lazy_task<T>`.
+
+The coroutine must contain a usage of either `co_await` or `co_return`.
+Note that a `lazy_task<T>` coroutine may not use the `co_yield` keyword.
+
+When a coroutine that returns a `lazy_task<T>` is called, a coroutine frame
+is allocated if necessary and the parameters are captured in the coroutine
+frame. The coroutine is suspended at the start of the coroutine body and
+execution is returned to the caller and a `lazy_task<T>` value that represents
+the asynchronous computation is returned from the function call.
+
+The coroutine body will start executing when the `lazy_task<T>` value is
+`co_await`ed. This will suspend the awaiting coroutine and start execution
+of the coroutine associated with the awaited `lazy_task<T>` value.
+
+The awaiting coroutine will later be resumed on the thread that completes
+execution of the awaited `lazy_task<T>`'s coroutine. ie. the thread that
+executes the `co_return` or that throws an unhandled exception that terminates
+execution of the coroutine.
+
+If the task has already run to completion then awaiting it again will obtain
+the already-computed result without suspending the awaiting coroutine.
+
+If the `lazy_task` value is destroyed before it is awaited then the coroutine
+never executes and the destructor simply destructs the captured parameters
+and frees any memory used by the coroutine frame.
+
+### Warning on synchronous completion
 
 Something to be aware of with `lazy_task<T>` is that if the coroutine
 completes synchronously then the awaiting coroutine is resumed
@@ -231,95 +172,9 @@ consumption of extra stack-space for each `co_await` of a `lazy_task`
 that completes synchronously which can lead to stack-overflow if
 performed in a loop.
 
-Using `task<T>` is safer than `lazy_task<T>` with regards to potential
-stack-overflow as it starts executing the task immediately on calling
-the coroutine function and unwinds the stack back to the caller before
-it can be awaited. The awaiting coroutine will continue execution without
-suspending if the coroutine completed synchronously.
-
-## `shared_task<T>`
-
-The `shared_task<T>` class is a coroutine type that yields a single value
-asynchronously.
-
-The task value can be copied, allowing multiple references
-to the result of the task to be created. It also allows multiple coroutines
-to concurrently await the result.
-
-API Summary
-```c++
-namespace cppcoro
-{
-  template<typename T = void>
-  class shared_task
-  {
-  public:
-    shared_task() noexcept;
-    shared_task(const shared_task& other) noexcept;
-    shared_task(shared_task&& other) noexcept;
-    shared_task& operator=(const shared_task& other) noexcept;
-    shared_task& operator=(shared_task&& other) noexcept;
-
-    void swap(shared_task& other) noexcept;
-
-    // Query if the task has completed and the result is ready.
-    bool is_ready() const noexcept;
-
-    // Returns an operation that when awaited will suspend the
-    // current coroutine until the task completes and the result
-    // is available.
-    //
-    // The type of the result of the 'co_await someTask' expression
-    // is an l-value reference to the task's result value (unless T
-    // is void in which case the expression has type 'void').
-    // If the task completed with an unhandled exception then the
-    // exception will be rethrown by the co_await expression.
-    <unspecified> operator co_await() const noexcept;
-
-    // Returns an operation that when awaited will suspend the
-    // calling coroutine until the task completes and the result
-    // is available.
-    //
-    // The result is not returned from the co_await expression.
-    // This can be used to synchronise with the task without the
-    // possibility of the co_await expression throwing an exception.
-    <unspecified> when_ready() const noexcept;
-
-  };
-
-  template<typename T>
-  bool operator==(const shared_task<T>& a, const shared_task<T>& b) noexcept;
-  template<typename T>
-  bool operator!=(const shared_task<T>& a, const shared_task<T>& b) noexcept;
-
-  template<typename T>
-  void swap(shared_task<T>& a, shared_task<T>& b) noexcept;
-
-  // Wrap a task in a shared_task to allow multiple coroutines to concurrently
-  // await the result.
-  template<typename T>
-  shared_task<T> make_shared_task(task<T> task);
-}
-```
-
-All const-methods on `shared_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
-It is not safe to call non-const methods of `shared_task<T>` concurrently with any other method on the same instance of a `shared_task<T>`.
-
-### Comparison to `task<T>`
-
-The `shared_task<T>` class is similar to `task<T>` in that the task starts execution
-immediately upon the coroutine function being called.
-
-It differs from `task<T>` in that the resulting task object can
-be copied, allowing multiple task objects to reference the same
-asynchronous result. It also supports multiple coroutines concurrently
-awaiting the result of the task.
-
-The trade-off is that the result is always an l-value reference to the
-result, never an r-value reference (since the result may be shared) which
-may limit ability to move-construct the result into a local variable.
-It also has a slightly higher run-time cost due to the need to maintain
-a reference count and support multiple awaiters.
+Note that the Clang compiler is able to achieve this tail-call behaviour
+in optimised builds but not in debug builds. MSVC is not currently able
+to perform these tail-calls.
 
 ## `shared_lazy_task<T>`
 
@@ -333,6 +188,16 @@ It is 'shared' in that the task value can be copied, allowing multiple reference
 the result of the task to be created. It also allows multiple coroutines to
 concurrently await the result.
 
+The task will start executing on the thread that first `co_await`s the task.
+Subsequent awaiters will either be suspended and queued for resumption
+when the task completes or will continue synchronously if the task has
+already run to completion.
+
+If an awaiter is suspended while waiting for the task to complete then
+it will be resumed on the thread that completes execution of the task.
+ie. the thread that executes the `co_return` or that throws the unhandled
+exception that terminates execution of the coroutine.
+
 API Summary
 ```c++
 namespace cppcoro
@@ -341,6 +206,10 @@ namespace cppcoro
   class shared_lazy_task
   {
   public:
+
+    using promise_type = <unspecified>;
+    using value_type = T;
+
     shared_lazy_task() noexcept;
     shared_lazy_task(const shared_lazy_task& other) noexcept;
     shared_lazy_task(shared_lazy_task&& other) noexcept;
@@ -391,6 +260,22 @@ namespace cppcoro
 
 All const-methods on `shared_lazy_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
 It is not safe to call non-const methods of `shared_lazy_task<T>` concurrently with any other method on the same instance of a `shared_lazy_task<T>`.
+
+### Comparison to `lazy_task<T>`
+
+The `shared_lazy_task<T>` class is similar to `lazy_task<T>` in that the task does
+not start execution immediately upon the coroutine function being called. The task
+only starts executing when it is first awaited.
+
+It differs from `lazy_task<T>` in that the resulting task object can be copied,
+allowing multiple task objects to reference the same asynchronous result.
+It also supports multiple coroutines concurrently awaiting the result of the task.
+
+The trade-off is that the result is always an l-value reference to the
+result, never an r-value reference (since the result may be shared) which
+may limit ability to move-construct the result into a local variable.
+It also has a slightly higher run-time cost due to the need to maintain
+a reference count and support multiple awaiters.
 
 ## `generator<T>`
 
@@ -547,7 +432,7 @@ cppcoro::async_generator<int> ticker(int count, threadpool& tp)
   }
 }
 
-cppcoro::task<> consumer(threadpool& tp)
+cppcoro::lazy_task<> consumer(threadpool& tp)
 {
   auto sequence = ticker(tp);
   for co_await(std::uint32_t i : sequence)
@@ -664,15 +549,21 @@ Example:
 cppcoro::single_consumer_event event;
 std::string value;
 
-cppcoro::task<> consumer()
+cppcoro::lazy_task<> consumer()
 {
+  // Coroutine will suspend here until some thread calls event.set()
+  // eg. inside the producer() function below.
   co_await event;
+
   std::cout << value << std::endl;
 }
 
 void producer()
 {
   value = "foo";
+
+  // This will resume the consumer() coroutine inside the call to set()
+  // if it is currently suspended.
   event.set();
 }
 ```
@@ -683,7 +574,8 @@ Provides a simple mutual exclusion abstraction that allows the caller to 'co_awa
 from within a coroutine to suspend the coroutine until the mutex lock is acquired.
 
 The implementation is lock-free in that a coroutine that awaits the mutex will not
-block the thread but will instead suspend
+block the thread but will instead suspend the coroutine and later resume it inside
+the call to `unlock()` by the previous lock-holder.
 
 API Summary:
 ```c++
@@ -753,7 +645,7 @@ Example usage:
 cppcoro::async_mutex mutex;
 std::set<std::string> values;
 
-cppcoro::task<> add_item(std::string value)
+cppcoro::lazy_task<> add_item(std::string value)
 {
   cppcoro::async_mutex_lock lock = co_await mutex;
   values.insert(std::move(value));
@@ -792,7 +684,7 @@ void producer()
 
 // Can be called many times to create many tasks.
 // All consumer tasks will wait until value has been published.
-cppcoro::task<> consumer()
+cppcoro::lazy_task<> consumer()
 {
   // Wait until value has been published by awaiting event.
   co_await event;
@@ -829,7 +721,7 @@ namespace cppcoro
 
   };
 
-  class async_manual_reset_event
+  class async_manual_reset_event_operation
   {
   public:
     async_manual_reset_event_operation(async_manual_reset_event& event) noexcept;
@@ -1003,7 +895,7 @@ namespace cppcoro
 
 Example: Polling Approach
 ```c++
-cppcoro::task<> do_something_async(cppcoro::cancellation_token token)
+cppcoro::lazy_task<> do_something_async(cppcoro::cancellation_token token)
 {
   // Explicitly define cancellation points within the function
   // by calling throw_if_cancellation_requested().
@@ -1222,7 +1114,7 @@ cppcoro::lazy_task<std::uint64_t> count_lines(cppcoro::io_service& ioService, fs
   co_return newlineCount;
 }
 
-cppcoro::task<> run(cppcoro::io_service& ioService)
+cppcoro::lazy_task<> run(cppcoro::io_service& ioService)
 {
   cppcoro::io_work_scope ioScope(ioService);
 
@@ -1231,14 +1123,21 @@ cppcoro::task<> run(cppcoro::io_service& ioService)
   std::cout << "foo.txt has " << lineCount << " lines." << std::endl;;
 }
 
+cppcoro::lazy_task<> process_events(cppcoro::io_service& ioService)
+{
+  // Process events until the io_service is stopped.
+  // ie. when the last io_work_scope goes out of scope.
+  ioService.process_events();
+  co_return;
+}
+
 int main()
 {
   cppcoro::io_service ioService;
 
-  auto t = run(ioService);
-
-  // Run until all io_work_scope objects have destructed.
-  ioService.process_events();
+  cppcoro::sync_wait(cppcoro::when_all_ready(
+    run(ioService),
+    process_events(ioService)));
 
   return 0;
 }
@@ -1253,19 +1152,20 @@ on an I/O thread associated with a particular `io_service` object.
 
 Example:
 ```c++
-cppcoro::task<> do_something(cppcoro::io_service& ioService)
+cppcoro::lazy_task<> do_something(cppcoro::io_service& ioService)
 {
-  // Coroutine starts execution on the thread of the caller.
+  // Coroutine starts execution on the thread of the task awaiter.
 
   // A coroutine can transfer execution to an I/O thread by awaiting the
   // result of io_service::schedule().
   co_await ioService.schedule();
 
-  // At this point, the coroutine is now executing on an I/O thread.
+  // At this point, the coroutine is now executing on an I/O thread
+  // inside a call to one of the io_service event processing methods.
 
   // A coroutine can also perform a delayed-schedule that will suspend
   // the coroutine for a specified duration of time before scheduling
-  // it for resumption on an I/O thread
+  // it for resumption on an I/O thread.
   co_await ioService.schedule_after(100ms);
 
   // At this point, the coroutine is executing on a potentially different I/O thread.
@@ -1424,7 +1324,7 @@ Given a type, `S`, that implements the `Scheduler` concept, and an instance, `s`
 * The result of the `co_await s.schedule()` expression has type `void`.
 
 ```c++
-cppcoro::task<> f(Scheduler& scheduler)
+cppcoro::lazy_task<> f(Scheduler& scheduler)
 {
   // Execution of the coroutine is initially on the caller's execution context.
 

@@ -28,9 +28,7 @@ sources = script.cwd([
   'cancellation_token_tests.cpp',
   'lazy_task_tests.cpp',
   'shared_lazy_task_tests.cpp',
-  'shared_task_tests.cpp',
   'sync_wait_tests.cpp',
-  'task_tests.cpp',
   'when_all_tests.cpp',
   'when_all_ready_tests.cpp',
 ])

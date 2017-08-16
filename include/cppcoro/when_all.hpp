@@ -7,8 +7,6 @@
 
 #include <cppcoro/lazy_task.hpp>
 #include <cppcoro/shared_lazy_task.hpp>
-#include <cppcoro/shared_task.hpp>
-#include <cppcoro/task.hpp>
 #include <cppcoro/when_all_ready.hpp>
 
 #include <cppcoro/detail/unwrap_reference.hpp>
@@ -119,68 +117,6 @@ namespace cppcoro
 	}
 
 	//////////
-	// when_all() with vector of task
-
-	[[nodiscard]]
-	inline lazy_task<> when_all(std::vector<task<>> tasks)
-	{
-		// First wait until all tasks are ready using non-throwing when_ready().
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
-		}
-
-		// Then await the value of the task so that any exceptions
-		// can be rethrown.
-		for (auto& t : tasks)
-		{
-			co_await std::move(t);
-		}
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	lazy_task<std::vector<T>> when_all(std::vector<task<T>> tasks)
-	{
-		// First wait until all tasks are ready using non-throwing when_ready().
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
-		}
-
-		std::vector<T> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<task<T&>> tasks)
-	{
-		// First wait until all tasks are ready using non-throwing when_ready().
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
-		}
-
-		std::vector<std::reference_wrapper<T>> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
-	}
-
-	//////////
 	// when_all() with vector of shared_lazy_task
 
 	[[nodiscard]]
@@ -217,66 +153,6 @@ namespace cppcoro
 	lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_lazy_task<T&>> tasks)
 	{
 		tasks = co_await when_all_ready(std::move(tasks));
-
-		std::vector<std::reference_wrapper<T>> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
-	}
-
-	//////////
-	// when_all() with vector of shared_task
-
-	[[nodiscard]]
-	inline lazy_task<> when_all(std::vector<shared_task<>> tasks)
-	{
-		// First wait until all tasks are ready.
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
-		}
-
-		// Then await the value of the task so that any exceptions
-		// can be rethrown.
-		for (auto& t : tasks)
-		{
-			co_await std::move(t);
-		}
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	lazy_task<std::vector<T>> when_all(std::vector<shared_task<T>> tasks)
-	{
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
-		}
-
-		std::vector<T> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_task<T&>> tasks)
-	{
-		for (auto& t : tasks)
-		{
-			co_await t.when_ready();
-		}
 
 		std::vector<std::reference_wrapper<T>> results;
 		results.reserve(tasks.size());
