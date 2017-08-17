@@ -7,7 +7,7 @@
 
 #include <cppcoro/config.hpp>
 #include <cppcoro/broken_promise.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 
 #include <cppcoro/detail/continuation.hpp>
 
@@ -21,21 +21,21 @@
 namespace cppcoro
 {
 	template<typename T>
-	class shared_lazy_task;
+	class shared_task;
 
 	namespace detail
 	{
-		struct shared_lazy_task_waiter
+		struct shared_task_waiter
 		{
 			continuation m_continuation;
-			shared_lazy_task_waiter* m_next;
+			shared_task_waiter* m_next;
 		};
 
-		class shared_lazy_task_promise_base
+		class shared_task_promise_base
 		{
 		public:
 
-			shared_lazy_task_promise_base() noexcept
+			shared_task_promise_base() noexcept
 				: m_waiters(&this->m_waiters)
 				, m_refCount(2)
 				, m_exception(nullptr)
@@ -50,9 +50,9 @@ namespace cppcoro
 			{
 				struct awaitable
 				{
-					shared_lazy_task_promise_base& m_promise;
+					shared_task_promise_base& m_promise;
 
-					awaitable(shared_lazy_task_promise_base& promise) noexcept
+					awaitable(shared_task_promise_base& promise) noexcept
 						: m_promise(promise)
 					{}
 
@@ -77,7 +77,7 @@ namespace cppcoro
 				void* waiters = m_waiters.exchange(valueReadyValue, std::memory_order_acq_rel);
 				if (waiters != nullptr)
 				{
-					shared_lazy_task_waiter* waiter = static_cast<shared_lazy_task_waiter*>(waiters);
+					shared_task_waiter* waiter = static_cast<shared_task_waiter*>(waiters);
 					do
 					{
 						// Read the m_next pointer before resuming the coroutine
@@ -137,11 +137,11 @@ namespace cppcoro
 			/// waiter->m_coroutine will be resumed when the task completes.
 			/// false if the coroutine was already completed and the awaiting
 			/// coroutine can continue without suspending.
-			bool try_await(shared_lazy_task_waiter* waiter, std::experimental::coroutine_handle<> coroutine)
+			bool try_await(shared_task_waiter* waiter, std::experimental::coroutine_handle<> coroutine)
 			{
 				void* const valueReadyValue = this;
 				void* const notStartedValue = &this->m_waiters;
-				constexpr void* startedNoWaitersValue = static_cast<shared_lazy_task_waiter*>(nullptr);
+				constexpr void* startedNoWaitersValue = static_cast<shared_task_waiter*>(nullptr);
 
 				// NOTE: If the coroutine is not yet started then the first waiter
 				// will start the coroutine before enqueuing itself up to the list
@@ -172,7 +172,7 @@ namespace cppcoro
 						return false;
 					}
 
-					waiter->m_next = static_cast<shared_lazy_task_waiter*>(oldWaiters);
+					waiter->m_next = static_cast<shared_task_waiter*>(oldWaiters);
 				} while (!m_waiters.compare_exchange_weak(
 					oldWaiters,
 					static_cast<void*>(waiter),
@@ -215,13 +215,13 @@ namespace cppcoro
 		};
 
 		template<typename T>
-		class shared_lazy_task_promise : public shared_lazy_task_promise_base
+		class shared_task_promise : public shared_task_promise_base
 		{
 		public:
 
-			shared_lazy_task_promise() noexcept = default;
+			shared_task_promise() noexcept = default;
 
-			~shared_lazy_task_promise()
+			~shared_task_promise()
 			{
 				if (this->is_ready() && !this->completed_with_unhandled_exception())
 				{
@@ -229,7 +229,7 @@ namespace cppcoro
 				}
 			}
 
-			shared_lazy_task<T> get_return_object() noexcept;
+			shared_task<T> get_return_object() noexcept;
 
 			template<
 				typename VALUE,
@@ -256,13 +256,13 @@ namespace cppcoro
 		};
 
 		template<>
-		class shared_lazy_task_promise<void> : public shared_lazy_task_promise_base
+		class shared_task_promise<void> : public shared_task_promise_base
 		{
 		public:
 
-			shared_lazy_task_promise() noexcept = default;
+			shared_task_promise() noexcept = default;
 
-			shared_lazy_task<void> get_return_object() noexcept;
+			shared_task<void> get_return_object() noexcept;
 
 			void return_void() noexcept
 			{}
@@ -275,13 +275,13 @@ namespace cppcoro
 		};
 
 		template<typename T>
-		class shared_lazy_task_promise<T&> : public shared_lazy_task_promise_base
+		class shared_task_promise<T&> : public shared_task_promise_base
 		{
 		public:
 
-			shared_lazy_task_promise() noexcept = default;
+			shared_task_promise() noexcept = default;
 
-			shared_lazy_task<T&> get_return_object() noexcept;
+			shared_task<T&> get_return_object() noexcept;
 
 			void return_value(T& value) noexcept
 			{
@@ -302,11 +302,11 @@ namespace cppcoro
 	}
 
 	template<typename T = void>
-	class shared_lazy_task
+	class shared_task
 	{
 	public:
 
-		using promise_type = detail::shared_lazy_task_promise<T>;
+		using promise_type = detail::shared_task_promise<T>;
 
 		using value_type = T;
 
@@ -315,7 +315,7 @@ namespace cppcoro
 		struct awaitable_base
 		{
 			std::experimental::coroutine_handle<promise_type> m_coroutine;
-			detail::shared_lazy_task_waiter m_waiter;
+			detail::shared_task_waiter m_waiter;
 
 			awaitable_base(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
 				: m_coroutine(coroutine)
@@ -335,25 +335,25 @@ namespace cppcoro
 
 	public:
 
-		shared_lazy_task() noexcept
+		shared_task() noexcept
 			: m_coroutine(nullptr)
 		{}
 
-		explicit shared_lazy_task(std::experimental::coroutine_handle<promise_type> coroutine)
+		explicit shared_task(std::experimental::coroutine_handle<promise_type> coroutine)
 			: m_coroutine(coroutine)
 		{
 			// Don't increment the ref-count here since it has already been
-			// initialised to 2 (one for shared_lazy_task and one for coroutine)
-			// in the shared_lazy_task_promise constructor.
+			// initialised to 2 (one for shared_task and one for coroutine)
+			// in the shared_task_promise constructor.
 		}
 
-		shared_lazy_task(shared_lazy_task&& other) noexcept
+		shared_task(shared_task&& other) noexcept
 			: m_coroutine(other.m_coroutine)
 		{
 			other.m_coroutine = nullptr;
 		}
 
-		shared_lazy_task(const shared_lazy_task& other) noexcept
+		shared_task(const shared_task& other) noexcept
 			: m_coroutine(other.m_coroutine)
 		{
 			if (m_coroutine)
@@ -362,12 +362,12 @@ namespace cppcoro
 			}
 		}
 
-		~shared_lazy_task()
+		~shared_task()
 		{
 			destroy();
 		}
 
-		shared_lazy_task& operator=(shared_lazy_task&& other) noexcept
+		shared_task& operator=(shared_task&& other) noexcept
 		{
 			if (&other != this)
 			{
@@ -380,7 +380,7 @@ namespace cppcoro
 			return *this;
 		}
 
-		shared_lazy_task& operator=(const shared_lazy_task& other) noexcept
+		shared_task& operator=(const shared_task& other) noexcept
 		{
 			if (m_coroutine != other.m_coroutine)
 			{
@@ -397,7 +397,7 @@ namespace cppcoro
 			return *this;
 		}
 
-		void swap(shared_lazy_task& other) noexcept
+		void swap(shared_task& other) noexcept
 		{
 			std::swap(m_coroutine, other.m_coroutine);
 		}
@@ -471,7 +471,7 @@ namespace cppcoro
 
 			private:
 				std::experimental::coroutine_handle<promise_type> m_coroutine;
-				detail::shared_lazy_task_waiter m_waiter;
+				detail::shared_task_waiter m_waiter;
 			};
 
 			return starter{ m_coroutine };
@@ -480,7 +480,7 @@ namespace cppcoro
 	private:
 
 		template<typename U>
-		friend bool operator==(const shared_lazy_task<U>&, const shared_lazy_task<U>&) noexcept;
+		friend bool operator==(const shared_task<U>&, const shared_task<U>&) noexcept;
 
 		void destroy() noexcept
 		{
@@ -498,19 +498,19 @@ namespace cppcoro
 	};
 
 	template<typename T>
-	bool operator==(const shared_lazy_task<T>& lhs, const shared_lazy_task<T>& rhs) noexcept
+	bool operator==(const shared_task<T>& lhs, const shared_task<T>& rhs) noexcept
 	{
 		return lhs.m_coroutine == rhs.m_coroutine;
 	}
 
 	template<typename T>
-	bool operator!=(const shared_lazy_task<T>& lhs, const shared_lazy_task<T>& rhs) noexcept
+	bool operator!=(const shared_task<T>& lhs, const shared_task<T>& rhs) noexcept
 	{
 		return !(lhs == rhs);
 	}
 
 	template<typename T>
-	void swap(shared_lazy_task<T>& a, shared_lazy_task<T>& b) noexcept
+	void swap(shared_task<T>& a, shared_task<T>& b) noexcept
 	{
 		a.swap(b);
 	}
@@ -518,39 +518,39 @@ namespace cppcoro
 	namespace detail
 	{
 		template<typename T>
-		shared_lazy_task<T> shared_lazy_task_promise<T>::get_return_object() noexcept
+		shared_task<T> shared_task_promise<T>::get_return_object() noexcept
 		{
-			return shared_lazy_task<T>{
-				std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this)
+			return shared_task<T>{
+				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
 			};
 		}
 
 		template<typename T>
-		shared_lazy_task<T&> shared_lazy_task_promise<T&>::get_return_object() noexcept
+		shared_task<T&> shared_task_promise<T&>::get_return_object() noexcept
 		{
-			return shared_lazy_task<T&>{
-				std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this)
+			return shared_task<T&>{
+				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
 			};
 		}
 
-		inline shared_lazy_task<void> shared_lazy_task_promise<void>::get_return_object() noexcept
+		inline shared_task<void> shared_task_promise<void>::get_return_object() noexcept
 		{
-			return shared_lazy_task<void>{
-				std::experimental::coroutine_handle<shared_lazy_task_promise>::from_promise(*this)
+			return shared_task<void>{
+				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
 			};
 		}
 	}
 
 
 	template<typename T>
-	shared_lazy_task<T> make_shared_task(lazy_task<T> t)
+	shared_task<T> make_shared_task(task<T> t)
 	{
 		co_return co_await std::move(t);
 	}
 
 #if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019 || CPPCORO_COMPILER_CLANG
 	// HACK: Workaround for broken MSVC that doesn't execute <expr> in 'co_return <expr>;'.
-	inline shared_lazy_task<void> make_shared_task(lazy_task<void> t)
+	inline shared_task<void> make_shared_task(task<void> t)
 	{
 		co_await t;
 	}

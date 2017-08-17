@@ -5,7 +5,7 @@
 
 #include <cppcoro/async_manual_reset_event.hpp>
 
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all_ready.hpp>
 
@@ -45,7 +45,7 @@ TEST_CASE("await not set event")
 {
 	cppcoro::async_manual_reset_event event;
 
-	auto createWaiter = [&](bool& flag) -> cppcoro::lazy_task<>
+	auto createWaiter = [&](bool& flag) -> cppcoro::task<>
 	{
 		co_await event;
 		flag = true;
@@ -54,7 +54,7 @@ TEST_CASE("await not set event")
 	bool completed1 = false;
 	bool completed2 = false;
 
-	auto check = [&]() -> cppcoro::lazy_task<>
+	auto check = [&]() -> cppcoro::task<>
 	{
 		CHECK(!completed1);
 		CHECK(!completed2);
@@ -82,7 +82,7 @@ TEST_CASE("awaiting already set event doesn't suspend")
 {
 	cppcoro::async_manual_reset_event event{ true };
 
-	auto createWaiter = [&]() -> cppcoro::lazy_task<>
+	auto createWaiter = [&]() -> cppcoro::task<>
 	{
 		co_await event;
 	};

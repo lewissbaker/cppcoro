@@ -4,8 +4,8 @@ The 'cppcoro' library provides a set of general-purpose primitives for making us
 
 These include:
 * Coroutine Types
-  * `lazy_task<T>`
-  * `shared_lazy_task<T>`
+  * `task<T>`
+  * `shared_task<T>`
   * `generator<T>`
   * `recursive_generator<T>`
   * `async_generator<T>`
@@ -43,17 +43,17 @@ The Linux version is functional except for the `io_context` and file I/O related
 
 # Class Details
 
-## `lazy_task<T>`
+## `task<T>`
 
-A lazy_task represents an asynchronous computation that is executed lazily in
+A task represents an asynchronous computation that is executed lazily in
 that the execution of the coroutine does not start until the task is awaited.
 
 Example:
 ```c++
 #include <cppcoro/read_only_file.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 
-cppcoro::lazy_task<int> count_lines(std::string path)
+cppcoro::task<int> count_lines(std::string path)
 {
   auto file = co_await cppcoro::read_only_file::open(path);
 
@@ -72,11 +72,11 @@ cppcoro::lazy_task<int> count_lines(std::string path)
   co_return lineCount;
 }
 
-cppcoro::lazy_task<> usage_example()
+cppcoro::task<> usage_example()
 {
-  // Calling function creates a new lazy_task but doesn't start
+  // Calling function creates a new task but doesn't start
   // executing the coroutine yet.
-  cppcoro::lazy_task<int> countTask = count_lines("foo.txt");
+  cppcoro::task<int> countTask = count_lines("foo.txt");
   
   // ...
   
@@ -89,25 +89,25 @@ cppcoro::lazy_task<> usage_example()
 
 API Overview:
 ```c++
-// <cppcoro/lazy_task.hpp>
+// <cppcoro/task.hpp>
 namespace cppcoro
 {
   template<typename T>
-  class lazy_task
+  class task
   {
   public:
 
     using promise_type = <unspecified>;
     using value_type = T;
 
-    lazy_task() noexcept;
+    task() noexcept;
 
-    lazy_task(lazy_task&& other) noexcept;
-    lazy_task& operator=(lazy_task&& other);
+    task(task&& other) noexcept;
+    task& operator=(task&& other);
 
-    // lazy_task is a move-only type.
-    lazy_task(const lazy_task& other) = delete;
-    lazy_task& operator=(const lazy_task& other) = delete;
+    // task is a move-only type.
+    task(const task& other) = delete;
+    task& operator=(const task& other) = delete;
 
     // Query if the task result is ready.
     bool is_ready() const noexcept;
@@ -135,42 +135,42 @@ namespace cppcoro
 }
 ```
 
-You create a `lazy_task<T>` object by calling a coroutine function that returns
-a `lazy_task<T>`.
+You create a `task<T>` object by calling a coroutine function that returns
+a `task<T>`.
 
 The coroutine must contain a usage of either `co_await` or `co_return`.
-Note that a `lazy_task<T>` coroutine may not use the `co_yield` keyword.
+Note that a `task<T>` coroutine may not use the `co_yield` keyword.
 
-When a coroutine that returns a `lazy_task<T>` is called, a coroutine frame
+When a coroutine that returns a `task<T>` is called, a coroutine frame
 is allocated if necessary and the parameters are captured in the coroutine
 frame. The coroutine is suspended at the start of the coroutine body and
-execution is returned to the caller and a `lazy_task<T>` value that represents
+execution is returned to the caller and a `task<T>` value that represents
 the asynchronous computation is returned from the function call.
 
-The coroutine body will start executing when the `lazy_task<T>` value is
+The coroutine body will start executing when the `task<T>` value is
 `co_await`ed. This will suspend the awaiting coroutine and start execution
-of the coroutine associated with the awaited `lazy_task<T>` value.
+of the coroutine associated with the awaited `task<T>` value.
 
 The awaiting coroutine will later be resumed on the thread that completes
-execution of the awaited `lazy_task<T>`'s coroutine. ie. the thread that
+execution of the awaited `task<T>`'s coroutine. ie. the thread that
 executes the `co_return` or that throws an unhandled exception that terminates
 execution of the coroutine.
 
 If the task has already run to completion then awaiting it again will obtain
 the already-computed result without suspending the awaiting coroutine.
 
-If the `lazy_task` value is destroyed before it is awaited then the coroutine
+If the `task` value is destroyed before it is awaited then the coroutine
 never executes and the destructor simply destructs the captured parameters
 and frees any memory used by the coroutine frame.
 
 ### Warning on synchronous completion
 
-Something to be aware of with `lazy_task<T>` is that if the coroutine
+Something to be aware of with `task<T>` is that if the coroutine
 completes synchronously then the awaiting coroutine is resumed
 from within the call to `await_suspend()`. If your compiler is not
 able to guarantee tail-call optimisations for the `await_suspend()`
 and `coroutine_handle<>::resume()` calls then this can result in
-consumption of extra stack-space for each `co_await` of a `lazy_task`
+consumption of extra stack-space for each `co_await` of a `task`
 that completes synchronously which can lead to stack-overflow if
 performed in a loop.
 
@@ -178,9 +178,9 @@ Note that the Clang compiler is able to achieve this tail-call behaviour
 in optimised builds but not in debug builds. MSVC is not currently able
 to perform these tail-calls.
 
-## `shared_lazy_task<T>`
+## `shared_task<T>`
 
-The `shared_lazy_task<T>` class is a coroutine type that yields a single value
+The `shared_task<T>` class is a coroutine type that yields a single value
 asynchronously.
 
 It is 'lazy' in that execution of the task does not start until it is awaited by some
@@ -205,20 +205,20 @@ API Summary
 namespace cppcoro
 {
   template<typename T = void>
-  class shared_lazy_task
+  class shared_task
   {
   public:
 
     using promise_type = <unspecified>;
     using value_type = T;
 
-    shared_lazy_task() noexcept;
-    shared_lazy_task(const shared_lazy_task& other) noexcept;
-    shared_lazy_task(shared_lazy_task&& other) noexcept;
-    shared_lazy_task& operator=(const shared_lazy_task& other) noexcept;
-    shared_lazy_task& operator=(shared_lazy_task&& other) noexcept;
+    shared_task() noexcept;
+    shared_task(const shared_task& other) noexcept;
+    shared_task(shared_task&& other) noexcept;
+    shared_task& operator=(const shared_task& other) noexcept;
+    shared_task& operator=(shared_task&& other) noexcept;
 
-    void swap(shared_lazy_task& other) noexcept;
+    void swap(shared_task& other) noexcept;
 
     // Query if the task has completed and the result is ready.
     bool is_ready() const noexcept;
@@ -246,30 +246,30 @@ namespace cppcoro
   };
 
   template<typename T>
-  bool operator==(const shared_lazy_task<T>& a, const shared_lazy_task<T>& b) noexcept;
+  bool operator==(const shared_task<T>& a, const shared_task<T>& b) noexcept;
   template<typename T>
-  bool operator!=(const shared_lazy_task<T>& a, const shared_lazy_task<T>& b) noexcept;
+  bool operator!=(const shared_task<T>& a, const shared_task<T>& b) noexcept;
 
   template<typename T>
-  void swap(shared_lazy_task<T>& a, shared_lazy_task<T>& b) noexcept;
+  void swap(shared_task<T>& a, shared_task<T>& b) noexcept;
 
-  // Wrap a lazy_task in a shared_lazy_task to allow multiple coroutines to concurrently
+  // Wrap a task in a shared_task to allow multiple coroutines to concurrently
   // await the result.
   template<typename T>
-  shared_lazy_task<T> make_shared_task(lazy_task<T> task);
+  shared_task<T> make_shared_task(task<T> task);
 }
 ```
 
-All const-methods on `shared_lazy_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
-It is not safe to call non-const methods of `shared_lazy_task<T>` concurrently with any other method on the same instance of a `shared_lazy_task<T>`.
+All const-methods on `shared_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
+It is not safe to call non-const methods of `shared_task<T>` concurrently with any other method on the same instance of a `shared_task<T>`.
 
-### Comparison to `lazy_task<T>`
+### Comparison to `task<T>`
 
-The `shared_lazy_task<T>` class is similar to `lazy_task<T>` in that the task does
+The `shared_task<T>` class is similar to `task<T>` in that the task does
 not start execution immediately upon the coroutine function being called. The task
 only starts executing when it is first awaited.
 
-It differs from `lazy_task<T>` in that the resulting task object can be copied,
+It differs from `task<T>` in that the resulting task object can be copied,
 allowing multiple task objects to reference the same asynchronous result.
 It also supports multiple coroutines concurrently awaiting the result of the task.
 
@@ -434,7 +434,7 @@ cppcoro::async_generator<int> ticker(int count, threadpool& tp)
   }
 }
 
-cppcoro::lazy_task<> consumer(threadpool& tp)
+cppcoro::task<> consumer(threadpool& tp)
 {
   auto sequence = ticker(tp);
   for co_await(std::uint32_t i : sequence)
@@ -551,7 +551,7 @@ Example:
 cppcoro::single_consumer_event event;
 std::string value;
 
-cppcoro::lazy_task<> consumer()
+cppcoro::task<> consumer()
 {
   // Coroutine will suspend here until some thread calls event.set()
   // eg. inside the producer() function below.
@@ -647,7 +647,7 @@ Example usage:
 cppcoro::async_mutex mutex;
 std::set<std::string> values;
 
-cppcoro::lazy_task<> add_item(std::string value)
+cppcoro::task<> add_item(std::string value)
 {
   cppcoro::async_mutex_lock lock = co_await mutex;
   values.insert(std::move(value));
@@ -686,7 +686,7 @@ void producer()
 
 // Can be called many times to create many tasks.
 // All consumer tasks will wait until value has been published.
-cppcoro::lazy_task<> consumer()
+cppcoro::task<> consumer()
 {
   // Wait until value has been published by awaiting event.
   co_await event;
@@ -897,7 +897,7 @@ namespace cppcoro
 
 Example: Polling Approach
 ```c++
-cppcoro::lazy_task<> do_something_async(cppcoro::cancellation_token token)
+cppcoro::task<> do_something_async(cppcoro::cancellation_token token)
 {
   // Explicitly define cancellation points within the function
   // by calling throw_if_cancellation_requested().
@@ -1081,7 +1081,7 @@ namespace cppcoro
 Example:
 ```c++
 #include <cppcoro/task.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/io_service.hpp>
 #include <cppcoro/read_only_file.hpp>
 
@@ -1092,7 +1092,7 @@ Example:
 
 namespace fs = std::experimental::filesystem;
 
-cppcoro::lazy_task<std::uint64_t> count_lines(cppcoro::io_service& ioService, fs::path path)
+cppcoro::task<std::uint64_t> count_lines(cppcoro::io_service& ioService, fs::path path)
 {
   auto file = cppcoro::read_only_file::open(ioService, path);
 
@@ -1116,7 +1116,7 @@ cppcoro::lazy_task<std::uint64_t> count_lines(cppcoro::io_service& ioService, fs
   co_return newlineCount;
 }
 
-cppcoro::lazy_task<> run(cppcoro::io_service& ioService)
+cppcoro::task<> run(cppcoro::io_service& ioService)
 {
   cppcoro::io_work_scope ioScope(ioService);
 
@@ -1125,7 +1125,7 @@ cppcoro::lazy_task<> run(cppcoro::io_service& ioService)
   std::cout << "foo.txt has " << lineCount << " lines." << std::endl;;
 }
 
-cppcoro::lazy_task<> process_events(cppcoro::io_service& ioService)
+cppcoro::task<> process_events(cppcoro::io_service& ioService)
 {
   // Process events until the io_service is stopped.
   // ie. when the last io_work_scope goes out of scope.
@@ -1154,7 +1154,7 @@ on an I/O thread associated with a particular `io_service` object.
 
 Example:
 ```c++
-cppcoro::lazy_task<> do_something(cppcoro::io_service& ioService)
+cppcoro::task<> do_something(cppcoro::io_service& ioService)
 {
   // Coroutine starts execution on the thread of the task awaiter.
 
@@ -1309,8 +1309,8 @@ All `open()` functions throw `std::system_error` on failure.
 # Functions
 ## `sync_wait()`
 
-The `sync_wait()`function can be used to synchronously wait until the specified `lazy_task`
-or `shared_lazy_task` completes.
+The `sync_wait()`function can be used to synchronously wait until the specified `task`
+or `shared_task` completes.
 
 If the task has not yet started execution then it will be started on the current thread.
 
@@ -1318,8 +1318,8 @@ The `sync_wait()` call will block until the task completes and will return the t
 or rethrow the task's exception if the task completed with an unhandled exception.
 
 The `sync_wait()` function is mostly useful for starting a top-level task from within `main()`
-and waiting until the task finishes, in practise it the only way to start the first/top-level
-`lazy_task`.
+and waiting until the task finishes, in practise it is the only way to start the first/top-level
+`task`.
 
 API Summary:
 ```c++
@@ -1327,15 +1327,15 @@ API Summary:
 namespace cppcoro
 {
   template<typename TASKS>
-	decltype(auto) sync_wait(TASK&& task)
+  decltype(auto) sync_wait(TASK&& task);
 }
 ```
 
 Examples:
 ```c++
-void example_lazy_task()
+void example_task()
 {
-  auto makeTask = []() -> lazy_task<std::string>
+  auto makeTask = []() -> task<std::string>
   {
     co_return "foo";
   };
@@ -1347,9 +1347,9 @@ void example_lazy_task()
   sync_wait(makeTask()) == "foo";
 }
 
-void example_shared_lazy_task()
+void example_shared_task()
 {
-  auto makeTask = []() -> shared_lazy_task<std::string>
+  auto makeTask = []() -> shared_task<std::string>
   {
     co_return "foo";
   };
@@ -1363,32 +1363,32 @@ void example_shared_lazy_task()
 
 ## `when_all_ready()`
 
-The `when_all_ready()` function can be used to create a new `lazy_task` that will
+The `when_all_ready()` function can be used to create a new `task` that will
 complete when all of the specified input tasks have completed.
 
-Input tasks can either be `lazy_task<T>` or `shared_lazy_task<T>`.
+Input tasks can either be `task<T>` or `shared_task<T>`.
 
-When the returned `lazy_task` is `co_await`ed it will start executing each of the input
+When the returned `task` is `co_await`ed it will start executing each of the input
 tasks in turn on the awaiting thread in the order they are passed to the `when_all_ready()`
 function. If these tasks to not complete synchronously then they will execute concurrently.
 
-Once all of the input tasks have run to completion the returned `lazy_task` will complete
+Once all of the input tasks have run to completion the returned `task` will complete
 and resume the awaiting coroutine. The awaiting coroutine will be resumed on the thread
 of the input task that is last to complete.
 
-The returned `lazy_task` is guaranteed not to throw an exception when `co_await`ed,
+The returned `task` is guaranteed not to throw an exception when `co_await`ed,
 even if some of the input tasks fail with an unhandled exception.
 
 Note, however, that the `when_all_ready()` call itself may throw `std::bad_alloc` if it
-was unable to allocate memory for the returned `lazy_task`'s coroutine frame.
+was unable to allocate memory for the returned `task`'s coroutine frame.
 
 The input tasks are returned back to the awaiting coroutine upon completion.
 This allows the caller to execute the coroutines concurrently and synchronise their
 completion while still retaining the ability to subsequently inspect the results of
 each of the input tasks for success/failure.
 
-This differs from `when_all()` in a similar way that `co_await`ing `lazy_task<T>::when_ready()`
-differs from `co_await'ing the `lazy_task<T>` directly.
+This differs from `when_all()` in a similar way that `co_await`ing `task<T>::when_ready()`
+differs from `co_await'ing the `task<T>` directly.
 
 API summary:
 ```c++
@@ -1396,23 +1396,23 @@ API summary:
 namespace cppcoro
 {
   template<typename... TASKS>
-  lazy_task<std::tuple<TASKS...>> when_all_ready(TASKS... tasks);
+  task<std::tuple<TASKS...>> when_all_ready(TASKS... tasks);
 
   template<typename T>
-  lazy_task<std::vector<lazy_task<T>> when_all_ready(
-    std::vector<lazy_task<T>> tasks);
+  task<std::vector<task<T>> when_all_ready(
+    std::vector<task<T>> tasks);
 
   template<typename T>
-  lazy_task<std::vector<shared_lazy_task<T>> when_all_ready(
-    std::vector<shared_lazy_task<T>> tasks);
+  task<std::vector<shared_task<T>> when_all_ready(
+    std::vector<shared_task<T>> tasks);
 }
 ```
 
 Example usage:
 ```c++
-lazy_task<std::string> get_record(int id);
+task<std::string> get_record(int id);
 
-lazy_task<> example1()
+task<> example1()
 {
   // Run 3 get_record() operations concurrently and wait until they're all ready.
   // Returns a std::tuple of tasks that can be unpacked using structured bindings.
@@ -1429,10 +1429,10 @@ lazy_task<> example1()
   // Use records....
 }
 
-lazy_task<> example2()
+task<> example2()
 {
   // Create the input tasks. They don't start executing yet.
-  std::vector<lazy_task<std::string>> tasks;
+  std::vector<task<std::string>> tasks;
   for (int i = 0; i < 1000; ++i)
   {
     tasks.emplace_back(get_record(i));
@@ -1460,18 +1460,18 @@ lazy_task<> example2()
 
 ## `when_all()`
 
-The `when_all()` function can be used to create a new `lazy_task` that will complete
+The `when_all()` function can be used to create a new `task` that will complete
 when all of the input tasks have completed, and will return an aggregate of all of the
 individual results.
 
-When the returned `lazy_task` is awaited, it will start execution of all of the input
+When the returned `task` is awaited, it will start execution of all of the input
 tasks on the current thread. Once the first task suspends, the second task will be started,
 and so on. The tasks execute concurrently until they have all run to completion.
 
 Once all input tasks have run to completion, an aggregate of the results is constructed
 from each individual task result. If an exception is thrown by any of the input tasks
 or if the construction of the aggregate result throws an exception then the exception
-will propagate out of the `co_await` of the returned `lazy_task`.
+will propagate out of the `co_await` of the returned `task`.
 
 If multiple tasks fail with an exception then one of the exceptions will propagate out
 of the `when_all()` task and the other exceptions will be silently ignored. It is not
@@ -1486,32 +1486,32 @@ namespace cppcoro
 {
   // Variadic version.
   template<typename... TASKS>
-  lazy_task<std::tuple<typename TASKS::value_type...>> when_all(TASKS... tasks);
+  task<std::tuple<typename TASKS::value_type...>> when_all(TASKS... tasks);
 
   // Overloads for vector of value-returning tasks
   template<typename T>
-  lazy_task<std::vector<T>> when_all(std::vector<lazy_task<T>> tasks);
+  task<std::vector<T>> when_all(std::vector<task<T>> tasks);
   template<typename T>
-  lazy_task<std::vector<T>> when_all(std::vector<shared_lazy_task<T>> tasks);
+  task<std::vector<T>> when_all(std::vector<shared_task<T>> tasks);
 
   // Overloads for vector of reference-returning tasks
   template<typename T>
-  lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<lazy_task<T&>> tasks);
+  task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<task<T&>> tasks);
   template<typename T>
-  lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_lazy_task<T&>> tasks);
+  task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_task<T&>> tasks);
 
   // Overloads for vector of void-returning tasks
-  lazy_task<> when_all(std::vector<lazy_task<>> tasks);
-  lazy_task<> when_all(std::vector<shared_lazy_task<>> tasks);
+  task<> when_all(std::vector<task<>> tasks);
+  task<> when_all(std::vector<shared_task<>> tasks);
 }
 ```
 
 Examples:
 ```c++
-lazy_task<A> get_a();
-lazy_task<B> get_b();
+task<A> get_a();
+task<B> get_b();
 
-lazy_task<> example1()
+task<> example1()
 {
   // Run get_a() and get_b() concurrently.
   // Task yields a std::tuple<A, B> which can be unpacked using structured bindings.
@@ -1520,11 +1520,11 @@ lazy_task<> example1()
   // use a, b
 }
 
-lazy_task<std::string> get_record(int id);
+task<std::string> get_record(int id);
 
-lazy_task<> example2()
+task<> example2()
 {
-  std::vector<lazy_task<std::string>> tasks;
+  std::vector<task<std::string>> tasks;
   for (int i = 0; i < 1000; ++i)
   {
     tasks.emplace_back(get_record(i));
@@ -1563,7 +1563,7 @@ Given a type, `S`, that implements the `Scheduler` concept, and an instance, `s`
 * The result of the `co_await s.schedule()` expression has type `void`.
 
 ```c++
-cppcoro::lazy_task<> f(Scheduler& scheduler)
+cppcoro::task<> f(Scheduler& scheduler)
 {
   // Execution of the coroutine is initially on the caller's execution context.
 

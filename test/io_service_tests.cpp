@@ -4,7 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <cppcoro/io_service.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all.hpp>
 #include <cppcoro/when_all_ready.hpp>
@@ -46,7 +46,7 @@ TEST_CASE("schedule coroutine")
 
 	bool reachedPointA = false;
 	bool reachedPointB = false;
-	auto startTask = [&](cppcoro::io_service& ioService) -> cppcoro::lazy_task<>
+	auto startTask = [&](cppcoro::io_service& ioService) -> cppcoro::task<>
 	{
 		reachedPointA = true;
 		co_await ioService.schedule();
@@ -55,7 +55,7 @@ TEST_CASE("schedule coroutine")
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		startTask(service),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 		{
 			CHECK(reachedPointA);
 			CHECK_FALSE(reachedPointB);
@@ -72,13 +72,13 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<2>, "multiple I/O threads serv
 {
 	std::atomic<int> completedCount = 0;
 
-	auto runOnIoThread = [&]() -> cppcoro::lazy_task<>
+	auto runOnIoThread = [&]() -> cppcoro::task<>
 	{
 		co_await io_service().schedule();
 		++completedCount;
 	};
 
-	std::vector<cppcoro::lazy_task<>> tasks;
+	std::vector<cppcoro::task<>> tasks;
 	{
 		for (int i = 0; i < 1000; ++i)
 		{
@@ -96,7 +96,7 @@ TEST_CASE("Multiple concurrent timers")
 	cppcoro::io_service ioService;
 
 	auto startTimer = [&](std::chrono::milliseconds duration)
-		-> cppcoro::lazy_task<std::chrono::high_resolution_clock::duration>
+		-> cppcoro::task<std::chrono::high_resolution_clock::duration>
 	{
 		auto start = std::chrono::high_resolution_clock::now();
 
@@ -107,7 +107,7 @@ TEST_CASE("Multiple concurrent timers")
 		co_return end - start;
 	};
 
-	auto test = [&]() -> cppcoro::lazy_task<>
+	auto test = [&]() -> cppcoro::task<>
 	{
 		using namespace std::chrono;
 		using namespace std::chrono_literals;
@@ -127,12 +127,12 @@ TEST_CASE("Multiple concurrent timers")
 	};
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 		{
 			auto stopIoOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
 			co_await test();
 		}(),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 		{
 			ioService.process_events();
 			co_return;
@@ -146,35 +146,35 @@ TEST_CASE("Timer cancellation"
 
 	cppcoro::io_service ioService;
 
-	auto longWait = [&](cppcoro::cancellation_token ct) -> cppcoro::lazy_task<>
+	auto longWait = [&](cppcoro::cancellation_token ct) -> cppcoro::task<>
 	{
 		co_await ioService.schedule_after(20'000ms, ct);
 	};
 
-	auto cancelAfter = [&](cppcoro::cancellation_source source, auto duration) -> cppcoro::lazy_task<>
+	auto cancelAfter = [&](cppcoro::cancellation_source source, auto duration) -> cppcoro::task<>
 	{
 		co_await ioService.schedule_after(duration);
 		source.request_cancellation();
 	};
 
-	auto test = [&]() -> cppcoro::lazy_task<>
+	auto test = [&]() -> cppcoro::task<>
 	{
 		cppcoro::cancellation_source source;
 		co_await cppcoro::when_all_ready(
-			[&](cppcoro::cancellation_token ct) -> cppcoro::lazy_task<>
+			[&](cppcoro::cancellation_token ct) -> cppcoro::task<>
 		{
 			CHECK_THROWS_AS(co_await longWait(std::move(ct)), const cppcoro::operation_cancelled&);
 		}(source.token()),
 			cancelAfter(source, 1ms));
 	};
 
-	auto testTwice = [&]() -> cppcoro::lazy_task<>
+	auto testTwice = [&]() -> cppcoro::task<>
 	{
 		co_await test();
 		co_await test();
 	};
 
-	auto stopIoServiceAfter = [&](cppcoro::lazy_task<> task) -> cppcoro::lazy_task<>
+	auto stopIoServiceAfter = [&](cppcoro::task<> task) -> cppcoro::task<>
 	{
 		co_await task.when_ready();
 		ioService.stop();
@@ -183,7 +183,7 @@ TEST_CASE("Timer cancellation"
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		stopIoServiceAfter(testTwice()),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 		{
 			ioService.process_events();
 			co_return;
@@ -192,7 +192,7 @@ TEST_CASE("Timer cancellation"
 
 TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "Many concurrent timers")
 {
-	auto startTimer = [&]() -> cppcoro::lazy_task<>
+	auto startTimer = [&]() -> cppcoro::task<>
 	{
 		using namespace std::literals::chrono_literals;
 		co_await io_service().schedule_after(50ms);
@@ -200,9 +200,9 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "Many concurrent timers")
 
 	constexpr std::uint32_t taskCount = 10'000;
 
-	auto runManyTimers = [&]() -> cppcoro::lazy_task<>
+	auto runManyTimers = [&]() -> cppcoro::task<>
 	{
-		std::vector<cppcoro::lazy_task<>> tasks;
+		std::vector<cppcoro::task<>> tasks;
 
 		tasks.reserve(taskCount);
 

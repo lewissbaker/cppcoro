@@ -5,8 +5,8 @@
 #ifndef CPPCORO_WHEN_ALL_READY_HPP_INCLUDED
 #define CPPCORO_WHEN_ALL_READY_HPP_INCLUDED
 
-#include <cppcoro/lazy_task.hpp>
-#include <cppcoro/shared_lazy_task.hpp>
+#include <cppcoro/task.hpp>
+#include <cppcoro/shared_task.hpp>
 
 #include <cppcoro/detail/when_all_awaitable.hpp>
 
@@ -18,14 +18,14 @@
 namespace cppcoro
 {
 	[[nodiscard]]
-	inline lazy_task<std::tuple<>> when_all_ready()
+	inline task<std::tuple<>> when_all_ready()
 	{
 		co_return std::tuple<>{};
 	}
 
 	template<typename TASK>
 	[[nodiscard]]
-	lazy_task<std::tuple<TASK>> when_all_ready(TASK task)
+	task<std::tuple<TASK>> when_all_ready(TASK task)
 	{
 		// Slightly more efficient implementation for single task case that avoids
 		// using atomics that are otherwise required to coordinate completion of
@@ -36,7 +36,7 @@ namespace cppcoro
 
 	template<typename... TASKS>
 	[[nodiscard]]
-	lazy_task<std::tuple<TASKS...>> when_all_ready(TASKS... tasks)
+	task<std::tuple<TASKS...>> when_all_ready(TASKS... tasks)
 	{
 		detail::when_all_awaitable awaitable{ sizeof...(TASKS) };
 
@@ -55,7 +55,7 @@ namespace cppcoro
 
 	template<typename T>
 	[[nodiscard]]
-	lazy_task<std::vector<lazy_task<T>>> when_all_ready(std::vector<lazy_task<T>> tasks)
+	task<std::vector<task<T>>> when_all_ready(std::vector<task<T>> tasks)
 	{
 		if (!tasks.empty())
 		{
@@ -76,13 +76,13 @@ namespace cppcoro
 
 	template<typename T>
 	[[nodiscard]]
-	lazy_task<std::vector<shared_lazy_task<T>>> when_all_ready(std::vector<shared_lazy_task<T>> tasks)
+	task<std::vector<shared_task<T>>> when_all_ready(std::vector<shared_task<T>> tasks)
 	{
 		if (!tasks.empty())
 		{
 			detail::when_all_awaitable awaitable{ tasks.size() };
 
-			using starter_t = decltype(std::declval<shared_lazy_task<T>>().get_starter());
+			using starter_t = decltype(std::declval<shared_task<T>>().get_starter());
 
 			std::vector<starter_t> starters;
 

@@ -5,8 +5,8 @@
 
 #include <cppcoro/when_all.hpp>
 
-#include <cppcoro/lazy_task.hpp>
-#include <cppcoro/shared_lazy_task.hpp>
+#include <cppcoro/task.hpp>
+#include <cppcoro/shared_task.hpp>
 #include <cppcoro/async_manual_reset_event.hpp>
 #include <cppcoro/sync_wait.hpp>
 
@@ -36,7 +36,7 @@ TEST_CASE("when_all() with one arg")
 {
 	bool started = false;
 	bool finished = false;
-	auto f = [&](cppcoro::async_manual_reset_event& event) -> cppcoro::lazy_task<std::string>
+	auto f = [&](cppcoro::async_manual_reset_event& event) -> cppcoro::task<std::string>
 	{
 		started = true;
 		co_await event;
@@ -50,12 +50,12 @@ TEST_CASE("when_all() with one arg")
 	CHECK(!started);
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		auto[s] = co_await whenAllTask;
 		CHECK(s == "foo");
 	}(),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		CHECK(started);
 		CHECK(!finished);
@@ -69,13 +69,13 @@ TEST_CASE("when_all() with all task types")
 {
 	counted::reset_counts();
 
-	auto run = [](cppcoro::async_manual_reset_event& event) -> cppcoro::lazy_task<>
+	auto run = [](cppcoro::async_manual_reset_event& event) -> cppcoro::task<>
 	{
 		using namespace std::string_literals;
 
 		auto[a, b] = co_await cppcoro::when_all(
-			when_event_set_return<cppcoro::lazy_task>(event, "foo"s),
-			when_event_set_return<cppcoro::shared_lazy_task>(event, counted{}));
+			when_event_set_return<cppcoro::task>(event, "foo"s),
+			when_event_set_return<cppcoro::shared_task>(event, counted{}));
 
 		CHECK(a == "foo");
 		CHECK(b.id == 0);
@@ -86,7 +86,7 @@ TEST_CASE("when_all() with all task types")
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		run(event),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		event.set();
 		co_return;
@@ -99,7 +99,7 @@ TEST_CASE("when_all() throws if any task throws")
 	struct Y {};
 
 	int startedCount = 0;
-	auto makeTask = [&](int value) -> cppcoro::lazy_task<int>
+	auto makeTask = [&](int value) -> cppcoro::task<int>
 	{
 		++startedCount;
 		if (value == 0) throw X{};
@@ -107,7 +107,7 @@ TEST_CASE("when_all() throws if any task throws")
 		else co_return value;
 	};
 
-	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
 		try
 		{
@@ -125,10 +125,10 @@ TEST_CASE("when_all() throws if any task throws")
 	}());
 }
 
-TEST_CASE("when_all() with vector<lazy_task<>>")
+TEST_CASE("when_all() with vector<task<>>")
 {
 	int startedCount = 0;
-	auto makeTask = [&](cppcoro::async_manual_reset_event& event) -> cppcoro::lazy_task<>
+	auto makeTask = [&](cppcoro::async_manual_reset_event& event) -> cppcoro::task<>
 	{
 		++startedCount;
 		co_await event;
@@ -139,9 +139,9 @@ TEST_CASE("when_all() with vector<lazy_task<>>")
 
 	bool finished = false;
 
-	auto run = [&]() -> cppcoro::lazy_task<>
+	auto run = [&]() -> cppcoro::task<>
 	{
-		std::vector<cppcoro::lazy_task<>> tasks;
+		std::vector<cppcoro::task<>> tasks;
 		tasks.push_back(makeTask(event1));
 		tasks.push_back(makeTask(event2));
 		tasks.push_back(makeTask(event1));
@@ -157,7 +157,7 @@ TEST_CASE("when_all() with vector<lazy_task<>>")
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		run(),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		CHECK(startedCount == 3);
 		CHECK(!finished);
@@ -173,10 +173,10 @@ TEST_CASE("when_all() with vector<lazy_task<>>")
 	}()));
 }
 
-TEST_CASE("when_all() with vector<shared_lazy_task<>>")
+TEST_CASE("when_all() with vector<shared_task<>>")
 {
 	int startedCount = 0;
-	auto makeTask = [&](cppcoro::async_manual_reset_event& event) -> cppcoro::shared_lazy_task<>
+	auto makeTask = [&](cppcoro::async_manual_reset_event& event) -> cppcoro::shared_task<>
 	{
 		++startedCount;
 		co_await event;
@@ -187,9 +187,9 @@ TEST_CASE("when_all() with vector<shared_lazy_task<>>")
 
 	bool finished = false;
 
-	auto run = [&]() -> cppcoro::lazy_task<>
+	auto run = [&]() -> cppcoro::task<>
 	{
-		std::vector<cppcoro::shared_lazy_task<>> tasks;
+		std::vector<cppcoro::shared_task<>> tasks;
 		tasks.push_back(makeTask(event1));
 		tasks.push_back(makeTask(event2));
 		tasks.push_back(makeTask(event1));
@@ -205,7 +205,7 @@ TEST_CASE("when_all() with vector<shared_lazy_task<>>")
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		run(),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		CHECK(startedCount == 3);
 		CHECK(!finished);
@@ -231,7 +231,7 @@ void check_when_all_vector_of_task_value()
 	bool whenAllCompleted = false;
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		std::vector<TASK<int>> tasks;
 
@@ -247,7 +247,7 @@ void check_when_all_vector_of_task_value()
 
 		whenAllCompleted = true;
 	}(),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		CHECK(!whenAllCompleted);
 		event2.set();
@@ -258,14 +258,14 @@ void check_when_all_vector_of_task_value()
 	}()));
 }
 
-TEST_CASE("when_all() with vector<lazy_task<T>>")
+TEST_CASE("when_all() with vector<task<T>>")
 {
-	check_when_all_vector_of_task_value<cppcoro::lazy_task>();
+	check_when_all_vector_of_task_value<cppcoro::task>();
 }
 
-TEST_CASE("when_all() with vector<shared_lazy_task<T>>")
+TEST_CASE("when_all() with vector<shared_task<T>>")
 {
-	check_when_all_vector_of_task_value<cppcoro::shared_lazy_task>();
+	check_when_all_vector_of_task_value<cppcoro::shared_task>();
 }
 
 template<template<typename T> class TASK>
@@ -286,7 +286,7 @@ void check_when_all_vector_of_task_reference()
 	bool whenAllComplete = false;
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		std::vector<TASK<int&>> tasks;
 		tasks.emplace_back(makeTask(event1, value1));
@@ -301,7 +301,7 @@ void check_when_all_vector_of_task_reference()
 
 		whenAllComplete = true;
 	}(),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 	{
 		CHECK(!whenAllComplete);
 		event2.set();
@@ -312,14 +312,14 @@ void check_when_all_vector_of_task_reference()
 	}()));
 }
 
-TEST_CASE("when_all() with vector<lazy_task<T&>>")
+TEST_CASE("when_all() with vector<task<T&>>")
 {
-	check_when_all_vector_of_task_reference<cppcoro::lazy_task>();
+	check_when_all_vector_of_task_reference<cppcoro::task>();
 }
 
-TEST_CASE("when_all() with vector<shared_lazy_task<T&>>")
+TEST_CASE("when_all() with vector<shared_task<T&>>")
 {
-	check_when_all_vector_of_task_reference<cppcoro::shared_lazy_task>();
+	check_when_all_vector_of_task_reference<cppcoro::shared_task>();
 }
 
 TEST_SUITE_END();

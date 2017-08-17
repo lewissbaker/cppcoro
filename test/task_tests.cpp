@@ -3,7 +3,7 @@
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
 
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/single_consumer_event.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all_ready.hpp>
@@ -16,18 +16,18 @@
 
 #include "doctest/doctest.h"
 
-TEST_SUITE_BEGIN("lazy_task");
+TEST_SUITE_BEGIN("task");
 
-TEST_CASE("lazy_task doesn't start until awaited")
+TEST_CASE("task doesn't start until awaited")
 {
 	bool started = false;
-	auto func = [&]() -> cppcoro::lazy_task<>
+	auto func = [&]() -> cppcoro::task<>
 	{
 		started = true;
 		co_return;
 	};
 
-	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
 		auto t = func();
 		CHECK(!started);
@@ -38,41 +38,41 @@ TEST_CASE("lazy_task doesn't start until awaited")
 	}());
 }
 
-TEST_CASE("awaiting default-constructed lazy_task throws broken_promise")
+TEST_CASE("awaiting default-constructed task throws broken_promise")
 {
-	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
-		cppcoro::lazy_task<> t;
+		cppcoro::task<> t;
 		CHECK_THROWS_AS(co_await t, const cppcoro::broken_promise&);
 	}());
 }
 
-TEST_CASE("awaiting lazy_task that completes asynchronously")
+TEST_CASE("awaiting task that completes asynchronously")
 {
 	bool reachedBeforeEvent = false;
 	bool reachedAfterEvent = false;
 	cppcoro::single_consumer_event event;
-	auto f = [&]() -> cppcoro::lazy_task<>
+	auto f = [&]() -> cppcoro::task<>
 	{
 		reachedBeforeEvent = true;
 		co_await event;
 		reachedAfterEvent = true;
 	};
 
-	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
 		auto t = f();
 
 		CHECK(!reachedBeforeEvent);
 
 		co_await cppcoro::when_all_ready(
-			[&]() -> cppcoro::lazy_task<>
+			[&]() -> cppcoro::task<>
 			{
 				co_await t;
 				CHECK(reachedBeforeEvent);
 				CHECK(reachedAfterEvent);
 			}(),
-			[&]() -> cppcoro::lazy_task<>
+			[&]() -> cppcoro::task<>
 			{
 				CHECK(reachedBeforeEvent);
 				CHECK(!reachedAfterEvent);
@@ -83,11 +83,11 @@ TEST_CASE("awaiting lazy_task that completes asynchronously")
 	}());
 }
 
-TEST_CASE("destroying lazy_task that was never awaited destroys captured args")
+TEST_CASE("destroying task that was never awaited destroys captured args")
 {
 	counted::reset_counts();
 
-	auto f = [](counted c) -> cppcoro::lazy_task<counted>
+	auto f = [](counted c) -> cppcoro::task<counted>
 	{
 		co_return c;
 	};
@@ -102,11 +102,11 @@ TEST_CASE("destroying lazy_task that was never awaited destroys captured args")
 	CHECK(counted::active_count() == 0);
 }
 
-TEST_CASE("lazy_task destructor destroys result")
+TEST_CASE("task destructor destroys result")
 {
 	counted::reset_counts();
 
-	auto f = []() -> cppcoro::lazy_task<counted>
+	auto f = []() -> cppcoro::task<counted>
 	{
 		co_return counted{};
 	};
@@ -124,22 +124,22 @@ TEST_CASE("lazy_task destructor destroys result")
 	CHECK(counted::active_count() == 0);
 }
 
-TEST_CASE("lazy_task of reference type")
+TEST_CASE("task of reference type")
 {
 	int value = 3;
-	auto f = [&]() -> cppcoro::lazy_task<int&>
+	auto f = [&]() -> cppcoro::task<int&>
 	{
 		co_return value;
 	};
 
-	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
 		SUBCASE("awaiting rvalue task")
 		{
 			decltype(auto) result = co_await f();
 			static_assert(
 				std::is_same<decltype(result), int&>::value,
-				"co_await r-value reference of lazy_task<int&> should result in an int&");
+				"co_await r-value reference of task<int&> should result in an int&");
 			CHECK(&result == &value);
 		}
 
@@ -149,17 +149,17 @@ TEST_CASE("lazy_task of reference type")
 			decltype(auto) result = co_await t;
 			static_assert(
 				std::is_same<decltype(result), int&>::value,
-				"co_await l-value reference of lazy_task<int&> should result in an int&");
+				"co_await l-value reference of task<int&> should result in an int&");
 			CHECK(&result == &value);
 		}
 	}());
 }
 
-TEST_CASE("passing parameter by value to lazy_task coroutine calls move-constructor exactly once")
+TEST_CASE("passing parameter by value to task coroutine calls move-constructor exactly once")
 {
 	counted::reset_counts();
 
-	auto f = [](counted arg) -> cppcoro::lazy_task<>
+	auto f = [](counted arg) -> cppcoro::task<>
 	{
 		co_return;
 	};
@@ -189,13 +189,13 @@ TEST_CASE("passing parameter by value to lazy_task coroutine calls move-construc
 	CHECK(counted::active_count() == 1);
 }
 
-TEST_CASE("lazy_task<void> fmap pipe operator")
+TEST_CASE("task<void> fmap pipe operator")
 {
 	using cppcoro::fmap;
 
 	cppcoro::single_consumer_event event;
 
-	auto f = [&]() -> cppcoro::lazy_task<>
+	auto f = [&]() -> cppcoro::task<>
 	{
 		co_await event;
 		co_return;
@@ -206,11 +206,11 @@ TEST_CASE("lazy_task<void> fmap pipe operator")
 	CHECK(!t.is_ready());
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 		{
 			CHECK(co_await t == 123);
 		}(),
-		[&]() -> cppcoro::lazy_task<>
+		[&]() -> cppcoro::task<>
 		{
 			event.set();
 			co_return;
@@ -219,20 +219,20 @@ TEST_CASE("lazy_task<void> fmap pipe operator")
 	CHECK(t.is_ready());
 }
 
-TEST_CASE("lazy_task<int> fmap pipe operator")
+TEST_CASE("task<int> fmap pipe operator")
 {
-	using cppcoro::lazy_task;
+	using cppcoro::task;
 	using cppcoro::fmap;
 	using cppcoro::sync_wait;
 
-	auto one = [&]() -> lazy_task<int>
+	auto one = [&]() -> task<int>
 	{
 		co_return 1;
 	};
 
 	SUBCASE("r-value fmap / r-value lambda")
 	{
-		lazy_task<int> t = one() | fmap([delta = 1](auto i) { return i + delta; });
+		task<int> t = one() | fmap([delta = 1](auto i) { return i + delta; });
 		CHECK(!t.is_ready());
 		CHECK(sync_wait(t) == 2);
 	}
@@ -241,7 +241,7 @@ TEST_CASE("lazy_task<int> fmap pipe operator")
 	{
 		using namespace std::string_literals;
 
-		lazy_task<std::string> t;
+		task<std::string> t;
 
 		{
 			auto f = [prefix = "pfx"s](int x)
@@ -263,7 +263,7 @@ TEST_CASE("lazy_task<int> fmap pipe operator")
 	{
 		using namespace std::string_literals;
 
-		lazy_task<std::string> t;
+		task<std::string> t;
 
 		{
 			auto addprefix = fmap([prefix = "a really really long prefix that prevents small string optimisation"s](int x)
@@ -285,7 +285,7 @@ TEST_CASE("lazy_task<int> fmap pipe operator")
 	{
 		using namespace std::string_literals;
 
-		lazy_task<std::string> t;
+		task<std::string> t;
 
 		{
 			auto lambda = [prefix = "a really really long prefix that prevents small string optimisation"s](int x)
@@ -309,7 +309,7 @@ TEST_CASE("lazy_task<int> fmap pipe operator")
 TEST_CASE("chained fmap pipe operations")
 {
 	using namespace std::string_literals;
-	using cppcoro::lazy_task;
+	using cppcoro::task;
 	using cppcoro::sync_wait;
 
 	auto prepend = [](std::string s)
@@ -324,7 +324,7 @@ TEST_CASE("chained fmap pipe operations")
 		return fmap([s = std::move(s)](const std::string& value){ return value + s; });
 	};
 
-	auto asyncString = [](std::string s) -> lazy_task<std::string>
+	auto asyncString = [](std::string s) -> task<std::string>
 	{
 		co_return std::move(s);
 	};

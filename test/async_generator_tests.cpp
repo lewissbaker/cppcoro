@@ -5,7 +5,7 @@
 
 #include <cppcoro/async_generator.hpp>
 #include <cppcoro/single_consumer_event.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all.hpp>
 
@@ -15,7 +15,7 @@ TEST_SUITE_BEGIN("async_generator");
 
 TEST_CASE("default-constructed async_generator is an empty sequence")
 {
-	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([]() -> cppcoro::task<>
 	{
 		// Iterating over default-constructed async_generator just
 		// gives an empty sequence.
@@ -41,7 +41,7 @@ TEST_CASE("async_generator doesn't start if begin() not called")
 
 TEST_CASE("enumerate sequence of 1 value")
 {
-	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([]() -> cppcoro::task<>
 	{
 		bool startedExecution = false;
 		auto makeGenerator = [&]() -> cppcoro::async_generator<std::uint32_t>
@@ -65,7 +65,7 @@ TEST_CASE("enumerate sequence of 1 value")
 
 TEST_CASE("enumerate sequence of multiple values")
 {
-	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([]() -> cppcoro::task<>
 	{
 		bool startedExecution = false;
 		auto makeGenerator = [&]() -> cppcoro::async_generator<std::uint32_t>
@@ -129,7 +129,7 @@ private:
 
 TEST_CASE("destructors of values in scope are called when async_generator destructed early")
 {
-	cppcoro::sync_wait([]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([]() -> cppcoro::task<>
 	{
 		bool aDestructed = false;
 		bool bDestructed = false;
@@ -186,7 +186,7 @@ TEST_CASE("async producer with async consumer"
 
 	bool consumerFinished = false;
 
-	auto consume = [&]() -> cppcoro::lazy_task<>
+	auto consume = [&]() -> cppcoro::task<>
 	{
 		auto generator = produce();
 		auto it = co_await generator.begin();
@@ -199,7 +199,7 @@ TEST_CASE("async producer with async consumer"
 		consumerFinished = true;
 	};
 
-	auto unblock = [&]() -> cppcoro::lazy_task<>
+	auto unblock = [&]() -> cppcoro::task<>
 	{
 		p1.set();
 		p2.set();
@@ -264,7 +264,7 @@ TEST_CASE("large number of synchronous completions doesn't result in stack-overf
 		}
 	};
 
-	auto consumer = [](cppcoro::async_generator<std::uint32_t> sequence) -> cppcoro::lazy_task<>
+	auto consumer = [](cppcoro::async_generator<std::uint32_t> sequence) -> cppcoro::task<>
 	{
 		std::uint32_t expected = 0;
 		for co_await(std::uint32_t i : sequence)
@@ -275,7 +275,7 @@ TEST_CASE("large number of synchronous completions doesn't result in stack-overf
 		CHECK(expected == 1'000'000u);
 	};
 
-	auto unblocker = [](cppcoro::single_consumer_event& event) -> cppcoro::lazy_task<>
+	auto unblocker = [](cppcoro::single_consumer_event& event) -> cppcoro::task<>
 	{
 		// Should have processed the first 500'000 elements synchronously with consumer driving
 		// iteraction before producer suspends and thus consumer suspends.
@@ -310,7 +310,7 @@ TEST_CASE("fmap")
 
 	auto squares = iota(5) | fmap([](auto x) { return x * x; });
 
-	cppcoro::sync_wait([&]() -> cppcoro::lazy_task<>
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
 		auto it = co_await squares.begin();
 		CHECK(*it == 0);

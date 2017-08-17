@@ -6,8 +6,8 @@
 #include <cppcoro/sync_wait.hpp>
 
 #include <cppcoro/config.hpp>
-#include <cppcoro/lazy_task.hpp>
-#include <cppcoro/shared_lazy_task.hpp>
+#include <cppcoro/task.hpp>
+#include <cppcoro/shared_task.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
 #if CPPCORO_OS_WINNT
@@ -23,15 +23,15 @@
 TEST_SUITE_BEGIN("sync_wait");
 
 static_assert(std::is_same<
-	decltype(cppcoro::sync_wait(std::declval<cppcoro::lazy_task<std::string>>())),
+	decltype(cppcoro::sync_wait(std::declval<cppcoro::task<std::string>>())),
 	std::string&&>::value);
 static_assert(std::is_same<
-	decltype(cppcoro::sync_wait(std::declval<cppcoro::lazy_task<std::string>&>())),
+	decltype(cppcoro::sync_wait(std::declval<cppcoro::task<std::string>&>())),
 	std::string&>::value);
 
-TEST_CASE("sync_wait(lazy_task<T>)")
+TEST_CASE("sync_wait(task<T>)")
 {
-	auto makeTask = []() -> cppcoro::lazy_task<std::string>
+	auto makeTask = []() -> cppcoro::task<std::string>
 	{
 		co_return "foo";
 	};
@@ -42,9 +42,9 @@ TEST_CASE("sync_wait(lazy_task<T>)")
 	CHECK(cppcoro::sync_wait(makeTask()) == "foo");
 }
 
-TEST_CASE("sync_wait(shared_lazy_task<T>)")
+TEST_CASE("sync_wait(shared_task<T>)")
 {
-	auto makeTask = []() -> cppcoro::shared_lazy_task<std::string>
+	auto makeTask = []() -> cppcoro::shared_task<std::string>
 	{
 		co_return "foo";
 	};
@@ -66,7 +66,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "multiple threads")
 	// sync_wait().
 
 	int value = 0;
-	auto createLazyTask = [&]() -> cppcoro::lazy_task<int>
+	auto createLazyTask = [&]() -> cppcoro::task<int>
 	{
 		co_await io_service().schedule();
 		co_return value++;

@@ -5,7 +5,7 @@
 
 #include <cppcoro/async_mutex.hpp>
 #include <cppcoro/single_consumer_event.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/when_all_ready.hpp>
 #include <cppcoro/sync_wait.hpp>
 
@@ -35,14 +35,14 @@ TEST_CASE("multiple lockers")
 	cppcoro::single_consumer_event c;
 	cppcoro::single_consumer_event d;
 
-	auto f = [&](cppcoro::single_consumer_event& e) -> cppcoro::lazy_task<>
+	auto f = [&](cppcoro::single_consumer_event& e) -> cppcoro::task<>
 	{
 		auto lock = co_await mutex.scoped_lock_async();
 		co_await e;
 		++value;
 	};
 
-	auto check = [&]() -> cppcoro::lazy_task<>
+	auto check = [&]() -> cppcoro::task<>
 	{
 		CHECK(value == 0);
 
@@ -50,7 +50,7 @@ TEST_CASE("multiple lockers")
 
 		CHECK(value == 1);
 
-		auto check2 = [&]() -> cppcoro::lazy_task<>
+		auto check2 = [&]() -> cppcoro::task<>
 		{
 			b.set();
 

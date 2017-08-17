@@ -5,8 +5,8 @@
 #ifndef CPPCORO_WHEN_ALL_HPP_INCLUDED
 #define CPPCORO_WHEN_ALL_HPP_INCLUDED
 
-#include <cppcoro/lazy_task.hpp>
-#include <cppcoro/shared_lazy_task.hpp>
+#include <cppcoro/task.hpp>
+#include <cppcoro/shared_task.hpp>
 #include <cppcoro/when_all_ready.hpp>
 
 #include <cppcoro/detail/unwrap_reference.hpp>
@@ -38,13 +38,13 @@ namespace cppcoro
 		}
 	}
 
-	inline lazy_task<std::tuple<>> when_all()
+	inline task<std::tuple<>> when_all()
 	{
 		co_return std::tuple<>{};
 	}
 
 	template<typename TASK>
-	lazy_task<std::tuple<typename detail::unwrap_reference_t<TASK>::value_type>> when_all(TASK task)
+	task<std::tuple<typename detail::unwrap_reference_t<TASK>::value_type>> when_all(TASK task)
 	{
 		// Specialisation for one task parameter that avoids use of atomics as no synchronisation
 		// is required.
@@ -53,7 +53,7 @@ namespace cppcoro
 
 	template<typename... TASKS>
 	[[nodiscard]]
-	lazy_task<std::tuple<typename detail::unwrap_reference_t<TASKS>::value_type...>> when_all(TASKS... tasks)
+	task<std::tuple<typename detail::unwrap_reference_t<TASKS>::value_type...>> when_all(TASKS... tasks)
 	{
 		detail::when_all_awaitable awaitable{ sizeof...(TASKS) };
 
@@ -68,10 +68,10 @@ namespace cppcoro
 	}
 
 	//////////
-	// when_all() with vector of lazy_task
+	// when_all() with vector of task
 
 	[[nodiscard]]
-	inline lazy_task<> when_all(std::vector<lazy_task<>> tasks)
+	inline task<> when_all(std::vector<task<>> tasks)
 	{
 		tasks = co_await when_all_ready(std::move(tasks));
 
@@ -84,7 +84,7 @@ namespace cppcoro
 
 	template<typename T>
 	[[nodiscard]]
-	lazy_task<std::vector<T>> when_all(std::vector<lazy_task<T>> tasks)
+	task<std::vector<T>> when_all(std::vector<task<T>> tasks)
 	{
 		tasks = co_await when_all_ready(std::move(tasks));
 
@@ -101,7 +101,7 @@ namespace cppcoro
 
 	template<typename T>
 	[[nodiscard]]
-	lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<lazy_task<T&>> tasks)
+	task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<task<T&>> tasks)
 	{
 		tasks = co_await when_all_ready(std::move(tasks));
 
@@ -117,10 +117,10 @@ namespace cppcoro
 	}
 
 	//////////
-	// when_all() with vector of shared_lazy_task
+	// when_all() with vector of shared_task
 
 	[[nodiscard]]
-	inline lazy_task<> when_all(std::vector<shared_lazy_task<>> tasks)
+	inline task<> when_all(std::vector<shared_task<>> tasks)
 	{
 		tasks = co_await when_all_ready(std::move(tasks));
 
@@ -133,7 +133,7 @@ namespace cppcoro
 
 	template<typename T>
 	[[nodiscard]]
-	lazy_task<std::vector<T>> when_all(std::vector<shared_lazy_task<T>> tasks)
+	task<std::vector<T>> when_all(std::vector<shared_task<T>> tasks)
 	{
 		tasks = co_await when_all_ready(std::move(tasks));
 
@@ -150,7 +150,7 @@ namespace cppcoro
 
 	template<typename T>
 	[[nodiscard]]
-	lazy_task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_lazy_task<T&>> tasks)
+	task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_task<T&>> tasks)
 	{
 		tasks = co_await when_all_ready(std::move(tasks));
 

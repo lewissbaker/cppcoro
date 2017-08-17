@@ -6,7 +6,7 @@
 #include <cppcoro/async_auto_reset_event.hpp>
 
 #include <cppcoro/config.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all.hpp>
 #include <cppcoro/when_all_ready.hpp>
@@ -31,14 +31,14 @@ TEST_CASE("single waiter")
 
 	bool started = false;
 	bool finished = false;
-	auto run = [&]() -> cppcoro::lazy_task<>
+	auto run = [&]() -> cppcoro::task<>
 	{
 		started = true;
 		co_await event;
 		finished = true;
 	};
 
-	auto check = [&]() -> cppcoro::lazy_task<>
+	auto check = [&]() -> cppcoro::task<>
 	{
 		CHECK(started);
 		CHECK(!finished);
@@ -58,7 +58,7 @@ TEST_CASE("multiple waiters")
 	cppcoro::async_auto_reset_event event;
 
 	
-	auto run = [&](bool& flag) -> cppcoro::lazy_task<>
+	auto run = [&](bool& flag) -> cppcoro::task<>
 	{
 		co_await event;
 		flag = true;
@@ -67,7 +67,7 @@ TEST_CASE("multiple waiters")
 	bool completed1 = false;
 	bool completed2 = false;
 
-	auto check = [&]() -> cppcoro::lazy_task<>
+	auto check = [&]() -> cppcoro::task<>
 	{
 		CHECK(!completed1);
 		CHECK(!completed2);
@@ -94,13 +94,13 @@ TEST_CASE("multiple waiters")
 
 TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 {
-	auto run = [&]() -> cppcoro::lazy_task<>
+	auto run = [&]() -> cppcoro::task<>
 	{
 		cppcoro::async_auto_reset_event event;
 
 		int value = 0;
 
-		auto startWaiter = [&]() -> cppcoro::lazy_task<>
+		auto startWaiter = [&]() -> cppcoro::task<>
 		{
 			co_await io_service().schedule();
 			co_await event;
@@ -108,14 +108,14 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 			event.set();
 		};
 
-		auto startSignaller = [&]() -> cppcoro::lazy_task<>
+		auto startSignaller = [&]() -> cppcoro::task<>
 		{
 			co_await io_service().schedule();
 			value = 5;
 			event.set();
 		};
 
-		std::vector<cppcoro::lazy_task<>> tasks;
+		std::vector<cppcoro::task<>> tasks;
 
 		tasks.emplace_back(startSignaller());
 
@@ -130,7 +130,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 		assert(value == 1005);
 	};
 
-	std::vector<cppcoro::lazy_task<>> tasks;
+	std::vector<cppcoro::task<>> tasks;
 
 	for (int i = 0; i < 1000; ++i)
 	{

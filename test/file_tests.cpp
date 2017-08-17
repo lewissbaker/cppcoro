@@ -7,7 +7,7 @@
 #include <cppcoro/read_only_file.hpp>
 #include <cppcoro/write_only_file.hpp>
 #include <cppcoro/read_write_file.hpp>
-#include <cppcoro/lazy_task.hpp>
+#include <cppcoro/task.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
@@ -70,7 +70,7 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 {
 	auto filePath = temp_dir() / "foo";
 
-	auto write = [&](cppcoro::io_service& ioService) -> cppcoro::lazy_task<>
+	auto write = [&](cppcoro::io_service& ioService) -> cppcoro::task<>
 	{
 		auto f = cppcoro::write_only_file::open(ioService, filePath);
 
@@ -88,7 +88,7 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 		}
 	};
 
-	auto read = [&](cppcoro::io_service& io) -> cppcoro::lazy_task<>
+	auto read = [&](cppcoro::io_service& io) -> cppcoro::task<>
 	{
 		auto f = cppcoro::read_only_file::open(io, filePath);
 
@@ -108,7 +108,7 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 		}
 	};
 
-	auto run = [&]() -> cppcoro::lazy_task<>
+	auto run = [&]() -> cppcoro::task<>
 	{
 		co_await write(io_service());
 		co_await read(io_service());
@@ -119,7 +119,7 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 
 TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
 {
-	auto run = [&]() -> cppcoro::lazy_task<>
+	auto run = [&]() -> cppcoro::task<>
 	{
 		cppcoro::io_work_scope ioScope{ io_service() };
 		auto f = cppcoro::read_write_file::open(io_service(), temp_dir() / "foo.txt");

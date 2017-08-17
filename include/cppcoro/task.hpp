@@ -19,15 +19,15 @@
 
 namespace cppcoro
 {
-	template<typename T> class lazy_task;
+	template<typename T> class task;
 
 	namespace detail
 	{
-		class lazy_task_promise_base
+		class task_promise_base
 		{
 		public:
 
-			lazy_task_promise_base() noexcept
+			task_promise_base() noexcept
 				: m_continuation()
 			{}
 
@@ -97,13 +97,13 @@ namespace cppcoro
 		};
 
 		template<typename T>
-		class lazy_task_promise : public lazy_task_promise_base
+		class task_promise : public task_promise_base
 		{
 		public:
 
-			lazy_task_promise() noexcept = default;
+			task_promise() noexcept = default;
 
-			~lazy_task_promise()
+			~task_promise()
 			{
 				if (is_ready() && !completed_with_unhandled_exception())
 				{
@@ -111,7 +111,7 @@ namespace cppcoro
 				}
 			}
 
-			lazy_task<T> get_return_object() noexcept;
+			task<T> get_return_object() noexcept;
 
 			template<
 				typename VALUE,
@@ -144,13 +144,13 @@ namespace cppcoro
 		};
 
 		template<>
-		class lazy_task_promise<void> : public lazy_task_promise_base
+		class task_promise<void> : public task_promise_base
 		{
 		public:
 
-			lazy_task_promise() noexcept = default;
+			task_promise() noexcept = default;
 
-			lazy_task<void> get_return_object() noexcept;
+			task<void> get_return_object() noexcept;
 
 			void return_void() noexcept
 			{}
@@ -163,13 +163,13 @@ namespace cppcoro
 		};
 
 		template<typename T>
-		class lazy_task_promise<T&> : public lazy_task_promise_base
+		class task_promise<T&> : public task_promise_base
 		{
 		public:
 
-			lazy_task_promise() noexcept = default;
+			task_promise() noexcept = default;
 
-			lazy_task<T&> get_return_object() noexcept;
+			task<T&> get_return_object() noexcept;
 
 			void return_value(T& value) noexcept
 			{
@@ -193,7 +193,7 @@ namespace cppcoro
 	/// A lazy task represents an asynchronous operation that is not started
 	/// until it is first awaited.
 	///
-	/// When you call a coroutine that returns a lazy_task, the coroutine
+	/// When you call a coroutine that returns a task, the coroutine
 	/// simply captures any passed parameters and returns exeuction to the
 	/// caller. Execution of the coroutine body does not start until the
 	/// coroutine is first co_await'ed.
@@ -204,24 +204,24 @@ namespace cppcoro
 	/// require the use of atomic operations to synchronise potential races
 	/// between the awaiting coroutine suspending and the coroutine completing.
 	///
-	/// The awaiting coroutine is suspended prior to the lazy_task being started
-	/// which means that when the lazy_task completes it can unconditionally
+	/// The awaiting coroutine is suspended prior to the task being started
+	/// which means that when the task completes it can unconditionally
 	/// resume the awaiter.
 	///
-	/// One limitation of this approach is that if the lazy_task completes
+	/// One limitation of this approach is that if the task completes
 	/// synchronously then, unless the compiler is able to perform tail-calls,
 	/// the awaiting coroutine will be resumed inside a nested stack-frame.
-	/// This call lead to stack-overflow if long chains of lazy_tasks complete
+	/// This call lead to stack-overflow if long chains of tasks complete
 	/// synchronously.
 	///
 	/// The task<T> type does not have this issue as the awaiting coroutine is
 	/// not suspended in the case that the task completes synchronously.
 	template<typename T = void>
-	class lazy_task
+	class task
 	{
 	public:
 
-		using promise_type = detail::lazy_task_promise<T>;
+		using promise_type = detail::task_promise<T>;
 
 		using value_type = T;
 
@@ -249,26 +249,26 @@ namespace cppcoro
 
 	public:
 
-		lazy_task() noexcept
+		task() noexcept
 			: m_coroutine(nullptr)
 		{}
 
-		explicit lazy_task(std::experimental::coroutine_handle<promise_type> coroutine)
+		explicit task(std::experimental::coroutine_handle<promise_type> coroutine)
 			: m_coroutine(coroutine)
 		{}
 
-		lazy_task(lazy_task&& t) noexcept
+		task(task&& t) noexcept
 			: m_coroutine(t.m_coroutine)
 		{
 			t.m_coroutine = nullptr;
 		}
 
 		/// Disable copy construction/assignment.
-		lazy_task(const lazy_task&) = delete;
-		lazy_task& operator=(const lazy_task&) = delete;
+		task(const task&) = delete;
+		task& operator=(const task&) = delete;
 
 		/// Frees resources used by this task.
-		~lazy_task()
+		~task()
 		{
 			if (m_coroutine)
 			{
@@ -276,7 +276,7 @@ namespace cppcoro
 			}
 		}
 
-		lazy_task& operator=(lazy_task&& other) noexcept
+		task& operator=(task&& other) noexcept
 		{
 			if (std::addressof(other) != this)
 			{
@@ -397,20 +397,20 @@ namespace cppcoro
 	namespace detail
 	{
 		template<typename T>
-		lazy_task<T> lazy_task_promise<T>::get_return_object() noexcept
+		task<T> task_promise<T>::get_return_object() noexcept
 		{
-			return lazy_task<T>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
+			return task<T>{ std::experimental::coroutine_handle<task_promise>::from_promise(*this) };
 		}
 
-		inline lazy_task<void> lazy_task_promise<void>::get_return_object() noexcept
+		inline task<void> task_promise<void>::get_return_object() noexcept
 		{
-			return lazy_task<void>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
+			return task<void>{ std::experimental::coroutine_handle<task_promise>::from_promise(*this) };
 		}
 
 		template<typename T>
-		lazy_task<T&> lazy_task_promise<T&>::get_return_object() noexcept
+		task<T&> task_promise<T&>::get_return_object() noexcept
 		{
-			return lazy_task<T&>{ std::experimental::coroutine_handle<lazy_task_promise>::from_promise(*this) };
+			return task<T&>{ std::experimental::coroutine_handle<task_promise>::from_promise(*this) };
 		}
 	}
 
@@ -419,22 +419,22 @@ namespace cppcoro
 	namespace detail
 	{
 		template<typename T, typename FUNC>
-		lazy_task<std::result_of_t<FUNC&&(T&&)>> apply_fmap(lazy_task<T> t, FUNC func)
+		task<std::result_of_t<FUNC&&(T&&)>> apply_fmap(task<T> t, FUNC func)
 		{
 			static_assert(
 				!std::is_reference_v<FUNC>,
-				"Passing by reference to lazy_task<T> coroutine is unsafe. "
+				"Passing by reference to task<T> coroutine is unsafe. "
 				"Use std::ref or std::cref to explicitly pass by reference.");
 
 			co_return std::invoke(std::move(func), co_await std::move(t));
 		}
 
 		template<typename FUNC>
-		lazy_task<std::result_of_t<FUNC&&()>> apply_fmap(lazy_task<> t, FUNC func)
+		task<std::result_of_t<FUNC&&()>> apply_fmap(task<> t, FUNC func)
 		{
 			static_assert(
 				!std::is_reference_v<FUNC>,
-				"Passing by reference to lazy_task<T> coroutine is unsafe. "
+				"Passing by reference to task<T> coroutine is unsafe. "
 				"Use std::ref or std::cref to explicitly pass by reference.");
 
 			co_await t;
@@ -443,19 +443,19 @@ namespace cppcoro
 	}
 
 	template<typename T, typename FUNC>
-	auto operator|(lazy_task<T>&& t, fmap_transform<FUNC>&& transform)
+	auto operator|(task<T>&& t, fmap_transform<FUNC>&& transform)
 	{
 		return detail::apply_fmap(std::move(t), std::forward<FUNC>(transform.func));
 	}
 
 	template<typename T, typename FUNC>
-	auto operator|(lazy_task<T>&& t, fmap_transform<FUNC>& transform)
+	auto operator|(task<T>&& t, fmap_transform<FUNC>& transform)
 	{
 		return detail::apply_fmap(std::move(t), transform.func);
 	}
 
 	template<typename T, typename FUNC>
-	auto operator|(lazy_task<T>&& t, const fmap_transform<FUNC>& transform)
+	auto operator|(task<T>&& t, const fmap_transform<FUNC>& transform)
 	{
 		return detail::apply_fmap(std::move(t), transform.func);
 	}
