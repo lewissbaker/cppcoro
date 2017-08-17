@@ -15,6 +15,7 @@ These include:
   * `async_manual_reset_event`
   * `async_auto_reset_event`
 * Functions
+  * `sync_wait()`
   * `when_all()`
   * `when_all_ready()`
 * Cancellation
@@ -1325,44 +1326,40 @@ API Summary:
 // <cppcoro/sync_wait.hpp>
 namespace cppcoro
 {
-  // 
   template<typename TASKS>
 	decltype(auto) sync_wait(TASK&& task)
-
 }
 ```
 
 Examples:
 ```c++
-void example_lazy_task(){
-	auto makeTask = []() -> lazy_task<std::string>
-	{
-		co_return "foo";
-	};
+void example_lazy_task()
+{
+  auto makeTask = []() -> lazy_task<std::string>
+  {
+    co_return "foo";
+  };
 
-	auto task = makeTask();
+  auto task = makeTask();
 
-	// start the lazy task and wait until it completes
-	sync_wait(task) == "foo";
+  // start the lazy task and wait until it completes
+  sync_wait(task) == "foo";
   sync_wait(makeTask()) == "foo";
 }
 
-void example_shared_lazy_task(){
-	auto makeTask = []() -> shared_lazy_task<std::string>
-	{
-		co_return "foo";
-	};
+void example_shared_lazy_task()
+{
+  auto makeTask = []() -> shared_lazy_task<std::string>
+  {
+    co_return "foo";
+  };
 
-	auto task = makeTask();
-	// start the shared task and wait until it completes
-	sync_wait(task) == "foo";
+  auto task = makeTask();
+  // start the shared task and wait until it completes
+  sync_wait(task) == "foo";
   sync_wait(makeTask()) == "foo";
 }
-
-
-
 ```
-
 
 ## `when_all_ready()`
 
