@@ -1607,8 +1607,8 @@ The Cake build-system is implemented in Python and requires Python 2.7 to be ins
 
 Ensure Python 2.7 interpreter is in your PATH and available as 'python'.
 
-Ensure Visual Studio 2017 Update 2 or later is installed.
-Note that there are some known issues with coroutines in Update 2 that have been fixed in the latest Update 3 preview.
+Ensure Visual Studio 2017 Update 3 or later is installed.
+Note that there are some known issues with coroutines in Update 2 or earlier that have been fixed in Update 3.
 
 You can also use an experimental version of the Visual Studio compiler by downloading a NuGet package from https://vcppdogfooding.azurewebsites.net/ and unzipping the .nuget file to a directory.
 Just update the `config.cake` file to point at the unzipped location by modifying and uncommenting the following line:
