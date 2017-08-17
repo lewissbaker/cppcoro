@@ -1306,6 +1306,63 @@ namespace cppcoro
 All `open()` functions throw `std::system_error` on failure.
 
 # Functions
+## `sync_wait()`
+
+The `sync_wait()`function can be used to synchronously wait until the specified `lazy_task`
+or `shared_lazy_task` completes.
+
+If the task has not yet started execution then it will be started on the current thread.
+
+The `sync_wait()` call will block until the task completes and will return the task's result
+or rethrow the task's exception if the task completed with an unhandled exception.
+
+The `sync_wait()` function is mostly useful for starting a top-level task from within `main()`
+and waiting until the task finishes, in practise it the only way to start the first/top-level
+`lazy_task`.
+
+API Summary:
+```c++
+// <cppcoro/sync_wait.hpp>
+namespace cppcoro
+{
+  // 
+  template<typename TASKS>
+	decltype(auto) sync_wait(TASK&& task)
+
+}
+```
+
+Examples:
+```c++
+void example_lazy_task(){
+	auto makeTask = []() -> lazy_task<std::string>
+	{
+		co_return "foo";
+	};
+
+	auto task = makeTask();
+
+	// start the lazy task and wait until it completes
+	sync_wait(task) == "foo";
+  sync_wait(makeTask()) == "foo";
+}
+
+void example_shared_lazy_task(){
+	auto makeTask = []() -> shared_lazy_task<std::string>
+	{
+		co_return "foo";
+	};
+
+	auto task = makeTask();
+	// start the shared task and wait until it completes
+	sync_wait(task) == "foo";
+  sync_wait(makeTask()) == "foo";
+}
+
+
+
+```
+
 
 ## `when_all_ready()`
 
