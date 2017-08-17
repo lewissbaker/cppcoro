@@ -336,4 +336,24 @@ TEST_CASE("chained fmap pipe operations")
 	CHECK(sync_wait(t) == "pre_base_post");
 }
 
+TEST_CASE("lots of synchronous completions doesn't result in stack-overflow")
+{
+	auto completesSynchronously = []() -> cppcoro::task<int>
+	{
+		co_return 1;
+	};
+
+	auto run = [&]() -> cppcoro::task<>
+	{
+		int sum = 0;
+		for (int i = 0; i < 1'000'000; ++i)
+		{
+			sum += co_await completesSynchronously();
+		}
+		CHECK(sum == 1'000'000);
+	};
+
+	cppcoro::sync_wait(run());
+}
+
 TEST_SUITE_END();

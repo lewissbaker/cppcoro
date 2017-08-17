@@ -5,6 +5,7 @@
 #ifndef CPPCORO_LAZY_TASK_HPP_INCLUDED
 #define CPPCORO_LAZY_TASK_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/fmap.hpp>
 
@@ -14,6 +15,7 @@
 #include <exception>
 #include <utility>
 #include <type_traits>
+#include <cstdint>
 
 #include <experimental/coroutine>
 
@@ -25,10 +27,36 @@ namespace cppcoro
 	{
 		class task_promise_base
 		{
+			friend struct final_awaitable;
+
+			struct final_awaitable
+			{
+				bool await_ready() const noexcept { return false; }
+
+				template<typename PROMISE>
+				void await_suspend(std::experimental::coroutine_handle<PROMISE> coroutine)
+				{
+					task_promise_base& promise = coroutine.promise();
+
+					// Use 'release' memory semantics in case we finish before the
+					// awaiter can suspend so that the awaiting thread sees our
+					// writes to the resulting value.
+					// Use 'acquire' memory semantics in case the caller registered
+					// the continuation before we finished. Ensure we see their write
+					// to m_continuation.
+					if (promise.m_state.exchange(true, std::memory_order_acq_rel))
+					{
+						promise.m_continuation.resume();
+					}
+				}
+
+				void await_resume() noexcept {}
+			};
+
 		public:
 
 			task_promise_base() noexcept
-				: m_continuation()
+				: m_state(false)
 			{}
 
 			auto initial_suspend() noexcept
@@ -38,25 +66,7 @@ namespace cppcoro
 
 			auto final_suspend() noexcept
 			{
-				struct awaitable
-				{
-					continuation m_continuation;
-
-					awaitable(continuation c) noexcept
-						: m_continuation(c)
-					{}
-
-					bool await_ready() const noexcept { return false; }
-
-					void await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> coroutine)
-					{
-						m_continuation.resume();
-					}
-
-					void await_resume() noexcept {}
-				};
-
-				return awaitable{ m_continuation };
+				return final_awaitable{};
 			}
 
 			void unhandled_exception() noexcept
@@ -64,17 +74,18 @@ namespace cppcoro
 				m_exception = std::current_exception();
 			}
 
-			bool is_ready() const noexcept
-			{
-				return static_cast<bool>(m_continuation);
-			}
-
-			void set_continuation(continuation c)
+			bool try_set_continuation(continuation c)
 			{
 				m_continuation = c;
+				return !m_state.exchange(true, std::memory_order_acq_rel);
 			}
 
 		protected:
+
+			bool completed() const noexcept
+			{
+				return m_state.load(std::memory_order_relaxed);
+			}
 
 			bool completed_with_unhandled_exception()
 			{
@@ -94,10 +105,15 @@ namespace cppcoro
 			continuation m_continuation;
 			std::exception_ptr m_exception;
 
+			// Initially false. Set to true when either a continuation is registered
+			// or when the coroutine has run to completion. Whichever operation
+			// successfully transitions from false->true got there first.
+			std::atomic<bool> m_state;
+
 		};
 
 		template<typename T>
-		class task_promise : public task_promise_base
+		class task_promise final : public task_promise_base
 		{
 		public:
 
@@ -105,7 +121,7 @@ namespace cppcoro
 
 			~task_promise()
 			{
-				if (is_ready() && !completed_with_unhandled_exception())
+				if (completed() && !completed_with_unhandled_exception())
 				{
 					reinterpret_cast<T*>(&m_valueStorage)->~T();
 				}
@@ -136,10 +152,19 @@ namespace cppcoro
 
 		private:
 
+#if CPPCORO_COMPILER_MSVC
+# pragma warning(push)
+# pragma warning(disable : 4324) // structure was padded due to alignment.
+#endif
+
 			// Not using std::aligned_storage here due to bug in MSVC 2015 Update 2
 			// that means it doesn't work for types with alignof(T) > 8.
 			// See MS-Connect bug #2658635.
 			alignas(T) char m_valueStorage[sizeof(T)];
+
+#if CPPCORO_COMPILER_MSVC
+# pragma warning(pop)
+#endif
 
 		};
 
@@ -237,13 +262,13 @@ namespace cppcoro
 
 			bool await_ready() const noexcept
 			{
-				return !m_coroutine || m_coroutine.promise().is_ready();
+				return !m_coroutine || m_coroutine.done();
 			}
 
-			void await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_coroutine.promise().set_continuation(detail::continuation{ awaiter });
 				m_coroutine.resume();
+				return m_coroutine.promise().try_set_continuation(detail::continuation{ awaiter });
 			}
 		};
 
@@ -295,10 +320,10 @@ namespace cppcoro
 		/// \brief
 		/// Query if the task result is complete.
 		///
-		/// Awaiting a task that is ready will not block.
+		/// Awaiting a task that is ready is guaranteed not to block/suspend.
 		bool is_ready() const noexcept
 		{
-			return !m_coroutine || m_coroutine.promise().is_ready();
+			return !m_coroutine || m_coroutine.done();
 		}
 
 		auto operator co_await() const & noexcept
@@ -367,17 +392,18 @@ namespace cppcoro
 					: m_coroutine(coroutine)
 				{}
 
-				void start(detail::continuation c) noexcept
+				void start(detail::continuation continuation) noexcept
 				{
-					if (m_coroutine && !m_coroutine.promise().is_ready())
+					if (m_coroutine && !m_coroutine.done())
 					{
-						m_coroutine.promise().set_continuation(c);
 						m_coroutine.resume();
+						if (m_coroutine.promise().try_set_continuation(continuation))
+						{
+							return;
+						}
 					}
-					else
-					{
-						c.resume();
-					}
+
+					continuation.resume();
 				}
 
 			private:

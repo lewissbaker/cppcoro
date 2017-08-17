@@ -163,20 +163,6 @@ If the `task` value is destroyed before it is awaited then the coroutine
 never executes and the destructor simply destructs the captured parameters
 and frees any memory used by the coroutine frame.
 
-### Warning on synchronous completion
-
-Something to be aware of with `task<T>` is that if the coroutine
-completes synchronously then the awaiting coroutine is resumed
-from within the call to `await_suspend()`. If your compiler is not
-able to guarantee tail-call optimisations for the `await_suspend()`
-and `coroutine_handle<>::resume()` calls then this can result in
-consumption of extra stack-space for each `co_await` of a `task`
-that completes synchronously which can lead to stack-overflow if
-performed in a loop.
-
-Note that the Clang compiler is able to achieve this tail-call behaviour
-in optimised builds but not in debug builds. MSVC is not currently able
-to perform these tail-calls.
 
 ## `shared_task<T>`
 
