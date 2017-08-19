@@ -221,6 +221,15 @@ namespace cppcoro
 			return generator<T>{ coroutine_handle::from_promise(*this) };
 		}
 	}
+
+	template<typename FUNC, typename T>
+	generator<std::result_of_t<FUNC&&(T&)>> fmap(FUNC func, generator<T> source)
+	{
+		for (auto& value : source)
+		{
+			co_yield std::invoke(func, value);
+		}
+	}
 }
 
 #endif

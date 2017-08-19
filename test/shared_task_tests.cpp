@@ -188,4 +188,60 @@ TEST_CASE("make_shared_task of void"
 	CHECK(c2.is_ready());
 }
 
+TEST_CASE("shared_task<void> fmap operator")
+{
+	cppcoro::single_consumer_event event;
+	int value = 0;
+
+	auto setNumber = [&]() -> cppcoro::shared_task<>
+	{
+		co_await event;
+		value = 123;
+	};
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::task<>
+	{
+		cppcoro::task<std::string> numericStringTask =
+			setNumber()
+			| cppcoro::fmap([&]() { return std::to_string(value); });
+
+		CHECK(co_await numericStringTask == "123");
+	}(),
+		[&]() -> cppcoro::task<>
+	{
+		CHECK(value == 0);
+		event.set();
+		CHECK(value == 123);
+		co_return;
+	}()));
+}
+
+TEST_CASE("shared_task<T> fmap operator")
+{
+	cppcoro::single_consumer_event event;
+
+	auto getNumber = [&]() -> cppcoro::shared_task<int>
+	{
+		co_await event;
+		co_return 123;
+	};
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		[&]() -> cppcoro::task<>
+	{
+		cppcoro::task<std::string> numericStringTask =
+			getNumber()
+			| cppcoro::fmap([](int x) { return std::to_string(x); });
+
+		CHECK(co_await numericStringTask == "123");
+	}(),
+		[&]() -> cppcoro::task<>
+	{
+		event.set();
+		co_return;
+	}()));
+}
+
+
 TEST_SUITE_END();

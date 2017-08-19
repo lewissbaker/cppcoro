@@ -440,50 +440,29 @@ namespace cppcoro
 		}
 	}
 
-	// operator| for fmap_transform
+	// fmap() overloads for task<T>
 
-	namespace detail
+	template<typename FUNC, typename T>
+	task<std::result_of_t<FUNC&&(T&&)>> fmap(FUNC func, task<T> t)
 	{
-		template<typename T, typename FUNC>
-		task<std::result_of_t<FUNC&&(T&&)>> apply_fmap(task<T> t, FUNC func)
-		{
-			static_assert(
-				!std::is_reference_v<FUNC>,
-				"Passing by reference to task<T> coroutine is unsafe. "
-				"Use std::ref or std::cref to explicitly pass by reference.");
+		static_assert(
+			!std::is_reference_v<FUNC>,
+			"Passing by reference to task<T> coroutine is unsafe. "
+			"Use std::ref or std::cref to explicitly pass by reference.");
 
-			co_return std::invoke(std::move(func), co_await std::move(t));
-		}
-
-		template<typename FUNC>
-		task<std::result_of_t<FUNC&&()>> apply_fmap(task<> t, FUNC func)
-		{
-			static_assert(
-				!std::is_reference_v<FUNC>,
-				"Passing by reference to task<T> coroutine is unsafe. "
-				"Use std::ref or std::cref to explicitly pass by reference.");
-
-			co_await t;
-			co_return std::invoke(std::move(func));
-		}
+		co_return std::invoke(std::move(func), co_await std::move(t));
 	}
 
-	template<typename T, typename FUNC>
-	auto operator|(task<T>&& t, fmap_transform<FUNC>&& transform)
+	template<typename FUNC>
+	task<std::result_of_t<FUNC&&()>> fmap(FUNC func, task<> t)
 	{
-		return detail::apply_fmap(std::move(t), std::forward<FUNC>(transform.func));
-	}
+		static_assert(
+			!std::is_reference_v<FUNC>,
+			"Passing by reference to task<T> coroutine is unsafe. "
+			"Use std::ref or std::cref to explicitly pass by reference.");
 
-	template<typename T, typename FUNC>
-	auto operator|(task<T>&& t, fmap_transform<FUNC>& transform)
-	{
-		return detail::apply_fmap(std::move(t), transform.func);
-	}
-
-	template<typename T, typename FUNC>
-	auto operator|(task<T>&& t, const fmap_transform<FUNC>& transform)
-	{
-		return detail::apply_fmap(std::move(t), transform.func);
+		co_await t;
+		co_return std::invoke(std::move(func));
 	}
 }
 

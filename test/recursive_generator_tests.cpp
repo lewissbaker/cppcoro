@@ -5,6 +5,7 @@
 
 #include <cppcoro/recursive_generator.hpp>
 #include <cppcoro/on_scope_exit.hpp>
+#include <cppcoro/fmap.hpp>
 
 #include <chrono>
 #include <algorithm>
@@ -369,6 +370,48 @@ TEST_CASE("usage in standard algorithms")
 		auto b = iterate_range(5, 300);
 		CHECK(!std::equal(a.begin(), a.end(), b.begin(), b.end()));
 	}
+}
+
+recursive_generator<int> range(int start, int end)
+{
+	while (start < end)
+	{
+		co_yield start++;
+	}
+}
+
+recursive_generator<int> range_chunks(int start, int end, int runLength, int stride)
+{
+	while (start < end)
+	{
+		co_yield range(start, std::min(end, start + runLength));
+		start += stride;
+	}
+}
+
+TEST_CASE("fmap operator")
+{
+	// 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24
+	cppcoro::generator<int> gen = range_chunks(0, 30, 5, 10)
+		| cppcoro::fmap([](int x) { return x * 3; });
+
+	auto it = gen.begin();
+	CHECK(*it == 0);
+	CHECK(*++it == 3);
+	CHECK(*++it == 6);
+	CHECK(*++it == 9);
+	CHECK(*++it == 12);
+	CHECK(*++it == 30);
+	CHECK(*++it == 33);
+	CHECK(*++it == 36);
+	CHECK(*++it == 39);
+	CHECK(*++it == 42);
+	CHECK(*++it == 60);
+	CHECK(*++it == 63);
+	CHECK(*++it == 66);
+	CHECK(*++it == 69);
+	CHECK(*++it == 72);
+	CHECK(++it == gen.end());
 }
 
 TEST_SUITE_END();

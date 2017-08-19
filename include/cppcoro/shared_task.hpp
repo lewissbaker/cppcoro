@@ -541,7 +541,6 @@ namespace cppcoro
 		}
 	}
 
-
 	template<typename T>
 	shared_task<T> make_shared_task(task<T> t)
 	{
@@ -555,6 +554,24 @@ namespace cppcoro
 		co_await t;
 	}
 #endif
+
+	// Note: We yield a task<> when applying fmap() operator to a shared_task<> since
+	// it's not necessarily the case that because the source task was shared that the
+	// result will be used in a shared context. So we choose to return a task<> which
+	// generally has less overhead than a shared_task<>.
+
+	template<typename FUNC, typename T>
+	task<std::result_of_t<FUNC&&(T&)>> fmap(FUNC func, shared_task<T> task)
+	{
+		co_return std::invoke(std::move(func), co_await std::move(task));
+	}
+
+	template<typename FUNC>
+	task<std::result_of_t<FUNC&&()>> fmap(FUNC func, shared_task<void> task)
+	{
+		co_await task;
+		co_return std::invoke(std::move(func));
+	}
 }
 
 #endif

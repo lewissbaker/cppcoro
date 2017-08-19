@@ -2,13 +2,16 @@
 // Copyright (c) Lewis Baker
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
-#ifndef CPPCORO_GENERATOR_HPP_INCLUDED
-#define CPPCORO_GENERATOR_HPP_INCLUDED
+#ifndef CPPCORO_RECURSIVE_GENERATOR_HPP_INCLUDED
+#define CPPCORO_RECURSIVE_GENERATOR_HPP_INCLUDED
+
+#include <cppcoro/generator.hpp>
 
 #include <experimental/coroutine>
 #include <type_traits>
 #include <utility>
 #include <cassert>
+#include <functional>
 
 namespace cppcoro
 {
@@ -316,6 +319,17 @@ namespace cppcoro
 	void swap(recursive_generator<T>& a, recursive_generator<T>& b) noexcept
 	{
 		a.swap(b);
+	}
+
+	// Note: When applying fmap operator to a recursive_generator we just yield a non-recursive
+	// generator since we generally won't be using the result in a recursive context.
+	template<typename FUNC, typename T>
+	generator<std::result_of_t<FUNC&&(T&)>> fmap(FUNC func, recursive_generator<T> source)
+	{
+		for (auto& value : source)
+		{
+			co_yield std::invoke(func, value);
+		}
 	}
 }
 

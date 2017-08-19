@@ -5,6 +5,7 @@
 
 #include <cppcoro/generator.hpp>
 #include <cppcoro/on_scope_exit.hpp>
+#include <cppcoro/fmap.hpp>
 
 #include <iostream>
 #include <vector>
@@ -187,6 +188,28 @@ TEST_CASE("safe capture of r-value reference args")
 	}
 
 	CHECK(s == "foobuzzbaz");
+}
+
+cppcoro::generator<int> range(int start, int end)
+{
+	for (; start < end; ++start)
+	{
+		co_yield start;
+	}
+}
+
+TEST_CASE("fmap operator")
+{
+	cppcoro::generator<int> gen = range(0, 5)
+		| cppcoro::fmap([](int x) { return x * 3; });
+
+	auto it = gen.begin();
+	CHECK(*it == 0);
+	CHECK(*++it == 3);
+	CHECK(*++it == 6);
+	CHECK(*++it == 9);
+	CHECK(*++it == 12);
+	CHECK(++it == gen.end());
 }
 
 TEST_SUITE_END();

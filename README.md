@@ -18,6 +18,7 @@ These include:
   * `sync_wait()`
   * `when_all()`
   * `when_all_ready()`
+  * `fmap()`
 * Cancellation
   * `cancellation_token`
   * `cancellation_source`
@@ -132,6 +133,19 @@ namespace cppcoro
     // the possibility of it throwing an exception.
     <unspecified> when_ready() const noexcept;
   };
+
+  template<typename T>
+  void swap(task<T>& a, task<T>& b);
+
+  // Apply func() to the result of the task, returning a new task that
+  // yields the result of 'func(co_await task)'.
+  template<typename FUNC, typename T>
+  task<std::invoke_result_t<FUNC, T&&>> fmap(FUNC func, task<T> task);
+
+  // Call func() after task completes, returning a task containing the
+  // result of func().
+  template<typename FUNC>
+  task<std::invoke_result_t<FUNC>> fmap(FUNC func, task<void> task);
 }
 ```
 
@@ -243,6 +257,16 @@ namespace cppcoro
   // await the result.
   template<typename T>
   shared_task<T> make_shared_task(task<T> task);
+
+  // Apply func() to the result of the task, returning a new task that
+  // yields the result of 'func(co_await task)'.
+  template<typename FUNC, typename T>
+  task<std::invoke_result_t<FUNC, T&&>> fmap(FUNC func, shared_task<T> task);
+
+  // Call func() after task completes, returning a task containing the
+  // result of func().
+  template<typename FUNC>
+  task<std::invoke_result_t<FUNC>> fmap(FUNC func, shared_task<void> task);
 }
 ```
 
@@ -364,7 +388,12 @@ namespace cppcoro
     };
 
     template<typename T>
-    void swap(generator<T>& a, generator<T>&b) noexcept;
+    void swap(generator<T>& a, generator<T>& b) noexcept;
+
+    // Apply function, func, lazily to each element of the source generator
+    // and yield a sequence of the results of calls to func().
+    template<typename FUNC, typename T>
+    generator<std::invoke_result_t<FUNC, T&>> fmap(FUNC func, generator<T> source);
 }
 ```
 
@@ -400,6 +429,10 @@ cppcoro::recursive_generator<dir_entry> list_directory_recursive(std::filesystem
   }
 }
 ```
+
+Note that applying the `fmap()` operator to a `recursive_generator<T>` will yield a `generator<U>`
+type rather than a `recursive_generator<U>`. This is because uses of `fmap` are generally not used
+in recursive contexts and we try to avoid the extra overhead incurred by `recursive_generator`.
 
 ## `async_generator<T>`
 
@@ -491,6 +524,14 @@ namespace cppcoro
     iterator end() noexcept;
 
   };
+
+  template<typename T>
+  void swap(async_generator<T>& a, async_generator<T>& b);
+
+  // Apply 'func' to each element of the source generator, yielding a sequence of
+  // the results of calling 'func' on the source elements.
+  template<typename FUNC, typename T>
+  async_generator<std::invoke_result_t<FUNC, T&>> fmap(FUNC func, async_generator<T> source);
 }
 ```
 
@@ -1293,6 +1334,7 @@ namespace cppcoro
 All `open()` functions throw `std::system_error` on failure.
 
 # Functions
+
 ## `sync_wait()`
 
 The `sync_wait()`function can be used to synchronously wait until the specified `task`
@@ -1528,6 +1570,73 @@ task<> example2()
   }
 }
 ```
+
+## `fmap()`
+
+The `fmap()` function can be used to apply a callable function to the value(s) contained within
+a container-type, returning a new container-type of the results of applying the function the
+contained value(s).
+
+The `fmap()` function can apply a function to values of type `task<T>`, `shared_task<T>`, `generator<T>`,
+`recursive_generator<T>` and `async_generator<T>`.
+
+Each of these types provides an overload for `fmap()` that takes two arguments; a function to apply and the container value.
+See documentation for each type for the supported `fmap()` overloads.
+
+For example, the `fmap()` function can be used to apply a function to the eventual result of
+a `task<T>`, producing a new `task<U>` that will complete with the return-value of the function.
+```c++
+// Given a function you want to apply that converts
+// a value of type A to value of type B.
+B a_to_b(A value);
+
+// And a task that yields a value of type A
+cppcoro::task<A> get_an_a();
+
+// We can apply the function to the result of the task using fmap()
+// and obtain a new task yielding the result.
+cppcoro::task<B> bTask = fmap(a_to_b, get_an_a());
+
+// An alternative syntax is to use the pipe notation.
+cppcoro::task<B> bTask = get_an_a() | cppcoro::fmap(a_to_b);
+```
+
+API Summary:
+```c++
+// <cppcoro/fmap.hpp>
+namespace cppcoro
+{
+  template<typename FUNC>
+  struct fmap_transform
+  {
+    fmap_transform(FUNC&& func) noexcept(std::is_nothrow_move_constructible_v<FUNC>);
+    FUNC func;
+  };
+
+  // Type-deducing constructor for fmap_transform object that can be used
+  // in conjunction with operator|.
+  template<typename FUNC>
+  fmap_transform<FUNC> fmap(FUNC&& func);
+
+  // operator| overloads for providing pipe-based syntactic sugar for fmap()
+  // such that the expression:
+  //   <value-expr> | cppcoro::fmap(<func-expr>)
+  // is equivalent to:
+  //   fmap(<func-expr>, <value-expr>)
+
+  template<typename T, typename FUNC>
+  decltype(auto) operator|(T&& value, fmap_transform<FUNC>&& transform);
+
+  template<typename T, typename FUNC>
+  decltype(auto) operator|(T&& value, fmap_transform<FUNC>& transform);
+
+  template<typename T, typename FUNC>
+  decltype(auto) operator|(T&& value, const fmap_transform<FUNC>& transform);
+}
+```
+
+The `fmap()` function is designed to look up the correct overload by argument-dependent
+lookup (ADL) so it should generally be called without the `cppcoro::` prefix.
 
 # Concepts
 

@@ -653,45 +653,27 @@ namespace cppcoro
 		}
 	}
 
-	// operator|(async_generator<T>, fmap_transform<F>)
-
-	namespace detail
+	template<typename FUNC, typename T>
+	async_generator<std::result_of_t<FUNC&(decltype(*std::declval<typename async_generator<T>::iterator&>()))>> fmap(
+		FUNC func,
+		async_generator<T> source)
 	{
-		template<typename T, typename FUNC>
-		auto apply_fmap(async_generator<T> g, FUNC func)
-			-> async_generator<std::result_of_t<FUNC&(typename async_generator<T>::iterator::reference)>>
+		static_assert(
+			!std::is_reference_v<FUNC>,
+			"Passing by reference to async_generator<T> coroutine is unsafe. "
+			"Use std::ref or std::cref to explicitly pass by reference.");
+
+		// Explicitly hand-coding the loop here rather than using range-based
+		// for loop since it's difficult to std::forward<???> the value of a
+		// range-based for-loop, preserving the value category of operator*
+		// return-value.
+		auto it = co_await source.begin();
+		const auto itEnd = source.end();
+		while (it != itEnd)
 		{
-			static_assert(
-				!std::is_reference_v<FUNC>,
-				"Passing by reference to async_generator<T> coroutine is unsafe. "
-				"Use std::ref or std::cref to explicitly pass by reference.");
-
-			auto it = co_await g.begin();
-			const auto itEnd = g.end();
-			while (it != itEnd)
-			{
-				co_yield std::invoke(func, *it);
-				(void)co_await ++it;
-			}
+			co_yield std::invoke(func, *it);
+			(void)co_await ++it;
 		}
-	}
-
-	template<typename T, typename FUNC>
-	auto operator|(async_generator<T>&& source, fmap_transform<FUNC>&& transform)
-	{
-		return detail::apply_fmap(std::move(source), std::forward<FUNC>(transform.func));
-	}
-
-	template<typename T, typename FUNC>
-	auto operator|(async_generator<T>&& source, fmap_transform<FUNC>& transform)
-	{
-		return detail::apply_fmap(std::move(source), transform.func);
-	}
-
-	template<typename T, typename FUNC>
-	auto operator|(async_generator<T>&& source, const fmap_transform<FUNC>& transform)
-	{
-		return detail::apply_fmap(std::move(source), transform.func);
 	}
 }
 
