@@ -19,6 +19,8 @@ These include:
   * `when_all()`
   * `when_all_ready()`
   * `fmap()`
+  * `schedule_on()`
+  * `resume_on()`
 * Cancellation
   * `cancellation_token`
   * `cancellation_source`
@@ -1637,6 +1639,148 @@ namespace cppcoro
 
 The `fmap()` function is designed to look up the correct overload by argument-dependent
 lookup (ADL) so it should generally be called without the `cppcoro::` prefix.
+
+## `resume_on()`
+
+The `resume_on()` function can be used to control the execution context that a `task`,
+`shared_task` or `async_generator` should resume its awaiting coroutine on.
+
+Normally, the awaiter of a `task` or `async_generator` will resume execution on whatever
+thread the `task` completed on. In some cases this may not be the thread that you want
+to continue executing on. In these cases you can use the `resume_on()` function to create
+a new task or generator that will resume execution on a thread associated with a specified
+scheduler.
+
+The `resume_on()` function can be used either as a normal function returning a new task/generator.
+Or it can be used in a pipeline-syntax.
+
+Example:
+```c++
+task<record> load_record(int id);
+
+ui_thread_scheduler uiThreadScheduler;
+
+task<> example()
+{
+  // This will start load_record() on the current thread.
+  // Then when load_record() completes (probably on an I/O thread)
+  // it will reschedule execution onto thread pool and call to_json
+  // Once to_json completes it will transfer execution onto the
+  // ui thread before resuming this coroutine and returning the json text.
+  task<std::string> jsonTask =
+    load_record(123)
+    | cppcoro::resume_on(threadpool::default())
+    | cppcoro::fmap(to_json)
+    | cppcoro::resume_on(uiThreadScheduler);
+
+  // At this point, all we've done is create a pipeline of tasks.
+  // The tasks haven't started executing yet.
+
+  // Await the result. Starts the pipeline of tasks.
+  std::string jsonText = co_await jsonTask;
+
+  // Guaranteed to be executing on ui thread here.
+
+  someUiControl.set_text(jsonText);
+}
+```
+
+API Summary:
+```c++
+// <cppcoro/resume_on.hpp>
+namespace cppcoro
+{
+  template<typename SCHEDULER, typename T>
+  task<T> resume_on(SCHEDULER& scheduler, task<T> t);
+
+  template<typename SCHEDULER, typename T>
+  task<T> resume_on(SCHEDULER& scheduler, shared_task<T> t);
+
+  template<typename SCHEDULER, typename T>
+  async_generator<T> resume_on(SCHEDULER& scheduler, async_generator<T> source);
+
+  template<typename SCHEDULER>
+  struct resume_on_transform
+  {
+    explicit resume_on_transform(SCHEDULER& scheduler) noexcept;
+    SCHEDULER& scheduler;
+  };
+
+  // Construct a transform/operation that can be applied to a source object
+  // using "pipe" notation (ie. operator|).
+  template<typename SCHEDULER>
+  resume_on_transform<SCHEDULER> resume_on(SCHEDULER& scheduler) noexcept;
+
+  // Equivalent to 'resume_on(transform.scheduler, std::forward<T>(value))'
+  template<typename T, typename SCHEDULER>
+  decltype(auto) operator|(T&& value, resume_on_transform<SCHEDULER> transform)
+  {
+    return resume_on(transform.scheduler, std::forward<T>(value));
+  }
+}
+```
+
+## `schedule_on()`
+
+The `schedule_on()` function can be used to change the execution context that a given
+`task` or `async_generator` starts executing on.
+
+When applied to an `async_generator` it also affects which execution context it resumes
+on after `co_yield` statement.
+
+Note that the `schedule_on` transform does not specify the thread that the `task` or `async_generator`
+will complete or yield results on, that is up to the implementing coroutine.
+
+See the `resume_on()` operator for a transform that controls the thread the operation completes on.
+
+For example:
+```c++
+task<int> get_value();
+io_service ioSvc;
+
+task<> example()
+{
+  // Starts executing get_value() on the current thread.
+  int a = co_await get_value();
+
+  // Starts executing get_value() on a thread associated with ioSvc.
+  int b = co_await schedule_on(ioSvc, get_value());
+}
+```
+
+API Summary:
+```
+// <cppcoro/schedule_on.hpp>
+namespace cppcoro
+{
+  // Return a task that yields the same result as 't' but that
+  // ensures that 't' is co_await'ed on a thread associated with
+  // the specified scheduler. Resulting task will complete on
+  // whatever thread 't' would normally complete on.
+  template<typename SCHEDULER, typename T>
+  task<T> schedule_on(SCHEDULER& scheduler, task<T> t);
+
+  // Return a generator that yields the same sequence of results as
+  // 'source' but that ensures that execution of the coroutine starts
+  // execution on a thread associated with 'scheduler' and resumes
+  // after a 'co_yield' on a thread associated with 'scheduler'.
+  template<typename SCHEDULER, typename T>
+  async_generator<T> schedule_on(SCHEDULER& scheduler, async_generator<T> source);
+
+  template<typename SCHEDULER>
+  struct schedule_on_transform
+  {
+    explicit schedule_on_transform(SCHEDULER& scheduler) noexcept;
+    SCHEDULER& scheduler;
+  };
+
+  template<typename SCHEDULER>
+  schedule_on_transform<SCHEDULER> schedule_on(SCHEDULER& scheduler) noexcept;
+
+  template<typename T, typename SCHEDULER>
+  decltype(auto) operator|(T&& value, schedule_on_transform<SCHEDULER> transform);
+}
+```
 
 # Concepts
 

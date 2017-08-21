@@ -35,6 +35,7 @@ sources = script.cwd([
 
 if variant.platform == 'windows':
   sources += script.cwd([
+    'scheduling_operator_tests.cpp',
     'io_service_tests.cpp',
     'file_tests.cpp',
     ])
