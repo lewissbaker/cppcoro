@@ -219,7 +219,6 @@ elif cake.system.isLinux():
     compiler.addCppFlag('-stdlib=libc++')
 
   compiler.addLibrary('c++')
-  compiler.addLibrary('c++abi')
   compiler.addLibrary('c')
   compiler.addLibrary('pthread')
 
