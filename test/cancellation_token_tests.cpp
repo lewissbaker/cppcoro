@@ -12,6 +12,8 @@
 
 #include "doctest/doctest.h"
 
+TEST_SUITE_BEGIN("cancellation_token tests");
+
 TEST_CASE("default cancellation_token is not cancellable")
 {
 	cppcoro::cancellation_token t;
@@ -335,3 +337,5 @@ TEST_CASE("cancellation registration single-threaded performance")
 	report("Batch10", time2, 10 * iterationCount);
 	report("Batch50", time3, 50 * iterationCount);
 }
+
+TEST_SUITE_END();
