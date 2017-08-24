@@ -97,35 +97,38 @@ TEST_CASE("enumerate sequence of multiple values")
 	}());
 }
 
-class set_to_true_on_destruction
+namespace
 {
-public:
-
-	set_to_true_on_destruction(bool* value)
-		: m_value(value)
-	{}
-
-	set_to_true_on_destruction(set_to_true_on_destruction&& other)
-		: m_value(other.m_value)
+	class set_to_true_on_destruction
 	{
-		other.m_value = nullptr;
-	}
+	public:
 
-	~set_to_true_on_destruction()
-	{
-		if (m_value != nullptr)
+		set_to_true_on_destruction(bool* value)
+			: m_value(value)
+		{}
+
+		set_to_true_on_destruction(set_to_true_on_destruction&& other)
+			: m_value(other.m_value)
 		{
-			*m_value = true;
+			other.m_value = nullptr;
 		}
-	}
 
-	set_to_true_on_destruction(const set_to_true_on_destruction&) = delete;
-	set_to_true_on_destruction& operator=(const set_to_true_on_destruction&) = delete;
+		~set_to_true_on_destruction()
+		{
+			if (m_value != nullptr)
+			{
+				*m_value = true;
+			}
+		}
 
-private:
+		set_to_true_on_destruction(const set_to_true_on_destruction&) = delete;
+		set_to_true_on_destruction& operator=(const set_to_true_on_destruction&) = delete;
 
-	bool* m_value;
-};
+	private:
+
+		bool* m_value;
+	};
+}
 
 TEST_CASE("destructors of values in scope are called when async_generator destructed early")
 {

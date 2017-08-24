@@ -320,20 +320,23 @@ TEST_CASE("exceptions thrown from nested call can be caught by caller")
 	CHECK(iter == gen.end());
 }
 
-recursive_generator<std::uint32_t> iterate_range(std::uint32_t begin, std::uint32_t end)
+namespace
 {
-	if ((end - begin) <= 10u)
+	recursive_generator<std::uint32_t> iterate_range(std::uint32_t begin, std::uint32_t end)
 	{
-		for (std::uint32_t i = begin; i < end; ++i)
+		if ((end - begin) <= 10u)
 		{
-			co_yield i;
+			for (std::uint32_t i = begin; i < end; ++i)
+			{
+				co_yield i;
+			}
 		}
-	}
-	else
-	{
-		std::uint32_t mid = begin + (end - begin) / 2;
-		co_yield iterate_range(begin, mid);
-		co_yield iterate_range(mid, end);
+		else
+		{
+			std::uint32_t mid = begin + (end - begin) / 2;
+			co_yield iterate_range(begin, mid);
+			co_yield iterate_range(mid, end);
+		}
 	}
 }
 
@@ -372,20 +375,23 @@ TEST_CASE("usage in standard algorithms")
 	}
 }
 
-recursive_generator<int> range(int start, int end)
+namespace
 {
-	while (start < end)
+	recursive_generator<int> range(int start, int end)
 	{
-		co_yield start++;
+		while (start < end)
+		{
+			co_yield start++;
+		}
 	}
-}
 
-recursive_generator<int> range_chunks(int start, int end, int runLength, int stride)
-{
-	while (start < end)
+	recursive_generator<int> range_chunks(int start, int end, int runLength, int stride)
 	{
-		co_yield range(start, std::min(end, start + runLength));
-		start += stride;
+		while (start < end)
+		{
+			co_yield range(start, std::min(end, start + runLength));
+			start += stride;
+		}
 	}
 }
 

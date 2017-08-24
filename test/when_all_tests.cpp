@@ -20,11 +20,14 @@
 
 TEST_SUITE_BEGIN("when_all");
 
-template<template<typename T> class TASK, typename T>
-TASK<T> when_event_set_return(cppcoro::async_manual_reset_event& event, T value)
+namespace
 {
-	co_await event;
-	co_return std::move(value);
+	template<template<typename T> class TASK, typename T>
+	TASK<T> when_event_set_return(cppcoro::async_manual_reset_event& event, T value)
+	{
+		co_await event;
+		co_return std::move(value);
+	}
 }
 
 TEST_CASE("when_all() with no args completes immediately")
@@ -222,40 +225,43 @@ TEST_CASE("when_all() with vector<shared_task<>>")
 	}()));
 }
 
-template<template<typename T> class TASK>
-void check_when_all_vector_of_task_value()
+namespace
 {
-	cppcoro::async_manual_reset_event event1;
-	cppcoro::async_manual_reset_event event2;
-
-	bool whenAllCompleted = false;
-
-	cppcoro::sync_wait(cppcoro::when_all_ready(
-		[&]() -> cppcoro::task<>
+	template<template<typename T> class TASK>
+	void check_when_all_vector_of_task_value()
 	{
-		std::vector<TASK<int>> tasks;
+		cppcoro::async_manual_reset_event event1;
+		cppcoro::async_manual_reset_event event2;
 
-		tasks.emplace_back(when_event_set_return<TASK>(event1, 1));
-		tasks.emplace_back(when_event_set_return<TASK>(event2, 2));
+		bool whenAllCompleted = false;
 
-		auto whenAllTask = cppcoro::when_all(std::move(tasks));
+		cppcoro::sync_wait(cppcoro::when_all_ready(
+			[&]() -> cppcoro::task<>
+		{
+			std::vector<TASK<int>> tasks;
 
-		auto& values = co_await whenAllTask;
-		REQUIRE(values.size() == 2);
-		CHECK(values[0] == 1);
-		CHECK(values[1] == 2);
+			tasks.emplace_back(when_event_set_return<TASK>(event1, 1));
+			tasks.emplace_back(when_event_set_return<TASK>(event2, 2));
 
-		whenAllCompleted = true;
-	}(),
-		[&]() -> cppcoro::task<>
-	{
-		CHECK(!whenAllCompleted);
-		event2.set();
-		CHECK(!whenAllCompleted);
-		event1.set();
-		CHECK(whenAllCompleted);
-		co_return;
-	}()));
+			auto whenAllTask = cppcoro::when_all(std::move(tasks));
+
+			auto& values = co_await whenAllTask;
+			REQUIRE(values.size() == 2);
+			CHECK(values[0] == 1);
+			CHECK(values[1] == 2);
+
+			whenAllCompleted = true;
+		}(),
+			[&]() -> cppcoro::task<>
+		{
+			CHECK(!whenAllCompleted);
+			event2.set();
+			CHECK(!whenAllCompleted);
+			event1.set();
+			CHECK(whenAllCompleted);
+			co_return;
+		}()));
+	}
 }
 
 TEST_CASE("when_all() with vector<task<T>>")
@@ -268,48 +274,51 @@ TEST_CASE("when_all() with vector<shared_task<T>>")
 	check_when_all_vector_of_task_value<cppcoro::shared_task>();
 }
 
-template<template<typename T> class TASK>
-void check_when_all_vector_of_task_reference()
+namespace
 {
-	cppcoro::async_manual_reset_event event1;
-	cppcoro::async_manual_reset_event event2;
-
-	int value1 = 1;
-	int value2 = 2;
-
-	auto makeTask = [](cppcoro::async_manual_reset_event& event, int& value) -> TASK<int&>
+	template<template<typename T> class TASK>
+	void check_when_all_vector_of_task_reference()
 	{
-		co_await event;
-		co_return value;
-	};
+		cppcoro::async_manual_reset_event event1;
+		cppcoro::async_manual_reset_event event2;
 
-	bool whenAllComplete = false;
+		int value1 = 1;
+		int value2 = 2;
 
-	cppcoro::sync_wait(cppcoro::when_all_ready(
-		[&]() -> cppcoro::task<>
-	{
-		std::vector<TASK<int&>> tasks;
-		tasks.emplace_back(makeTask(event1, value1));
-		tasks.emplace_back(makeTask(event2, value2));
+		auto makeTask = [](cppcoro::async_manual_reset_event& event, int& value) -> TASK<int&>
+		{
+			co_await event;
+			co_return value;
+		};
 
-		auto whenAllTask = cppcoro::when_all(std::move(tasks));
+		bool whenAllComplete = false;
 
-		std::vector<std::reference_wrapper<int>>& values = co_await whenAllTask;
-		REQUIRE(values.size() == 2);
-		CHECK(&values[0].get() == &value1);
-		CHECK(&values[1].get() == &value2);
+		cppcoro::sync_wait(cppcoro::when_all_ready(
+			[&]() -> cppcoro::task<>
+		{
+			std::vector<TASK<int&>> tasks;
+			tasks.emplace_back(makeTask(event1, value1));
+			tasks.emplace_back(makeTask(event2, value2));
 
-		whenAllComplete = true;
-	}(),
-		[&]() -> cppcoro::task<>
-	{
-		CHECK(!whenAllComplete);
-		event2.set();
-		CHECK(!whenAllComplete);
-		event1.set();
-		CHECK(whenAllComplete);
-		co_return;
-	}()));
+			auto whenAllTask = cppcoro::when_all(std::move(tasks));
+
+			std::vector<std::reference_wrapper<int>>& values = co_await whenAllTask;
+			REQUIRE(values.size() == 2);
+			CHECK(&values[0].get() == &value1);
+			CHECK(&values[1].get() == &value2);
+
+			whenAllComplete = true;
+		}(),
+			[&]() -> cppcoro::task<>
+		{
+			CHECK(!whenAllComplete);
+			event2.set();
+			CHECK(!whenAllComplete);
+			event1.set();
+			CHECK(whenAllComplete);
+			co_return;
+		}()));
+	}
 }
 
 TEST_CASE("when_all() with vector<task<T&>>")

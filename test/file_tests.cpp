@@ -23,48 +23,51 @@ TEST_SUITE_BEGIN("file");
 
 namespace fs = std::experimental::filesystem;
 
-class temp_dir_fixture : public io_service_fixture
+namespace
 {
-public:
-
-	temp_dir_fixture()
+	class temp_dir_fixture : public io_service_fixture
 	{
-		auto tempDir = fs::temp_directory_path();
+	public:
 
-		std::random_device random;
-		for (int attempt = 1;; ++attempt)
+		temp_dir_fixture()
 		{
-			m_path = tempDir / std::to_string(random());
-			try
+			auto tempDir = fs::temp_directory_path();
+
+			std::random_device random;
+			for (int attempt = 1;; ++attempt)
 			{
-				fs::create_directories(m_path);
-				return;
-			}
-			catch (const fs::filesystem_error&)
-			{
-				if (attempt == 10)
+				m_path = tempDir / std::to_string(random());
+				try
 				{
-					throw;
+					fs::create_directories(m_path);
+					return;
+				}
+				catch (const fs::filesystem_error&)
+				{
+					if (attempt == 10)
+					{
+						throw;
+					}
 				}
 			}
 		}
-	}
 
-	~temp_dir_fixture()
-	{
-		fs::remove_all(m_path);
-	}
+		~temp_dir_fixture()
+		{
+			fs::remove_all(m_path);
+		}
 
-	const std::experimental::filesystem::path& temp_dir()
-	{
-		return m_path;
-	}
+		const std::experimental::filesystem::path& temp_dir()
+		{
+			return m_path;
+		}
 
-private:
+	private:
 
-	std::experimental::filesystem::path m_path;
+		std::experimental::filesystem::path m_path;
 
-};
+	};
+}
 
 TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 {

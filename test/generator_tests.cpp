@@ -159,15 +159,18 @@ TEST_CASE("generator throwing after first element rethrows out of operator++")
 	}
 }
 
-template<typename FIRST, typename SECOND>
-auto concat(FIRST&& first, SECOND&& second)
+namespace
 {
-	using value_type = std::remove_reference_t<decltype(*first.begin())>;
-	return [](FIRST first, SECOND second) -> cppcoro::generator<value_type>
+	template<typename FIRST, typename SECOND>
+	auto concat(FIRST&& first, SECOND&& second)
 	{
-		for (auto&& x : first) co_yield x;
-		for (auto&& y : second) co_yield y;
-	}(std::forward<FIRST>(first), std::forward<SECOND>(second));
+		using value_type = std::remove_reference_t<decltype(*first.begin())>;
+		return [](FIRST first, SECOND second) -> cppcoro::generator<value_type>
+		{
+			for (auto&& x : first) co_yield x;
+			for (auto&& y : second) co_yield y;
+		}(std::forward<FIRST>(first), std::forward<SECOND>(second));
+	}
 }
 
 TEST_CASE("safe capture of r-value reference args")
@@ -190,11 +193,14 @@ TEST_CASE("safe capture of r-value reference args")
 	CHECK(s == "foobuzzbaz");
 }
 
-cppcoro::generator<int> range(int start, int end)
+namespace
 {
-	for (; start < end; ++start)
+	cppcoro::generator<int> range(int start, int end)
 	{
-		co_yield start;
+		for (; start < end; ++start)
+		{
+			co_yield start;
+		}
 	}
 }
 
