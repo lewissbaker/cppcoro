@@ -11,6 +11,7 @@
 
 #include "counted.hpp"
 
+#include <ostream>
 #include <string>
 
 #include "doctest/doctest.h"
@@ -242,6 +243,5 @@ TEST_CASE("shared_task<T> fmap operator")
 		co_return;
 	}()));
 }
-
 
 TEST_SUITE_END();
