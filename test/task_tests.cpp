@@ -65,7 +65,7 @@ TEST_CASE("awaiting task that completes asynchronously")
 
 		CHECK(!reachedBeforeEvent);
 
-		co_await cppcoro::when_all_ready(
+		(void)co_await cppcoro::when_all_ready(
 			[&]() -> cppcoro::task<>
 			{
 				co_await t;

@@ -72,7 +72,7 @@ TEST_CASE("multiple lockers")
 		// We'lll now queue up another one before releasing any more waiters
 		// to test the code-path that looks at the newly queued waiter list
 		// when the cache of waiters is exhausted.
-		co_await cppcoro::when_all_ready(f(d), check2());
+		(void)co_await cppcoro::when_all_ready(f(d), check2());
 	};
 
 	cppcoro::sync_wait(cppcoro::when_all_ready(
