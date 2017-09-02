@@ -8,6 +8,9 @@ import cake.path
 from cake.tools import compiler, script, env, project, variant
 
 includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
+  'awaitable_traits.hpp',
+  'is_awaitable.hpp',
+  'is_awaiter.hpp',
   'async_auto_reset_event.hpp',
   'async_manual_reset_event.hpp',
   'async_generator.hpp',
@@ -48,6 +51,8 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
   'continuation.hpp',
   'when_all_awaitable.hpp',
+  'get_awaiter.hpp',
+  'any.hpp',
   'unwrap_reference.hpp',
   'lightweight_manual_reset_event.hpp',
   ])
