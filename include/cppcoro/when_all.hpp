@@ -9,61 +9,25 @@
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/when_all_ready.hpp>
 
-#include <cppcoro/detail/unwrap_reference.hpp>
-#include <cppcoro/detail/when_all_awaitable.hpp>
+#include <cppcoro/detail/when_all_awaitable2.hpp>
 
 #include <tuple>
 #include <functional>
 #include <utility>
 #include <vector>
 #include <type_traits>
+#include <cassert>
 
 namespace cppcoro
 {
 	//////////
 	// Variadic when_all()
 
-	namespace detail
+	template<typename... AWAITABLES>
+	[[nodiscard]] auto when_all(AWAITABLES&&... awaitables)
 	{
-		template<typename T>
-		T&& move_if_not_reference_wrapper(T& value)
-		{
-			return std::move(value);
-		}
-
-		template<typename T>
-		T& move_if_not_reference_wrapper(std::reference_wrapper<T>& value)
-		{
-			return value.get();
-		}
-	}
-
-	inline task<std::tuple<>> when_all()
-	{
-		co_return std::tuple<>{};
-	}
-
-	template<typename TASK>
-	task<std::tuple<typename detail::unwrap_reference_t<TASK>::value_type>> when_all(TASK task)
-	{
-		// Specialisation for one task parameter that avoids use of atomics as no synchronisation
-		// is required.
-		co_return std::tuple<typename detail::unwrap_reference_t<TASK>::value_type>{ co_await std::move(task) };
-	}
-
-	template<typename... TASKS>
-	[[nodiscard]]
-	task<std::tuple<typename detail::unwrap_reference_t<TASKS>::value_type...>> when_all(TASKS... tasks)
-	{
-		detail::when_all_awaitable awaitable{ sizeof...(TASKS) };
-
-		const std::initializer_list<int> dummy = {
-			(std::ref(tasks).get().get_starter().start(awaitable.get_continuation()), 0)...,
-			(co_await awaitable, 0)
-		};
-
-		co_return std::tuple<typename detail::unwrap_reference_t<TASKS>::value_type...>{
-			co_await detail::move_if_not_reference_wrapper(tasks)...
+		return detail::when_all_awaitable2<std::remove_reference_t<AWAITABLES>...>{
+			std::forward<AWAITABLES>(awaitables)...
 		};
 	}
 
