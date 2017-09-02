@@ -53,6 +53,7 @@ detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 
   'when_all_awaitable.hpp',
   'get_awaiter.hpp',
   'any.hpp',
+  'sync_wait_task.hpp',
   'unwrap_reference.hpp',
   'lightweight_manual_reset_event.hpp',
   ])

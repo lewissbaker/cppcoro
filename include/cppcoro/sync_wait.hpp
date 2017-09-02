@@ -6,32 +6,23 @@
 #define CPPCORO_SYNC_WAIT_HPP_INCLUDED
 
 #include <cppcoro/detail/lightweight_manual_reset_event.hpp>
-#include <cppcoro/detail/continuation.hpp>
+#include <cppcoro/detail/sync_wait_task.hpp>
+#include <cppcoro/awaitable_traits.hpp>
 
 #include <cstdint>
 #include <atomic>
 
 namespace cppcoro
 {
-	template<typename TASK>
-	decltype(auto) sync_wait(TASK&& task)
+	template<typename AWAITABLE>
+	auto sync_wait(AWAITABLE&& awaitable)
+		-> typename cppcoro::awaitable_traits<AWAITABLE&&>::await_result_t
 	{
-		if (!task.is_ready())
-		{
-			detail::lightweight_manual_reset_event event;
-
-			auto callback = [](void* state)
-			{
-				static_cast<detail::lightweight_manual_reset_event*>(state)->set();
-			};
-
-			auto starter = task.get_starter();
-			starter.start(cppcoro::detail::continuation{ callback, &event });
-
-			event.wait();
-		}
-
-		return std::forward<TASK>(task).operator co_await().await_resume();
+		auto task = detail::make_sync_wait_task<AWAITABLE&&>(awaitable);
+		detail::lightweight_manual_reset_event event;
+		task.start(event);
+		event.wait();
+		return task.result();
 	}
 }
 
