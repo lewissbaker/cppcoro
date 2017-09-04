@@ -108,6 +108,8 @@ namespace cppcoro
 		template<>
 		class when_all_task_promise<void>
 		{
+		public:
+
 			using reference = void_value;
 
 			using coroutine_handle_t = std::experimental::coroutine_handle<when_all_task_promise<void>>;
