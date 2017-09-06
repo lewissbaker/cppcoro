@@ -131,8 +131,8 @@ namespace cppcoro
 				, m_tasks(make_when_all_task(static_cast<AWAITABLES&&>(awaitables))...)
 			{}
 
-			when_all_awaitable2(when_all_awaitable2&& other)
-				: m_counter(other.m_counter.load(std::memory_order_relaxed))
+			when_all_awaitable2(when_all_awaitable2&& other) noexcept
+				: m_counter(sizeof...(AWAITABLES))
 				, m_tasks(std::move(other.m_tasks))
 			{
 			}
