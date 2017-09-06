@@ -46,7 +46,8 @@ namespace cppcoro
 
 				auto await_ready()
 				{
-					return static_cast<awaiter_t&&>(m_awaiter).await_ready(); }
+					return static_cast<awaiter_t&&>(m_awaiter).await_ready();
+				}
 
 #if CPPCORO_COMPILER_CLANG
 				// HACK: Work around bug in clang that complains about return
@@ -79,7 +80,16 @@ namespace cppcoro
 
 				auto await_resume()
 				{
-					return std::make_tuple(static_cast<awaiter_t&&>(m_awaiter).await_resume());
+					using await_result_t = typename cppcoro::awaitable_traits<AWAITABLE&&>::await_result_t;
+					if constexpr (std::is_void_v<await_result_t>)
+					{
+						static_cast<awaiter_t&&>(m_awaiter).await_resume();
+						return std::make_tuple(void_value{});
+					}
+					else
+					{
+						return std::make_tuple(static_cast<awaiter_t&&>(m_awaiter).await_resume());
+					}
 				}
 
 			private:

@@ -128,6 +128,45 @@ TEST_CASE("when_all() throws if any task throws")
 	}());
 }
 
+TEST_CASE("when_all() with task<void>")
+{
+	int voidTaskCount = 0;
+	auto makeVoidTask = [&]() -> cppcoro::task<>
+	{
+		++voidTaskCount;
+		co_return;
+	};
+
+	auto makeIntTask = [](int x) -> cppcoro::task<int>
+	{
+		co_return x;
+	};
+
+	// Single void task in when_all()
+	auto[x] = cppcoro::sync_wait(cppcoro::when_all(makeVoidTask()));
+	(void)x;
+	CHECK(voidTaskCount == 1);
+
+	// Multiple void tasks in when_all()
+	auto[a, b] = cppcoro::sync_wait(cppcoro::when_all(
+		makeVoidTask(),
+		makeVoidTask()));
+	(void)a;
+	(void)b;
+	CHECK(voidTaskCount == 3);
+
+	// Mixing void and non-void tasks in when_all()
+	auto[v1, i, v2] = cppcoro::sync_wait(cppcoro::when_all(
+		makeVoidTask(),
+		makeIntTask(123),
+		makeVoidTask()));
+	(void)v1;
+	(void)v2;
+	CHECK(voidTaskCount == 5);
+
+	CHECK(i == 123);
+}
+
 TEST_CASE("when_all() with vector<task<>>")
 {
 	int startedCount = 0;
