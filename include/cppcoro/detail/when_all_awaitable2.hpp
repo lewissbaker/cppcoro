@@ -26,7 +26,7 @@ namespace cppcoro
 		public:
 
 			bool await_ready() const noexcept { return true; }
-			void await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> awaiter) {}
+			void await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> awaiter) noexcept {}
 			std::tuple<> await_resume() const noexcept { return {}; }
 
 		};
