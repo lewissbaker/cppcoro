@@ -101,7 +101,7 @@ namespace cppcoro
 
 			when_all_awaitable_counter* m_counter;
 			std::exception_ptr m_exception;
-			std::remove_reference_t<RESULT>* m_result;
+			std::add_pointer_t<RESULT> m_result;
 
 		};
 
