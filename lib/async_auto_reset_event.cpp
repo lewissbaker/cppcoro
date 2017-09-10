@@ -261,16 +261,15 @@ bool cppcoro::async_auto_reset_event_operation::await_suspend(
 	// visible to anyone that acquires the lock.
 	// Needs to be 'acquire' in case we acquired the lock so we can see
 	// others' writes to m_newWaiters and writes prior to set() calls.
-	constexpr std::uint64_t waiterIncrement = std::uint64_t(1) << 32;
 	const std::uint64_t oldState =
-		m_event->m_state.fetch_add(waiterIncrement, std::memory_order_acq_rel);
+		m_event->m_state.fetch_add(local::waiter_increment, std::memory_order_acq_rel);
 
 	if (oldState != 0 && local::get_waiter_count(oldState) == 0)
 	{
 		// We transitioned from non-zero set and zero waiters to
 		// non-zero set and non-zero waiters, so we acquired the lock
 		// and thus responsibility for resuming waiters.
-		m_event->resume_waiters(oldState + waiterIncrement);
+		m_event->resume_waiters(oldState + local::waiter_increment);
 	}
 
 	// Decrement the ref-count to indicate that this waiter is now safe
