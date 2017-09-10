@@ -12,6 +12,9 @@
 # include <cstdint>
 #elif CPPCORO_OS_WINNT
 # include <cppcoro/detail/win32.hpp>
+#else
+# include <mutex>
+# include <condition_variable>
 #endif
 
 namespace cppcoro
@@ -42,6 +45,14 @@ namespace cppcoro
 #elif CPPCORO_OS_WINNT
 			// Before Windows 8 we need to use a WIN32 manual reset event.
 			cppcoro::detail::win32::handle_t m_eventHandle;
+#else
+			// For other platforms that don't have a native futex
+			// or manual reset event we can just use a std::mutex
+			// and std::condition_variable to perform the wait.
+			// Not so lightweight, but should be portable to all platforms.
+			std::mutex m_mutex;
+			std::condition_variable m_cv;
+			bool m_isSet;
 #endif
 		};
 	}
