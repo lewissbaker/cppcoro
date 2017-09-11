@@ -5,7 +5,7 @@
 #ifndef CPPCORO_DETAIL_GET_AWAITER_HPP_INCLUDED
 #define CPPCORO_DETAIL_GET_AWAITER_HPP_INCLUDED
 
-#include <cppcoro/is_awaiter.hpp>
+#include <cppcoro/detail/is_awaiter.hpp>
 #include <cppcoro/detail/any.hpp>
 
 namespace cppcoro
@@ -28,7 +28,9 @@ namespace cppcoro
 			return operator co_await(static_cast<T&&>(value));
 		}
 
-		template<typename T, std::enable_if_t<cppcoro::is_awaiter<T&&>::value, int> = 0>
+		template<
+			typename T,
+			std::enable_if_t<cppcoro::detail::is_awaiter<T&&>::value, int> = 0>
 		T&& get_awaiter_impl(T&& value, cppcoro::detail::any) noexcept
 		{
 			return static_cast<T&&>(value);
