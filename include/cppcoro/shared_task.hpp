@@ -6,10 +6,12 @@
 #define CPPCORO_SHARED_LAZY_TASK_HPP_INCLUDED
 
 #include <cppcoro/config.hpp>
+#include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cppcoro/detail/continuation.hpp>
+#include <cppcoro/detail/remove_rvalue_reference.hpp>
 
 #include <atomic>
 #include <exception>
@@ -541,36 +543,11 @@ namespace cppcoro
 		}
 	}
 
-	template<typename T>
-	shared_task<T> make_shared_task(task<T> t)
+	template<typename AWAITABLE>
+	auto make_shared_task(AWAITABLE awaitable)
+		-> shared_task<detail::remove_rvalue_reference_t<typename awaitable_traits<AWAITABLE>::await_result_t>>
 	{
-		co_return co_await std::move(t);
-	}
-
-#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019 || CPPCORO_COMPILER_CLANG
-	// HACK: Workaround for broken MSVC that doesn't execute <expr> in 'co_return <expr>;'.
-	inline shared_task<void> make_shared_task(task<void> t)
-	{
-		co_await t;
-	}
-#endif
-
-	// Note: We yield a task<> when applying fmap() operator to a shared_task<> since
-	// it's not necessarily the case that because the source task was shared that the
-	// result will be used in a shared context. So we choose to return a task<> which
-	// generally has less overhead than a shared_task<>.
-
-	template<typename FUNC, typename T>
-	task<std::result_of_t<FUNC&&(T&)>> fmap(FUNC func, shared_task<T> task)
-	{
-		co_return std::invoke(std::move(func), co_await std::move(task));
-	}
-
-	template<typename FUNC>
-	task<std::result_of_t<FUNC&&()>> fmap(FUNC func, shared_task<void> task)
-	{
-		co_await task;
-		co_return std::invoke(std::move(func));
+		co_return co_await static_cast<AWAITABLE&&>(awaitable);
 	}
 }
 

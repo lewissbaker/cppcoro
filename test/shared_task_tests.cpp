@@ -8,6 +8,7 @@
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all_ready.hpp>
 #include <cppcoro/single_consumer_event.hpp>
+#include <cppcoro/fmap.hpp>
 
 #include "counted.hpp"
 
@@ -203,7 +204,7 @@ TEST_CASE("shared_task<void> fmap operator")
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		[&]() -> cppcoro::task<>
 	{
-		cppcoro::task<std::string> numericStringTask =
+		auto numericStringTask =
 			setNumber()
 			| cppcoro::fmap([&]() { return std::to_string(value); });
 
@@ -231,7 +232,7 @@ TEST_CASE("shared_task<T> fmap operator")
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		[&]() -> cppcoro::task<>
 	{
-		cppcoro::task<std::string> numericStringTask =
+		auto numericStringTask =
 			getNumber()
 			| cppcoro::fmap([](int x) { return std::to_string(x); });
 

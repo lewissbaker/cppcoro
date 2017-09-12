@@ -7,6 +7,7 @@
 #include <cppcoro/single_consumer_event.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all_ready.hpp>
+#include <cppcoro/fmap.hpp>
 
 #include "counted.hpp"
 
@@ -203,8 +204,6 @@ TEST_CASE("task<void> fmap pipe operator")
 
 	auto t = f() | fmap([] { return 123; });
 
-	CHECK(!t.is_ready());
-
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		[&]() -> cppcoro::task<>
 		{
@@ -215,8 +214,6 @@ TEST_CASE("task<void> fmap pipe operator")
 			event.set();
 			co_return;
 		}()));
-
-	CHECK(t.is_ready());
 }
 
 TEST_CASE("task<int> fmap pipe operator")
@@ -224,6 +221,7 @@ TEST_CASE("task<int> fmap pipe operator")
 	using cppcoro::task;
 	using cppcoro::fmap;
 	using cppcoro::sync_wait;
+	using cppcoro::make_task;
 
 	auto one = [&]() -> task<int>
 	{
@@ -232,8 +230,8 @@ TEST_CASE("task<int> fmap pipe operator")
 
 	SUBCASE("r-value fmap / r-value lambda")
 	{
-		task<int> t = one() | fmap([delta = 1](auto i) { return i + delta; });
-		CHECK(!t.is_ready());
+		auto t = one()
+			| fmap([delta = 1](auto i) { return i + delta; });
 		CHECK(sync_wait(t) == 2);
 	}
 
@@ -241,20 +239,17 @@ TEST_CASE("task<int> fmap pipe operator")
 	{
 		using namespace std::string_literals;
 
-		task<std::string> t;
-
+		auto t = [&]
 		{
 			auto f = [prefix = "pfx"s](int x)
 			{
 				return prefix + std::to_string(x);
 			};
 
-			// Want to make sure that the resulting task has taken
+			// Want to make sure that the resulting awaitable has taken
 			// a copy of the lambda passed to fmap().
-			t = one() | fmap(f);
-		}
-
-		CHECK(!t.is_ready());
+			return one() | fmap(f);
+		}();
 
 		CHECK(sync_wait(t) == "pfx1");
 	}
@@ -263,20 +258,17 @@ TEST_CASE("task<int> fmap pipe operator")
 	{
 		using namespace std::string_literals;
 
-		task<std::string> t;
-
+		auto t = [&]
 		{
 			auto addprefix = fmap([prefix = "a really really long prefix that prevents small string optimisation"s](int x)
 			{
 				return prefix + std::to_string(x);
 			});
 
-			// Want to make sure that the resulting task has taken
+			// Want to make sure that the resulting awaitable has taken
 			// a copy of the lambda passed to fmap().
-			t = one() | addprefix;
-		}
-
-		CHECK(!t.is_ready());
+			return one() | addprefix;
+		}();
 
 		CHECK(sync_wait(t) == "a really really long prefix that prevents small string optimisation1");
 	}
@@ -297,7 +289,7 @@ TEST_CASE("task<int> fmap pipe operator")
 
 			// Want to make sure that the resulting task has taken
 			// a copy of the lambda passed to fmap().
-			t = one() | addprefix;
+			t = make_task(one() | addprefix);
 		}
 
 		CHECK(!t.is_ready());
@@ -330,8 +322,6 @@ TEST_CASE("chained fmap pipe operations")
 	};
 
 	auto t = asyncString("base"s) | prepend("pre_"s) | append("_post"s);
-
-	CHECK(!t.is_ready());
 
 	CHECK(sync_wait(t) == "pre_base_post");
 }

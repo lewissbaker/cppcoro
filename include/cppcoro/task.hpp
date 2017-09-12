@@ -6,10 +6,11 @@
 #define CPPCORO_LAZY_TASK_HPP_INCLUDED
 
 #include <cppcoro/config.hpp>
+#include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/broken_promise.hpp>
-#include <cppcoro/fmap.hpp>
 
 #include <cppcoro/detail/continuation.hpp>
+#include <cppcoro/detail/remove_rvalue_reference.hpp>
 
 #include <atomic>
 #include <exception>
@@ -451,29 +452,11 @@ namespace cppcoro
 		}
 	}
 
-	// fmap() overloads for task<T>
-
-	template<typename FUNC, typename T>
-	task<std::result_of_t<FUNC&&(T&&)>> fmap(FUNC func, task<T> t)
+	template<typename AWAITABLE>
+	auto make_task(AWAITABLE awaitable)
+		-> task<detail::remove_rvalue_reference_t<typename awaitable_traits<AWAITABLE>::await_result_t>>
 	{
-		static_assert(
-			!std::is_reference_v<FUNC>,
-			"Passing by reference to task<T> coroutine is unsafe. "
-			"Use std::ref or std::cref to explicitly pass by reference.");
-
-		co_return std::invoke(std::move(func), co_await std::move(t));
-	}
-
-	template<typename FUNC>
-	task<std::result_of_t<FUNC&&()>> fmap(FUNC func, task<> t)
-	{
-		static_assert(
-			!std::is_reference_v<FUNC>,
-			"Passing by reference to task<T> coroutine is unsafe. "
-			"Use std::ref or std::cref to explicitly pass by reference.");
-
-		co_await t;
-		co_return std::invoke(std::move(func));
+		co_return co_await static_cast<AWAITABLE&&>(awaitable);
 	}
 }
 
