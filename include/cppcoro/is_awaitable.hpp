@@ -18,6 +18,9 @@ namespace cppcoro
 	struct is_awaitable<T, std::void_t<decltype(cppcoro::detail::get_awaiter(std::declval<T>()))>>
 		: std::true_type
 	{};
+
+	template<typename T>
+	constexpr bool is_awaitable_v = is_awaitable<T>::value;
 }
 
 #endif
