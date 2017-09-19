@@ -678,7 +678,7 @@ std::set<std::string> values;
 
 cppcoro::task<> add_item(std::string value)
 {
-  cppcoro::async_mutex_lock lock = co_await mutex;
+  cppcoro::async_mutex_lock lock = co_await mutex.scoped_lock_async();
   values.insert(std::move(value));
 }
 ```
