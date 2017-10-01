@@ -49,34 +49,11 @@ namespace cppcoro
 					return static_cast<awaiter_t&&>(m_awaiter).await_ready();
 				}
 
-#if CPPCORO_COMPILER_CLANG
-				// HACK: Work around bug in clang that complains about return
-				// type of 'auto await_suspend()' where return-value is deduced
-				// to 'bool', saying that it must be 'void' or 'bool'.
-				template<
-					typename PROMISE,
-					std::enable_if_t<std::is_void_v<decltype(std::declval<awaiter_t&&>().await_suspend(std::declval<std::experimental::coroutine_handle<PROMISE>&>()))>, int> = 0>
-				void await_suspend(std::experimental::coroutine_handle<PROMISE> awaitingCoroutine)
-				{
-					static_cast<awaiter_t&&>(m_awaiter).await_suspend(awaitingCoroutine);
-				}
-
-				template<
-					typename PROMISE,
-					std::enable_if_t<std::is_same_v<bool, decltype(std::declval<awaiter_t&&>().await_suspend(std::declval<std::experimental::coroutine_handle<PROMISE>&>()))>, int> = 0>
-				bool await_suspend(std::experimental::coroutine_handle<PROMISE> awaitingCoroutine)
-				{
-					return static_cast<awaiter_t&&>(m_awaiter).await_suspend(awaitingCoroutine);
-				}
-
-#else
-
 				template<typename PROMISE>
 				auto await_suspend(std::experimental::coroutine_handle<PROMISE> awaitingCoroutine)
 				{
 					return static_cast<awaiter_t&&>(m_awaiter).await_suspend(awaitingCoroutine);
 				}
-#endif
 
 				auto await_resume()
 				{
