@@ -209,13 +209,18 @@ namespace cppcoro
 
 		};
 
+#if CPPCORO_COMPILER_MSVC <= 191125506
+		// HACK: Work around bug in MSVC where passing a parameter by universal reference
+		// results in an error when passed a move-only type, complaining that the copy-constructor
+		// has been deleted. The parameter should be passed by reference and the compiler should
+		// notcalling the copy-constructor for the argument
 		template<
 			typename AWAITABLE,
 			typename RESULT = typename cppcoro::awaitable_traits<AWAITABLE&&>::await_result_t,
 			std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
 		sync_wait_task<RESULT> make_sync_wait_task(AWAITABLE& awaitable)
 		{
-			co_yield co_await static_cast<AWAITABLE&&>(awaitable);
+			co_yield co_await std::forward<AWAITABLE>(awaitable);
 		}
 
 		template<
@@ -224,8 +229,27 @@ namespace cppcoro
 			std::enable_if_t<std::is_void_v<RESULT>, int> = 0>
 		sync_wait_task<void> make_sync_wait_task(AWAITABLE& awaitable)
 		{
-			co_await static_cast<AWAITABLE&&>(awaitable);
+			co_await std::forward<AWAITABLE>(awaitable);
 		}
+#else
+		template<
+			typename AWAITABLE,
+			typename RESULT = typename cppcoro::awaitable_traits<AWAITABLE&&>::await_result_t,
+			std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
+		sync_wait_task<RESULT> make_sync_wait_task(AWAITABLE&& awaitable)
+		{
+			co_yield co_await std::forward<AWAITABLE>(awaitable);
+		}
+
+		template<
+			typename AWAITABLE,
+			typename RESULT = typename cppcoro::awaitable_traits<AWAITABLE&&>::await_result_t,
+			std::enable_if_t<std::is_void_v<RESULT>, int> = 0>
+		sync_wait_task<void> make_sync_wait_task(AWAITABLE&& awaitable)
+		{
+			co_await std::forward<AWAITABLE>(awaitable);
+		}
+#endif
 	}
 }
 
