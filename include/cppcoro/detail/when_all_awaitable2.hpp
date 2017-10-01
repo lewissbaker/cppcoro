@@ -57,15 +57,16 @@ namespace cppcoro
 
 				auto await_resume()
 				{
-					using await_result_t = typename cppcoro::awaitable_traits<AWAITABLE&&>::await_result_t;
+					using await_result_t = decltype(static_cast<awaiter_t&&>(m_awaiter).await_resume());
 					if constexpr (std::is_void_v<await_result_t>)
 					{
 						static_cast<awaiter_t&&>(m_awaiter).await_resume();
-						return std::make_tuple(void_value{});
+						return std::tuple<void_value>{};
 					}
 					else
 					{
-						return std::make_tuple(static_cast<awaiter_t&&>(m_awaiter).await_resume());
+						return std::make_tuple(
+							static_cast<awaiter_t&&>(m_awaiter).await_resume());
 					}
 				}
 
@@ -141,7 +142,7 @@ namespace cppcoro
 			template<std::size_t... INDICES>
 			auto get_result(std::integer_sequence<std::size_t, INDICES...>)
 			{
-				return std::make_tuple(std::get<INDICES>(m_tasks).result()...);
+				return std::make_tuple(std::get<INDICES>(m_tasks).non_void_result()...);
 			}
 
 			template<std::size_t... INDICES>

@@ -17,11 +17,17 @@ namespace cppcoro
 {
 	namespace detail
 	{
+		template<typename... AWAITABLES>
+		class when_all_awaitable2;
+
+		template<typename... AWAITABLES>
+		class when_all_ready_awaitable;
+
 		template<typename RESULT>
 		class when_all_task;
 
 		template<typename RESULT>
-		class when_all_task_promise
+		class when_all_task_promise final
 		{
 		public:
 
@@ -106,11 +112,9 @@ namespace cppcoro
 		};
 
 		template<>
-		class when_all_task_promise<void>
+		class when_all_task_promise<void> final
 		{
 		public:
-
-			using reference = void_value;
 
 			using coroutine_handle_t = std::experimental::coroutine_handle<when_all_task_promise<void>>;
 
@@ -162,14 +166,12 @@ namespace cppcoro
 				coroutine_handle_t::from_promise(*this).resume();
 			}
 
-			reference result()
+			void result()
 			{
 				if (m_exception)
 				{
 					std::rethrow_exception(m_exception);
 				}
-
-				return void_value{};
 			}
 
 		private:
@@ -204,17 +206,36 @@ namespace cppcoro
 			when_all_task(const when_all_task&) = delete;
 			when_all_task& operator=(const when_all_task&) = delete;
 
-			void start(when_all_awaitable_counter& counter) noexcept
-			{
-				m_coroutine.promise().start(counter);
-			}
-
 			decltype(auto) result()
 			{
 				return m_coroutine.promise().result();
 			}
 
+			decltype(auto) non_void_result()
+			{
+				if constexpr (std::is_void_v<decltype(this->result())>)
+				{
+					this->result();
+					return void_value{};
+				}
+				else
+				{
+					return this->result();
+				}
+			}
+
 		private:
+
+			template<typename... AWAITABLES>
+			friend class when_all_awaitable2;
+
+			template<typename... AWAITABLES>
+			friend class when_all_ready_awaitable;
+
+			void start(when_all_awaitable_counter& counter) noexcept
+			{
+				m_coroutine.promise().start(counter);
+			}
 
 			coroutine_handle_t m_coroutine;
 

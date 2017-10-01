@@ -9,6 +9,7 @@
 #include <cppcoro/shared_task.hpp>
 
 #include <cppcoro/detail/when_all_awaitable.hpp>
+#include <cppcoro/detail/when_all_ready_awaitable.hpp>
 
 #include <tuple>
 #include <functional>
@@ -17,40 +18,12 @@
 
 namespace cppcoro
 {
-	[[nodiscard]]
-	inline task<std::tuple<>> when_all_ready()
+	template<typename... AWAITABLES>
+	[[nodiscard]] auto when_all_ready(AWAITABLES&&... awaitables)
 	{
-		co_return std::tuple<>{};
-	}
-
-	template<typename TASK>
-	[[nodiscard]]
-	task<std::tuple<TASK>> when_all_ready(TASK task)
-	{
-		// Slightly more efficient implementation for single task case that avoids
-		// using atomics that are otherwise required to coordinate completion of
-		// multiple tasks in general version below.
-		co_await std::ref(task).get().when_ready();
-		co_return std::tuple<TASK>{ std::move(task) };
-	}
-
-	template<typename... TASKS>
-	[[nodiscard]]
-	task<std::tuple<TASKS...>> when_all_ready(TASKS... tasks)
-	{
-		detail::when_all_awaitable awaitable{ sizeof...(TASKS) };
-
-		// Use std::initializer_list trick here to force sequential ordering
-		// of evaluation of the arguments so that tasks are deterministically
-		// started in the order they are passed-in and the 'co_await' is
-		// evaluated last but before all of the temporary 'starter' objects
-		// are destructed.
-		const std::initializer_list<int> dummy = {
-			(std::ref(tasks).get().get_starter().start(awaitable.get_continuation()), 0)...,
-			(co_await awaitable, 0)
+		return detail::when_all_ready_awaitable<typename awaitable_traits<AWAITABLES>::await_result_t...>{
+			detail::make_when_all_task(std::forward<AWAITABLES>(awaitables))...
 		};
-
-		co_return std::tuple<TASKS...>{ std::move(tasks)... };
 	}
 
 	template<typename T>
