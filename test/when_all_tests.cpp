@@ -5,10 +5,12 @@
 
 #include <cppcoro/when_all.hpp>
 
-#include <cppcoro/task.hpp>
-#include <cppcoro/shared_task.hpp>
 #include <cppcoro/async_manual_reset_event.hpp>
+#include <cppcoro/async_mutex.hpp>
+#include <cppcoro/fmap.hpp>
+#include <cppcoro/shared_task.hpp>
 #include <cppcoro/sync_wait.hpp>
+#include <cppcoro/task.hpp>
 
 #include "counted.hpp"
 
@@ -66,6 +68,32 @@ TEST_CASE("when_all() with one arg")
 		CHECK(finished);
 		co_return;
 	}()));
+}
+
+TEST_CASE("when_all() with awaitables")
+{
+	cppcoro::sync_wait([]() -> cppcoro::task<>
+	{
+		auto makeTask = [](int x) -> cppcoro::task<int>
+		{
+			co_return x;
+		};
+
+		cppcoro::async_manual_reset_event event;
+		event.set();
+
+		cppcoro::async_mutex mutex;
+
+		auto[eventResult, mutexLock, number] = co_await cppcoro::when_all(
+			std::ref(event),
+			mutex.scoped_lock_async(),
+			makeTask(123) | cppcoro::fmap([](int x) { return x + 1; }));
+
+		(void)eventResult;
+		(void)mutexLock;
+		CHECK(number == 124);
+		CHECK(!mutex.try_lock());
+	}());
 }
 
 TEST_CASE("when_all() with all task types")
@@ -284,7 +312,7 @@ namespace
 
 			auto whenAllTask = cppcoro::when_all(std::move(tasks));
 
-			auto& values = co_await whenAllTask;
+			auto values = co_await whenAllTask;
 			REQUIRE(values.size() == 2);
 			CHECK(values[0] == 1);
 			CHECK(values[1] == 2);
@@ -341,7 +369,7 @@ namespace
 
 			auto whenAllTask = cppcoro::when_all(std::move(tasks));
 
-			std::vector<std::reference_wrapper<int>>& values = co_await whenAllTask;
+			std::vector<std::reference_wrapper<int>> values = co_await whenAllTask;
 			REQUIRE(values.size() == 2);
 			CHECK(&values[0].get() == &value1);
 			CHECK(&values[1].get() == &value2);

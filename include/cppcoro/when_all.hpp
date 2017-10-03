@@ -5,11 +5,12 @@
 #ifndef CPPCORO_WHEN_ALL_HPP_INCLUDED
 #define CPPCORO_WHEN_ALL_HPP_INCLUDED
 
-#include <cppcoro/task.hpp>
-#include <cppcoro/shared_task.hpp>
 #include <cppcoro/when_all_ready.hpp>
+#include <cppcoro/awaitable_traits.hpp>
+#include <cppcoro/is_awaitable.hpp>
+#include <cppcoro/fmap.hpp>
 
-#include <cppcoro/detail/when_all_awaitable2.hpp>
+#include <cppcoro/detail/unwrap_reference.hpp>
 
 #include <tuple>
 #include <functional>
@@ -23,110 +24,67 @@ namespace cppcoro
 	//////////
 	// Variadic when_all()
 
-	template<typename... AWAITABLES>
+	template<
+		typename... AWAITABLES,
+		std::enable_if_t<
+			std::conjunction_v<is_awaitable<detail::unwrap_reference_t<std::remove_reference_t<AWAITABLES>>>...>,
+			int> = 0>
 	[[nodiscard]] auto when_all(AWAITABLES&&... awaitables)
 	{
-		return detail::when_all_awaitable2<std::remove_reference_t<AWAITABLES>...>{
-			std::forward<AWAITABLES>(awaitables)...
-		};
+		return fmap([](auto&& taskTuple)
+		{
+			return std::apply([](auto&&... tasks) {
+				return std::make_tuple(static_cast<decltype(tasks)>(tasks).non_void_result()...);
+			}, static_cast<decltype(taskTuple)>(taskTuple));
+		}, when_all_ready(std::forward<AWAITABLES>(awaitables)...));
 	}
 
 	//////////
-	// when_all() with vector of task
+	// when_all() with vector of awaitable
 
+	template<
+		typename AWAITABLE,
+		typename RESULT = typename awaitable_traits<detail::unwrap_reference_t<AWAITABLE>>::await_result_t,
+		std::enable_if_t<std::is_void_v<RESULT>, int> = 0>
 	[[nodiscard]]
-	inline task<> when_all(std::vector<task<>> tasks)
+	auto when_all(std::vector<AWAITABLE> awaitables)
 	{
-		tasks = co_await when_all_ready(std::move(tasks));
-
-		// Now await each task so that any exceptions are rethrown.
-		for (auto& t : tasks)
-		{
-			co_await std::move(t);
-		}
+		return fmap([](auto&& taskVector) {
+			for (auto& task : taskVector)
+			{
+				task.result();
+			}
+		}, when_all_ready(std::move(awaitables)));
 	}
 
-	template<typename T>
+	template<
+		typename AWAITABLE,
+		typename RESULT = typename awaitable_traits<detail::unwrap_reference_t<AWAITABLE>>::await_result_t,
+		std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
 	[[nodiscard]]
-	task<std::vector<T>> when_all(std::vector<task<T>> tasks)
+	auto when_all(std::vector<AWAITABLE> awaitables)
 	{
-		tasks = co_await when_all_ready(std::move(tasks));
+		using result_t = std::conditional_t<
+			std::is_lvalue_reference_v<RESULT>,
+			std::reference_wrapper<std::remove_reference_t<RESULT>>,
+			std::remove_reference_t<RESULT>>;
 
-		std::vector<T> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<task<T&>> tasks)
-	{
-		tasks = co_await when_all_ready(std::move(tasks));
-
-		std::vector<std::reference_wrapper<T>> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
-	}
-
-	//////////
-	// when_all() with vector of shared_task
-
-	[[nodiscard]]
-	inline task<> when_all(std::vector<shared_task<>> tasks)
-	{
-		tasks = co_await when_all_ready(std::move(tasks));
-
-		// Now await each task so that any exceptions are rethrown.
-		for (auto& t : tasks)
-		{
-			co_await std::move(t);
-		}
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	task<std::vector<T>> when_all(std::vector<shared_task<T>> tasks)
-	{
-		tasks = co_await when_all_ready(std::move(tasks));
-
-		std::vector<T> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
-	}
-
-	template<typename T>
-	[[nodiscard]]
-	task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_task<T&>> tasks)
-	{
-		tasks = co_await when_all_ready(std::move(tasks));
-
-		std::vector<std::reference_wrapper<T>> results;
-		results.reserve(tasks.size());
-
-		for (auto& t : tasks)
-		{
-			results.emplace_back(co_await std::move(t));
-		}
-
-		co_return std::move(results);
+		return fmap([](auto&& taskVector) {
+			std::vector<result_t> results;
+			results.reserve(taskVector.size());
+			for (auto& task : taskVector)
+			{
+				if constexpr (std::is_rvalue_reference_v<decltype(taskVector)>)
+				{
+					results.emplace_back(std::move(task).result());
+				}
+				else
+				{
+					results.emplace_back(task.result());
+				}
+			}
+			return results;
+		}, when_all_ready(std::move(awaitables)));
 	}
 }
 

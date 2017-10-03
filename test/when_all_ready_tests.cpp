@@ -152,8 +152,7 @@ TEST_CASE("when_all_ready() with std::vector<task<T>>")
 		tasks.emplace_back(makeTask());
 	}
 
-	cppcoro::task<std::vector<cppcoro::task<>>> allTask =
-		cppcoro::when_all_ready(std::move(tasks));
+	auto allTask = cppcoro::when_all_ready(std::move(tasks));
 
 	// Shouldn't have started any tasks yet.
 	CHECK(startedCount == 0u);
@@ -162,11 +161,11 @@ TEST_CASE("when_all_ready() with std::vector<task<T>>")
 		[&]() -> cppcoro::task<>
 	{
 		auto resultTasks = co_await std::move(allTask);
-		CHECK(resultTasks .size() == 10u);
+		CHECK(resultTasks.size() == 10u);
 
 		for (auto& t : resultTasks)
 		{
-			CHECK(t.is_ready());
+			CHECK_NOTHROW(t.result());
 		}
 	}(),
 		[&]() -> cppcoro::task<>
@@ -202,8 +201,7 @@ TEST_CASE("when_all_ready() with std::vector<shared_task<T>>")
 		tasks.emplace_back(makeTask());
 	}
 
-	cppcoro::task<std::vector<cppcoro::shared_task<>>> allTask =
-		cppcoro::when_all_ready(std::move(tasks));
+	auto allTask = cppcoro::when_all_ready(std::move(tasks));
 
 	// Shouldn't have started any tasks yet.
 	CHECK(startedCount == 0u);
@@ -216,7 +214,7 @@ TEST_CASE("when_all_ready() with std::vector<shared_task<T>>")
 
 		for (auto& t : resultTasks)
 		{
-			CHECK(t.is_ready());
+			CHECK_NOTHROW(t.result());
 		}
 	}(),
 		[&]() -> cppcoro::task<>

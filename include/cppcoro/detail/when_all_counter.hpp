@@ -13,11 +13,11 @@ namespace cppcoro
 {
 	namespace detail
 	{
-		class when_all_awaitable_counter
+		class when_all_counter
 		{
 		public:
 
-			when_all_awaitable_counter(std::size_t count) noexcept
+			when_all_counter(std::size_t count) noexcept
 				: m_count(count + 1)
 				, m_awaitingCoroutine(nullptr)
 			{}

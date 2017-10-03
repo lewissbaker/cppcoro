@@ -17,10 +17,7 @@ namespace cppcoro
 {
 	namespace detail
 	{
-		template<typename... AWAITABLES>
-		class when_all_awaitable2;
-
-		template<typename... AWAITABLES>
+		template<typename TASK_CONTAINER>
 		class when_all_ready_awaitable;
 
 		template<typename RESULT>
@@ -30,8 +27,6 @@ namespace cppcoro
 		class when_all_task_promise final
 		{
 		public:
-
-			using reference = RESULT&&;
 
 			using coroutine_handle_t = std::experimental::coroutine_handle<when_all_task_promise<RESULT>>;
 
@@ -81,31 +76,41 @@ namespace cppcoro
 				assert(false);
 			}
 
-			auto yield_value(reference result) noexcept
+			auto yield_value(RESULT&& result) noexcept
 			{
 				m_result = std::addressof(result);
 				return final_suspend();
 			}
 
-			void start(when_all_awaitable_counter& counter) noexcept
+			void start(when_all_counter& counter) noexcept
 			{
 				m_counter = &counter;
 				coroutine_handle_t::from_promise(*this).resume();
 			}
 
-			reference result()
+			RESULT& result() &
+			{
+				rethrow_if_exception();
+				return *m_result;
+			}
+
+			RESULT&& result() &&
+			{
+				rethrow_if_exception();
+				return std::forward<RESULT>(*m_result);
+			}
+
+		private:
+
+			void rethrow_if_exception()
 			{
 				if (m_exception)
 				{
 					std::rethrow_exception(m_exception);
 				}
-
-				return static_cast<reference>(*m_result);
 			}
 
-		private:
-
-			when_all_awaitable_counter* m_counter;
+			when_all_counter* m_counter;
 			std::exception_ptr m_exception;
 			std::add_pointer_t<RESULT> m_result;
 
@@ -160,7 +165,7 @@ namespace cppcoro
 			{
 			}
 
-			void start(when_all_awaitable_counter& counter) noexcept
+			void start(when_all_counter& counter) noexcept
 			{
 				m_counter = &counter;
 				coroutine_handle_t::from_promise(*this).resume();
@@ -176,7 +181,7 @@ namespace cppcoro
 
 		private:
 
-			when_all_awaitable_counter* m_counter;
+			when_all_counter* m_counter;
 			std::exception_ptr m_exception;
 
 		};
@@ -206,12 +211,17 @@ namespace cppcoro
 			when_all_task(const when_all_task&) = delete;
 			when_all_task& operator=(const when_all_task&) = delete;
 
-			decltype(auto) result()
+			decltype(auto) result() &
 			{
 				return m_coroutine.promise().result();
 			}
 
-			decltype(auto) non_void_result()
+			decltype(auto) result() &&
+			{
+				return std::move(m_coroutine.promise()).result();
+			}
+
+			decltype(auto) non_void_result() &
 			{
 				if constexpr (std::is_void_v<decltype(this->result())>)
 				{
@@ -224,15 +234,25 @@ namespace cppcoro
 				}
 			}
 
+			decltype(auto) non_void_result() &&
+			{
+				if constexpr (std::is_void_v<decltype(this->result())>)
+				{
+					std::move(*this).result();
+					return void_value{};
+				}
+				else
+				{
+					return std::move(*this).result();
+				}
+			}
+
 		private:
 
-			template<typename... AWAITABLES>
-			friend class when_all_awaitable2;
-
-			template<typename... AWAITABLES>
+			template<typename TASK_CONTAINER>
 			friend class when_all_ready_awaitable;
 
-			void start(when_all_awaitable_counter& counter) noexcept
+			void start(when_all_counter& counter) noexcept
 			{
 				m_coroutine.promise().start(counter);
 			}
@@ -257,6 +277,24 @@ namespace cppcoro
 		when_all_task<void> make_when_all_task(AWAITABLE awaitable)
 		{
 			co_await static_cast<AWAITABLE&&>(awaitable);
+		}
+
+		template<
+			typename AWAITABLE,
+			typename RESULT = typename cppcoro::awaitable_traits<AWAITABLE&>::await_result_t,
+			std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
+		when_all_task<RESULT> make_when_all_task(std::reference_wrapper<AWAITABLE> awaitable)
+		{
+			co_yield co_await awaitable.get();
+		}
+
+		template<
+			typename AWAITABLE,
+			typename RESULT = typename cppcoro::awaitable_traits<AWAITABLE&>::await_result_t,
+			std::enable_if_t<std::is_void_v<RESULT>, int> = 0>
+		when_all_task<void> make_when_all_task(std::reference_wrapper<AWAITABLE> awaitable)
+		{
+			co_await awaitable.get();
 		}
 	}
 }
