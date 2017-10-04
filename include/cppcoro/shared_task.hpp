@@ -10,7 +10,6 @@
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
 
-#include <cppcoro/detail/continuation.hpp>
 #include <cppcoro/detail/remove_rvalue_reference.hpp>
 
 #include <atomic>
@@ -29,7 +28,7 @@ namespace cppcoro
 	{
 		struct shared_task_waiter
 		{
-			continuation m_continuation;
+			std::experimental::coroutine_handle<> m_continuation;
 			shared_task_waiter* m_next;
 		};
 
@@ -330,7 +329,7 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_waiter.m_continuation = detail::continuation{ awaiter };
+				m_waiter.m_continuation = awaiter;
 				return m_coroutine.promise().try_await(&m_waiter, m_coroutine);
 			}
 		};
@@ -446,37 +445,6 @@ namespace cppcoro
 			};
 
 			return awaitable{ m_coroutine };
-		}
-
-		auto get_starter() const noexcept
-		{
-			struct starter
-			{
-			public:
-
-				explicit starter(std::experimental::coroutine_handle<promise_type> coroutine)
-					: m_coroutine(coroutine)
-				{}
-
-				void start(detail::continuation c) noexcept
-				{
-					m_waiter.m_continuation = c;
-
-					if (!m_coroutine ||
-						m_coroutine.promise().is_ready() ||
-						!m_coroutine.promise().try_await(&m_waiter, m_coroutine))
-					{
-						// Task completed synchronously, resume immediately.
-						c.resume();
-					}
-				}
-
-			private:
-				std::experimental::coroutine_handle<promise_type> m_coroutine;
-				detail::shared_task_waiter m_waiter;
-			};
-
-			return starter{ m_coroutine };
 		}
 
 	private:

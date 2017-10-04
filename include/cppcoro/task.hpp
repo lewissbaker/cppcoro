@@ -9,7 +9,6 @@
 #include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/broken_promise.hpp>
 
-#include <cppcoro/detail/continuation.hpp>
 #include <cppcoro/detail/remove_rvalue_reference.hpp>
 
 #include <atomic>
@@ -75,9 +74,9 @@ namespace cppcoro
 				m_exception = std::current_exception();
 			}
 
-			bool try_set_continuation(continuation c)
+			bool try_set_continuation(std::experimental::coroutine_handle<> continuation)
 			{
-				m_continuation = c;
+				m_continuation = continuation;
 				return !m_state.exchange(true, std::memory_order_acq_rel);
 			}
 
@@ -103,7 +102,7 @@ namespace cppcoro
 
 		private:
 
-			continuation m_continuation;
+			std::experimental::coroutine_handle<> m_continuation;
 			std::exception_ptr m_exception;
 
 			// Initially false. Set to true when either a continuation is registered
@@ -277,10 +276,10 @@ namespace cppcoro
 				return !m_coroutine || m_coroutine.done();
 			}
 
-			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+			bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
 			{
 				m_coroutine.resume();
-				return m_coroutine.promise().try_set_continuation(detail::continuation{ awaiter });
+				return m_coroutine.promise().try_set_continuation(awaitingCoroutine);
 			}
 		};
 
@@ -391,39 +390,6 @@ namespace cppcoro
 			};
 
 			return awaitable{ m_coroutine };
-		}
-
-		// Internal helper method for when_all() implementation.
-		auto get_starter() const noexcept
-		{
-			class starter
-			{
-			public:
-
-				starter(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
-					: m_coroutine(coroutine)
-				{}
-
-				void start(detail::continuation continuation) noexcept
-				{
-					if (m_coroutine && !m_coroutine.done())
-					{
-						m_coroutine.resume();
-						if (m_coroutine.promise().try_set_continuation(continuation))
-						{
-							return;
-						}
-					}
-
-					continuation.resume();
-				}
-
-			private:
-
-				std::experimental::coroutine_handle<promise_type> m_coroutine;
-			};
-
-			return starter{ m_coroutine };
 		}
 
 	private:

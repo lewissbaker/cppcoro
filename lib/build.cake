@@ -48,7 +48,6 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   ])
 
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
-  'continuation.hpp',
   'void_value.hpp',
   'when_all_ready_awaitable.hpp',
   'when_all_counter.hpp',
