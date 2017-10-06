@@ -145,7 +145,7 @@ TEST_CASE("when_all() throws if any task throws")
 			// This could either throw X or Y exception.
 			// The exact exception that is thrown is not defined if multiple tasks throw an exception.
 			// TODO: Consider throwing some kind of aggregate_exception that collects all of the exceptions together.
-			co_await cppcoro::when_all(makeTask(0), makeTask(1), makeTask(2));
+			(void)co_await cppcoro::when_all(makeTask(0), makeTask(1), makeTask(2));
 		}
 		catch (const X&)
 		{
