@@ -5,6 +5,7 @@
 #ifndef CPPCORO_WHEN_ALL_READY_HPP_INCLUDED
 #define CPPCORO_WHEN_ALL_READY_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/is_awaitable.hpp>
 
@@ -23,7 +24,8 @@ namespace cppcoro
 		typename... AWAITABLES,
 		std::enable_if_t<std::conjunction_v<
 			is_awaitable<detail::unwrap_reference_t<std::remove_reference_t<AWAITABLES>>>...>, int> = 0>
-	[[nodiscard]] auto when_all_ready(AWAITABLES&&... awaitables)
+	[[nodiscard]]
+	CPPCORO_FORCE_INLINE auto when_all_ready(AWAITABLES&&... awaitables)
 	{
 		return detail::when_all_ready_awaitable<std::tuple<detail::when_all_task<
 			typename awaitable_traits<detail::unwrap_reference_t<std::remove_reference_t<AWAITABLES>>>::await_result_t>...>>(
