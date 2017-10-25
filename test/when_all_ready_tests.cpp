@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include <ostream>
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("when_all_ready");

@@ -9,6 +9,7 @@
 #include <cppcoro/when_all_ready.hpp>
 #include <cppcoro/sync_wait.hpp>
 
+#include <ostream>
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("async_mutex");
@@ -26,6 +27,7 @@ TEST_CASE("try_lock")
 	CHECK(mutex.try_lock());
 }
 
+#if 0
 TEST_CASE("multiple lockers")
 {
 	int value = 0;
@@ -83,5 +85,6 @@ TEST_CASE("multiple lockers")
 
 	CHECK(value == 4);
 }
+#endif
 
 TEST_SUITE_END();

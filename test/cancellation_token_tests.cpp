@@ -10,6 +10,7 @@
 
 #include <thread>
 
+#include <ostream>
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("cancellation_token tests");
