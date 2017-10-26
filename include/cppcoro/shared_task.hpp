@@ -34,71 +34,57 @@ namespace cppcoro
 
 		class shared_task_promise_base
 		{
+			friend struct final_awaiter;
+
+			struct final_awaiter
+			{
+				bool await_ready() const noexcept { return false; }
+
+				template<typename PROMISE>
+				void await_suspend(std::experimental::coroutine_handle<PROMISE> h) noexcept
+				{
+					shared_task_promise_base& promise = h.promise();
+
+					// Exchange operation needs to be 'release' so that subsequent awaiters have
+					// visibility of the result. Also needs to be 'acquire' so we have visibility
+					// of writes to the waiters list.
+					void* const valueReadyValue = &promise;
+					void* waiters = promise.m_waiters.exchange(valueReadyValue, std::memory_order_acq_rel);
+					if (waiters != nullptr)
+					{
+						shared_task_waiter* waiter = static_cast<shared_task_waiter*>(waiters);
+						while (waiter->m_next != nullptr)
+						{
+							// Read the m_next pointer before resuming the coroutine
+							// since resuming the coroutine may destroy the shared_task_waiter value.
+							auto* next = waiter->m_next;
+							waiter->m_continuation.resume();
+							waiter = next;
+						}
+
+						// Resume last waiter in tail position to allow it to potentially
+						// be compiled as a tail-call.
+						waiter->m_continuation.resume();
+					}
+				}
+
+				void await_resume() noexcept {}
+			};
+
 		public:
 
 			shared_task_promise_base() noexcept
 				: m_waiters(&this->m_waiters)
-				, m_refCount(2)
+				, m_refCount(1)
 				, m_exception(nullptr)
 			{}
 
-			auto initial_suspend() noexcept
-			{
-				return std::experimental::suspend_always{};
-			}
-
-			auto final_suspend() noexcept
-			{
-				struct awaitable
-				{
-					shared_task_promise_base& m_promise;
-
-					awaitable(shared_task_promise_base& promise) noexcept
-						: m_promise(promise)
-					{}
-
-					bool await_ready() const noexcept
-					{
-						return m_promise.m_refCount.load(std::memory_order_acquire) == 1;
-					}
-
-					bool await_suspend(std::experimental::coroutine_handle<>) noexcept
-					{
-						return m_promise.m_refCount.fetch_sub(1, std::memory_order_acq_rel) > 1;
-					}
-
-					void await_resume() noexcept
-					{}
-				};
-
-				// Exchange operation needs to be 'release' so that subsequent awaiters have
-				// visibility of the result. Also needs to be 'acquire' so we have visibility
-				// of writes to the waiters list.
-				void* const valueReadyValue = this;
-				void* waiters = m_waiters.exchange(valueReadyValue, std::memory_order_acq_rel);
-				if (waiters != nullptr)
-				{
-					shared_task_waiter* waiter = static_cast<shared_task_waiter*>(waiters);
-					do
-					{
-						// Read the m_next pointer before resuming the coroutine
-						// since resuming the coroutine may destroy the shared_task_waiter value.
-						auto* next = waiter->m_next;
-						waiter->m_continuation.resume();
-						waiter = next;
-					} while (waiter != nullptr);
-				}
-
-				return awaitable{ *this };
-			}
+			std::experimental::suspend_always initial_suspend() noexcept { return {}; }
+			final_awaiter final_suspend() noexcept { return {}; }
 
 			void unhandled_exception() noexcept
 			{
-				// No point capturing exception if no more references to the task.
-				if (m_refCount.load(std::memory_order_relaxed) > 1)
-				{
-					m_exception = std::current_exception();
-				}
+				m_exception = std::current_exception();
 			}
 
 			bool is_ready() const noexcept
@@ -120,7 +106,7 @@ namespace cppcoro
 			/// call destroy() on the coroutine handle.
 			bool try_detach() noexcept
 			{
-				return m_refCount.fetch_sub(1, std::memory_order_acq_rel) > 1;
+				return m_refCount.fetch_sub(1, std::memory_order_acq_rel) != 1;
 			}
 
 			/// Try to enqueue a waiter to the list of waiters.
@@ -157,7 +143,10 @@ namespace cppcoro
 				// Start the coroutine if not already started.
 				void* oldWaiters = m_waiters.load(std::memory_order_acquire);
 				if (oldWaiters == notStartedValue &&
-					m_waiters.compare_exchange_strong(oldWaiters, startedNoWaitersValue, std::memory_order_relaxed))
+				    m_waiters.compare_exchange_strong(
+				      oldWaiters,
+				      startedNoWaitersValue,
+				      std::memory_order_relaxed))
 				{
 					// Start the task executing.
 					coroutine.resume();
