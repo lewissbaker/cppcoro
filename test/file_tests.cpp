@@ -80,9 +80,10 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 		CHECK(f.size() == 0);
 
 		char buffer[1024];
-		for (int i = 0; i < sizeof(buffer); ++i)
+		char c = 'a';
+		for (int i = 0; i < sizeof(buffer); ++i, c = (c == 'z' ? 'a' : c + 1))
 		{
-			buffer[i] = 'a' + (i % 26);
+			buffer[i] = c;
 		}
 
 		for (int chunk = 0; chunk < 10; ++chunk)

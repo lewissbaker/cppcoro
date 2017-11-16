@@ -1,6 +1,6 @@
 # CppCoro - A coroutine library for C++
 
-The 'cppcoro' library provides a set of general-purpose primitives for making use of the coroutines TS proposal described in [N4628](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4628.pdf).
+The 'cppcoro' library provides a set of general-purpose primitives for making use of the coroutines TS proposal described in [N4680](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4680.pdf).
 
 These include:
 * Coroutine Types
@@ -2206,3 +2206,13 @@ ninja install
 ```
 
 This will build and install libc++ into the same install directory where you have clang installed.
+
+# Support
+
+GitHub issues are the primary mechanism for support, bug reports and feature requests.
+
+Contributions are welcome and pull-requests will be happily reviewed.
+I only ask that you agree to license any contributions that you make under the MIT license.
+
+If you have general questions about C++ coroutines, you can generally find someone to help
+in the `#coroutines` channel on [https://cpplang.slack.com/][Cpplang Slack] group.
