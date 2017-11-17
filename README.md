@@ -1,6 +1,6 @@
 # CppCoro - A coroutine library for C++
 
-The 'cppcoro' library provides a set of general-purpose primitives for making use of the coroutines TS proposal described in [N4628](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4628.pdf).
+The 'cppcoro' library provides a set of general-purpose primitives for making use of the coroutines TS proposal described in [N4680](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4680.pdf).
 
 These include:
 * Coroutine Types
@@ -11,6 +11,7 @@ These include:
   * `async_generator<T>`
 * Awaitable Types
   * `single_consumer_event`
+  * `single_consumer_auto_reset_event`
   * `async_mutex`
   * `async_manual_reset_event`
   * `async_auto_reset_event`
@@ -602,7 +603,70 @@ void producer()
 }
 ```
 
-## async_mutex
+## `single_consumer_async_auto_reset_event`
+
+This class provides an async synchronisation primitive that allows a single coroutine to
+wait until the event is signalled by a call to the `set()` method.
+
+Once the coroutine that is awaiting the event is released by either a prior or subsequent call to `set()`
+the event is automatically reset back to the 'not set' state.
+
+This class is a more efficient version of `async_auto_reset_event` that can be used in cases where
+only a single coroutine will be awaiting the event at a time. If you need to support multiple concurrent
+awaiting coroutines on the event then use the `async_auto_reset_event` class instead.
+
+API Summary:
+```c++
+// <cppcoro/single_consumer_async_auto_reset_event.hpp>
+namespace cppcoro
+{
+  class single_consumer_async_auto_reset_event
+  {
+  public:
+
+    single_consumer_async_auto_reset_event(
+      bool initiallySet = false) noexcept;
+
+    // Change the event to the 'set' state. If a coroutine is awaiting the
+    // event then the event is immediately transitioned back to the 'not set'
+    // state and the coroutine is resumed.
+    void set() noexcept;
+
+    // Returns an Awaitable type that can be awaited to wait until
+    // the event becomes 'set' via a call to the .set() method. If
+    // the event is already in the 'set' state then the coroutine
+    // continues without suspending.
+    // The event is automatically reset back to the 'not set' state
+    // before resuming the coroutine.
+    Awaitable<void> operator co_await() const noexcept;
+
+  };
+}
+```
+
+Example Usage:
+```c++
+std::atomic<int> value;
+cppcoro::single_consumer_async_auto_reset_event valueDecreasedEvent;
+
+cppcoro::task<> wait_until_value_is_below(int limit)
+{
+  while (value.load(std::memory_order_relaxed) >= limit)
+  {
+    // Wait until there has been some change that we're interested in.
+    co_await valueDecreasedEvent;
+  }
+}
+
+void change_value(int delta)
+{
+  value.fetch_add(delta, std::memory_order_relaxed);
+  // Notify the waiter if there has been some change.
+  if (delta < 0) valueDecreasedEvent.set();
+}
+```
+
+## `async_mutex`
 
 Provides a simple mutual exclusion abstraction that allows the caller to 'co_await' the mutex
 from within a coroutine to suspend the coroutine until the mutex lock is acquired.
@@ -681,7 +745,7 @@ std::set<std::string> values;
 
 cppcoro::task<> add_item(std::string value)
 {
-  cppcoro::async_mutex_lock lock = co_await mutex;
+  cppcoro::async_mutex_lock lock = co_await mutex.scoped_lock_async();
   values.insert(std::move(value));
 }
 ```
@@ -2255,3 +2319,13 @@ ninja install
 ```
 
 This will build and install libc++ into the same install directory where you have clang installed.
+
+# Support
+
+GitHub issues are the primary mechanism for support, bug reports and feature requests.
+
+Contributions are welcome and pull-requests will be happily reviewed.
+I only ask that you agree to license any contributions that you make under the MIT license.
+
+If you have general questions about C++ coroutines, you can generally find someone to help
+in the `#coroutines` channel on [https://cpplang.slack.com/][Cpplang Slack] group.

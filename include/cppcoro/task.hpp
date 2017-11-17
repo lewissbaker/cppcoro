@@ -226,32 +226,13 @@ namespace cppcoro
 	}
 
 	/// \brief
-	/// A lazy task represents an asynchronous operation that is not started
-	/// until it is first awaited.
+	/// A task represents an operation that produces a result both lazily
+	/// and asynchronously.
 	///
 	/// When you call a coroutine that returns a task, the coroutine
 	/// simply captures any passed parameters and returns exeuction to the
 	/// caller. Execution of the coroutine body does not start until the
 	/// coroutine is first co_await'ed.
-	///
-	/// Comparison with task<T>
-	/// -----------------------
-	/// The lazy task has lower overhead than cppcoro::task<T> as it does not
-	/// require the use of atomic operations to synchronise potential races
-	/// between the awaiting coroutine suspending and the coroutine completing.
-	///
-	/// The awaiting coroutine is suspended prior to the task being started
-	/// which means that when the task completes it can unconditionally
-	/// resume the awaiter.
-	///
-	/// One limitation of this approach is that if the task completes
-	/// synchronously then, unless the compiler is able to perform tail-calls,
-	/// the awaiting coroutine will be resumed inside a nested stack-frame.
-	/// This call lead to stack-overflow if long chains of tasks complete
-	/// synchronously.
-	///
-	/// The task<T> type does not have this issue as the awaiting coroutine is
-	/// not suspended in the case that the task completes synchronously.
 	template<typename T = void>
 	class task
 	{
@@ -278,6 +259,22 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
 			{
+				// NOTE: We are using the bool-returning version of await_suspend() here
+				// to work around a potential stack-overflow issue if a coroutine
+				// awaits many synchronously-completing tasks in a loop.
+				//
+				// We first start the task by calling resume() and then conditionally
+				// attach the continuation if it has not already completed. This allows us
+				// to immediately resume the awaiting coroutine without increasing
+				// the stack depth, avoiding the stack-overflow problem. However, it has
+				// the down-side of requiring a std::atomic to arbitrate the race between
+				// the coroutine potentially completing on another thread concurrently
+				// with registering the continuation on this thread.
+				//
+				// We can eliminate the use of the std::atomic once we have access to
+				// coroutine_handle-returning await_suspend() on both MSVC and Clang
+				// as this will provide ability to suspend the awaiting coroutine and
+				// resume another coroutine with a guaranteed tail-call to resume().
 				m_coroutine.resume();
 				return m_coroutine.promise().try_set_continuation(awaitingCoroutine);
 			}

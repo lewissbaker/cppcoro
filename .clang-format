@@ -1,0 +1,81 @@
+---
+BasedOnStyle: LLVM
+---
+Language: Cpp
+Standard: Cpp11
+ColumnLimit: 100
+TabWidth: 4
+IndentWidth: 4
+UseTab: ForContinuationAndIndentation
+AccessModifierOffset: -4
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+AlignOperands: false
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterReturnType: None
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BraceWrapping: {
+  AfterClass: true,
+  AfterControlStatement: true,
+  AfterEnum: true,
+  AfterFunction: true,
+  AfterNamespace: true,
+  AfterStruct: true,
+  AfterUnion: true,
+  BeforeCatch: true,
+  BeforeElse: true,
+  IndentBraces: false,
+  #SplitEmptyFunctionBody: false
+}
+BreakBeforeInheritanceComma: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeComma
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: false
+IncludeCategories:
+- Regex: '^<cppcoro/config.hpp>$'
+  Priority: 1
+- Regex: '^<cppcoro/detail/'
+  Priority: 3
+- Regex: '^<cppcoro/'
+  Priority: 2
+- Regex: '^"doctest/'
+  Priority: 7
+- Regex: '^"'
+  Priority: 4
+- Regex: '^<experimental/'
+  Priority: 6
+- Regex: '^<'
+  Priority: 5
+IndentCaseLabels: true
+#IndentPPDirectives: AfterHash
+IndentWrappedFunctionNames: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: All
+PointerAlignment: Left
+ReflowComments: true
+SortIncludes: true
+SortUsingDeclarations: true
+SpacesInSquareBrackets: false
+SpacesInParentheses: false
+SpaceInEmptyParentheses: false
+SpacesInCStyleCastParentheses: false
+SpaceAfterCStyleCast: false
+SpacesInAngles: false
+SpacesBeforeTrailingComments: 2
+SpaceBeforeParens: ControlStatements
+SpaceBeforeAssignmentOperators: true
+SpaceAfterTemplateKeyword: false
