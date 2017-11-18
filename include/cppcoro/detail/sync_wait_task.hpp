@@ -5,6 +5,7 @@
 #ifndef CPPCORO_DETAIL_SYNC_WAIT_TASK_HPP_INCLUDED
 #define CPPCORO_DETAIL_SYNC_WAIT_TASK_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/detail/lightweight_manual_reset_event.hpp>
 
@@ -209,7 +210,7 @@ namespace cppcoro
 
 		};
 
-#if CPPCORO_COMPILER_MSVC <= 191125506
+#if CPPCORO_COMPILER_MSVC
 		// HACK: Work around bug in MSVC where passing a parameter by universal reference
 		// results in an error when passed a move-only type, complaining that the copy-constructor
 		// has been deleted. The parameter should be passed by reference and the compiler should
