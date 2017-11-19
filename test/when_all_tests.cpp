@@ -5,6 +5,7 @@
 
 #include <cppcoro/when_all.hpp>
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/async_manual_reset_event.hpp>
 #include <cppcoro/async_mutex.hpp>
 #include <cppcoro/fmap.hpp>
@@ -337,7 +338,18 @@ TEST_CASE("when_all() with vector<task<T>>")
 	check_when_all_vector_of_task_value<cppcoro::task>();
 }
 
-TEST_CASE("when_all() with vector<shared_task<T>>")
+#if defined(CPPCORO_RELEASE_OPTIMISED)
+constexpr bool isOptimised = true;
+#else
+constexpr bool isOptimised = false;
+#endif
+
+// Disable test on MSVC x64 optimised due to bad codegen bug in
+// 'co_await whenAllTask' expression.
+// Issue reported to MS on 19/11/2017.
+TEST_CASE("when_all() with vector<shared_task<T>>"
+* doctest::skip(CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC <= 191225805 &&
+	            isOptimised && CPPCORO_CPU_X64))
 {
 	check_when_all_vector_of_task_value<cppcoro::shared_task>();
 }
@@ -389,12 +401,22 @@ namespace
 	}
 }
 
-TEST_CASE("when_all() with vector<task<T&>>")
+// Disable test on MSVC x64 optimised due to bad codegen bug in
+// 'co_await whenAllTask' expression.
+// Issue reported to MS on 19/11/2017.
+TEST_CASE("when_all() with vector<task<T&>>"
+	* doctest::skip(CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC <= 191225805 &&
+		isOptimised && CPPCORO_CPU_X64))
 {
 	check_when_all_vector_of_task_reference<cppcoro::task>();
 }
 
-TEST_CASE("when_all() with vector<shared_task<T&>>")
+// Disable test on MSVC x64 optimised due to bad codegen bug in
+// 'co_await whenAllTask' expression.
+// Issue reported to MS on 19/11/2017.
+TEST_CASE("when_all() with vector<shared_task<T&>>"
+	* doctest::skip(CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC <= 191225805 &&
+		isOptimised && CPPCORO_CPU_X64))
 {
 	check_when_all_vector_of_task_reference<cppcoro::shared_task>();
 }
