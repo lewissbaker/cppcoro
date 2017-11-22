@@ -2,8 +2,8 @@
 // Copyright (c) Lewis Baker
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
-#ifndef CPPCORO_LAZY_TASK_HPP_INCLUDED
-#define CPPCORO_LAZY_TASK_HPP_INCLUDED
+#ifndef CPPCORO_TASK_HPP_INCLUDED
+#define CPPCORO_TASK_HPP_INCLUDED
 
 #include <cppcoro/config.hpp>
 #include <cppcoro/broken_promise.hpp>
