@@ -2222,7 +2222,7 @@ header required to use C++ coroutines under Clang.
 
 Checkout `libc++` + `llvm`:
 ```
-mkdir llmv
+mkdir llvm
 cd llvm
 git clone --depth=1 https://github.com/llvm-mirror/llvm.git llvm
 git clone --depth=1 https://github.com/llvm-mirror/libcxx.git llvm/projects/libcxx
@@ -2237,7 +2237,7 @@ cmake -GNinja \
       -DCMAKE_CXX_COMPILER="/path/to/clang/install/bin/clang++" \
       -DCMAKE_C_COMPILER="/path/to/clang/install/bin/clang" \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install"
+      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install" \
       -DLLVM_PATH="../llvm" \
       -DLIBCXX_CXX_ABI=libstdc++ \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/usr/include/c++/6.3.0/;/usr/include/x86_64-linux-gnu/c++/6.3.0/" \
