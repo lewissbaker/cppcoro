@@ -15,6 +15,7 @@ These include:
   * `async_mutex`
   * `async_manual_reset_event`
   * `async_auto_reset_event`
+  * `async_latch`
 * Functions
   * `sync_wait()`
   * `when_all()`
@@ -895,6 +896,46 @@ namespace cppcoro
     bool await_ready() const noexcept;
     bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
     void await_resume() const noexcept;
+
+  };
+}
+```
+
+## `async_latch`
+
+An async latch is a synchronisation primitive that allows coroutines to asynchronously
+wait until a counter has been decremented to zero.
+
+The latch is a single-use object. Once the counter reaches zero the latch becomes 'ready'
+and will remain ready until the latch is destroyed.
+
+API Summary:
+```c++
+// <cppcoro/async_latch.hpp>
+namespace cppcoro
+{
+  class async_latch
+  {
+  public:
+
+    // Initialise the latch with the specified count.
+    async_latch(std::ptrdiff_t initialCount) noexcept;
+
+    // Query if the count has reached zero yet.
+    bool is_ready() const noexcept;
+
+    // Decrement the count by n.
+    // This will resume any waiting coroutines if the count reaches zero
+    // as a result of this call.
+    // It is undefined behaviour to decrement the count below zero.
+    void count_down(std::ptrdiff_t n = 1) noexcept;
+
+    // Wait until the latch becomes ready.
+    // If the latch count is not yet zero then the awaiting coroutine will
+    // be suspended and later resumed by a call to count_down() that decrements
+    // the count to zero. If the latch count was already zero then the coroutine
+    // continues without suspending.
+    Awaiter<void> operator co_await() const noexcept;
 
   };
 }

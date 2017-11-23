@@ -25,6 +25,7 @@ sources = script.cwd([
   'async_auto_reset_event_tests.cpp',
   'async_manual_reset_event_tests.cpp',
   'async_mutex_tests.cpp',
+  'async_latch_tests.cpp',
   'cancellation_token_tests.cpp',
   'task_tests.cpp',
   'shared_task_tests.cpp',
