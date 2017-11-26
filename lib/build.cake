@@ -20,6 +20,8 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'cancellation_source.hpp',
   'cancellation_token.hpp',
   'task.hpp',
+  'sequence_barrier.hpp',
+  'sequence_traits.hpp',
   'shared_task.hpp',
   'shared_task.hpp',
   'single_consumer_event.hpp',
