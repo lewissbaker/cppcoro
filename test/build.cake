@@ -32,6 +32,7 @@ sources = script.cwd([
   'shared_task_tests.cpp',
   'sync_wait_tests.cpp',
   'single_consumer_async_auto_reset_event_tests.cpp',
+  'single_producer_sequencer_tests.cpp',
   'when_all_tests.cpp',
   'when_all_ready_tests.cpp',
 ])

@@ -14,6 +14,7 @@ namespace cppcoro
 	{
 		using value_type = SEQUENCE;
 		using difference_type = std::make_signed_t<SEQUENCE>;
+		using size_type = std::make_unsigned_t<SEQUENCE>;
 
 		static constexpr value_type initial_sequence = static_cast<value_type>(-1);
 
