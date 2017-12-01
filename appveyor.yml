@@ -18,4 +18,7 @@ clone_script:
 - ps: git submodule update -q --init --recursive
 
 build_script:
-- cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=time,stack architecture=%PLATFORM% release=%CONFIGURATION% lib/build.cake"
+- cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=stack architecture=%PLATFORM% release=%CONFIGURATION% lib/build.cake test/build.cake@programs"
+
+test_script:
+- cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=stack architecture=%PLATFORM% release=%CONFIGURATION% test/build.cake"
