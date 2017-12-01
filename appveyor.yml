@@ -1,0 +1,15 @@
+
+version: 1.0.{build}
+
+image: Visual Studio 2017
+
+platform:
+- x64
+- x86
+
+configuration:
+- debug
+- optimised
+
+build_script:
+  cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=time,stack architecture=%PLATFORM% release=%CONFIGURATION% lib/build.cake"
