@@ -1,0 +1,24 @@
+
+version: 1.0.{build}
+
+image: Visual Studio 2017
+
+platform:
+- x64
+- x86
+
+configuration:
+- debug
+- optimised
+
+clone_script:
+- ps: git clone -q $("--branch=" + $env:APPVEYOR_REPO_BRANCH) $("https://github.com/" + $env:APPVEYOR_REPO_NAME + ".git") $env:APPVEYOR_BUILD_FOLDER
+- ps: if (!$env:APPVEYOR_PULL_REQUEST_NUMBER) {$("git checkout -qf " + $env:APPVEYOR_REPO_COMMIT)}
+- ps: if ($env:APPVEYOR_PULL_REQUEST_NUMBER) {git fetch -q origin +refs/pull/$($env:APPVEYOR_PULL_REQUEST_NUMBER)/merge; git checkout -qf FETCH_HEAD}
+- ps: git submodule update -q --init --recursive
+
+build_script:
+- cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=stack architecture=%PLATFORM% release=%CONFIGURATION% lib/build.cake test/build.cake@programs"
+
+test_script:
+- cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=stack architecture=%PLATFORM% release=%CONFIGURATION% test/build.cake"
