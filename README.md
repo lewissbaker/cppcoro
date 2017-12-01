@@ -41,7 +41,7 @@ It has been open-sourced in the hope that others will find it useful and that th
 can provide feedback on it and ways to improve it.
 
 It requires a compiler that supports the coroutines TS:
-- Windows + Visual Studio 2017
+- Windows + Visual Studio 2017 ![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/lewissbaker/cppcoro?branch=master&svg=true&passingText=master%20-%20OK&failingText=master%20-%20Failing&pendingText=master%20-%20Pending)
 - Linux + Clang 5.0/6.0 + libc++
 
 The Linux version is functional except for the `io_context` and file I/O related classes which have not yet been implemented for Linux (see issue [#15](https://github.com/lewissbaker/cppcoro/issues/15) for more info).
