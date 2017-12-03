@@ -91,6 +91,11 @@ namespace cppcoro
 			return sequence_range{ m_begin, static_cast<SEQUENCE>(m_begin + std::min(size(), count)) };
 		}
 
+		constexpr sequence_range skip(size_type count) const noexcept
+		{
+			return sequence_range{ m_begin + std::min(size(), count), m_end };
+		}
+
 	private:
 
 		SEQUENCE m_begin;
