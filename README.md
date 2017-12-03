@@ -48,7 +48,7 @@ It has been open-sourced in the hope that others will find it useful and that th
 can provide feedback on it and ways to improve it.
 
 It requires a compiler that supports the coroutines TS:
-- Windows + Visual Studio 2017
+- Windows + Visual Studio 2017 ![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/lewissbaker/cppcoro?branch=master&svg=true&passingText=master%20-%20OK&failingText=master%20-%20Failing&pendingText=master%20-%20Pending)
 - Linux + Clang 5.0/6.0 + libc++
 
 The Linux version is functional except for the `io_context` and file I/O related classes which have not yet been implemented for Linux (see issue [#15](https://github.com/lewissbaker/cppcoro/issues/15) for more info).
@@ -2335,7 +2335,7 @@ header required to use C++ coroutines under Clang.
 
 Checkout `libc++` + `llvm`:
 ```
-mkdir llmv
+mkdir llvm
 cd llvm
 git clone --depth=1 https://github.com/llvm-mirror/llvm.git llvm
 git clone --depth=1 https://github.com/llvm-mirror/libcxx.git llvm/projects/libcxx
@@ -2350,7 +2350,7 @@ cmake -GNinja \
       -DCMAKE_CXX_COMPILER="/path/to/clang/install/bin/clang++" \
       -DCMAKE_C_COMPILER="/path/to/clang/install/bin/clang" \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install"
+      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install" \
       -DLLVM_PATH="../llvm" \
       -DLIBCXX_CXX_ABI=libstdc++ \
       -DLIBCXX_CXX_ABI_INCLUDE_PATHS="/usr/include/c++/6.3.0/;/usr/include/x86_64-linux-gnu/c++/6.3.0/" \
