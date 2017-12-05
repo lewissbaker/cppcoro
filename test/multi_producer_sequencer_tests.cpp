@@ -68,7 +68,8 @@ namespace
 		std::uint64_t i = 0;
 		while (i < iterationCount)
 		{
-			const std::size_t batchSize = std::min<std::uint64_t>(maxBatchSize, iterationCount - i);
+			const std::size_t batchSize = static_cast<std::size_t>(
+				std::min<std::uint64_t>(maxBatchSize, iterationCount - i));
 			auto sequences = co_await sequencer.claim_up_to(batchSize);
 			for (auto seq : sequences)
 			{
@@ -149,7 +150,7 @@ DOCTEST_TEST_CASE("two producers (batch) / single consumer")
 	sequence_barrier<std::size_t> readBarrier;
 	multi_producer_sequencer<std::size_t> sequencer(readBarrier, bufferSize);
 
-	constexpr std::size_t iterationCount = 1'000'000;
+	constexpr std::uint64_t iterationCount = 1'000'000;
 
 	std::uint64_t buffer[bufferSize];
 
@@ -203,7 +204,7 @@ DOCTEST_TEST_CASE("two producers (single) / single consumer")
 	sequence_barrier<std::size_t> readBarrier;
 	multi_producer_sequencer<std::size_t> sequencer(readBarrier, bufferSize);
 
-	constexpr std::size_t iterationCount = 1'000'000;
+	constexpr std::uint64_t iterationCount = 1'000'000;
 
 	std::uint64_t buffer[bufferSize];
 
