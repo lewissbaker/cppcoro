@@ -89,6 +89,8 @@ class UnitTestTool(Tool):
 
     self.engine.logger.outputInfo("Testing %s\n" % programPath)
 
+    self.engine.logger.outputDebug("run", " ".join(programArgs))
+
     if results:
       resultsAbsPath = self.configuration.abspath(results)
       cake.filesys.makeDirs(cake.path.dirName(resultsAbsPath))
