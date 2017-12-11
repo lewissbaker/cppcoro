@@ -16,6 +16,7 @@ addons:
   apt:
     packages:
     - python2.7
+    - ninja
 
 compiler:
 - clang
