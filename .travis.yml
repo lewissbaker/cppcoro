@@ -29,11 +29,12 @@ env:
   global:
   - TOOLS_DIR=${TRAVIS_BUILD_DIR}/tools
   - LLVM_INSTALL_PREFIX=${TOOLS_DIR}/llvm
+matrix:
   include:
-  - RELEASE=debug ARCH=x86 CLANG_VERSION=6.0
-  - RELEASE=optimised ARCH=x86 CLANG_VERSION=6.0
-  - RELEASE=debug ARCH=x64 CLANG_VERSION=6.0
-  - RELEASE=optimised ARCH=x64 CLANG_VERSION=6.0
+  - env: RELEASE=debug ARCH=x86 CLANG_VERSION=6.0
+  - env: RELEASE=optimised ARCH=x86 CLANG_VERSION=6.0
+  - env: RELEASE=debug ARCH=x64 CLANG_VERSION=6.0
+  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=6.0
  
 before_install:
 - export CC="$CC-$CLANG_VERSION"
