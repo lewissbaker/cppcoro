@@ -1,0 +1,37 @@
+# Copyright Lewis Baker 2017
+#
+# Distributed under MIT license.
+# See LICENSE.txt file for details.
+
+language: cpp
+
+os: linux
+
+dist: trusty
+
+git:
+  submodules: true
+
+addons:
+  apt:
+    sources:
+    - llvm-toolchain-trusty
+    packages:
+    - clang
+    - lld
+    - python-2.7
+
+compiler:
+- clang
+    
+env:
+- RELEASE=debug
+- RELEASE=optimised
+- ARCH=x86
+- ARCH=x64
+ 
+before_script:
+- source ./init.sh
+
+script:
+- cake architecture=$ARCH release=$RELEASE compiler=$CXX
