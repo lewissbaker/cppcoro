@@ -84,7 +84,7 @@ fi
        -DCMAKE_BUILD_WITH_INSTALL_RPATH="yes" \
        -DLLVM_TARGETS_TO_BUILD=X86 \
        -DLLVM_ENABLE_PROJECTS="lld;clang" \
-       "${LLVM_PROJECT}" && \
+       "${LLVM_PROJECT}/llvm" && \
   ninja install-clang \
         install-clang-headers \
         install-llvm-ar \
@@ -99,5 +99,6 @@ fi
        -DCMAKE_BUILD_TYPE=Release \
        -DCMAKE_INSTALL_PREFIX="${LLVM_INSTALL_PREFIX}" \
        -DLLVM_PATH="${LLVM_PROJECT}/llvm" \
-       -DLIBCXX_CXX_ABI=libstdc++ && \
+       -DLIBCXX_CXX_ABI=libstdc++ \
+       "${LLVM_PROJECT}/libcxx" && \
   ninja install) || exit
