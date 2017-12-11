@@ -56,6 +56,7 @@ before_install:
  
 install:
 - ./build-libcxx.sh
+- export LD_LIBRARY_PATH="${LLVM_INSTALL_PREFIX}/lib"
  
 before_script:
 - source ./init.sh
