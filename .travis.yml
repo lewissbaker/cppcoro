@@ -14,24 +14,30 @@ git:
 
 addons:
   apt:
-    sources:
-    - llvm-toolchain-trusty
     packages:
-    - clang-6.0
-    - lld-6.0
     - python2.7
 
 compiler:
 - clang
     
 env:
-- RELEASE=debug
-- RELEASE=optimised
-- ARCH=x86
-- ARCH=x64
+  global:
+  - LLVM_INSTALL_PREFIX=${TRAVIS_BUILD_DIR}/tools/llvm
+  include:
+  - RELEASE=debug ARCH=x86
+  - RELEASE=optimised ARCH=x86
+  - RELEASE=debug ARCH=x64
+  - RELEASE=optimised ARCH=x64
  
+before_install:
+- ./build-clang.sh
+- export PATH="${LLVM_INSTALL_PREFIX}/bin:$PATH"
+
 before_script:
 - source ./init.sh
 
 script:
-- cake architecture=$ARCH release=$RELEASE compiler=$CXX
+- cake architecture=$ARCH release=$RELEASE
+
+notifications:
+  email: false
