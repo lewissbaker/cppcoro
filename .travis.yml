@@ -14,9 +14,13 @@ git:
 
 addons:
   apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-trusty
     packages:
     - python2.7
-    - ninja-build
+    - clang-6.0
+    - lld-6.0
 
 compiler:
 - clang
@@ -25,31 +29,12 @@ env:
   global:
   - TOOLS_DIR=${TRAVIS_BUILD_DIR}/tools
   - LLVM_INSTALL_PREFIX=${TOOLS_DIR}/llvm
-  - CMAKE_VERSION="3.9.1"
   include:
   - RELEASE=debug ARCH=x86
   - RELEASE=optimised ARCH=x86
   - RELEASE=debug ARCH=x64
   - RELEASE=optimised ARCH=x64
  
-cache:
-  directories:
-  - ${TOOLS_DIR}/cmake-${CMAKE_VERSION}
- 
-before_install:
-- |
-  if [ ! -f "${TOOLS_DIR}/cmake-${CMAKE_VERSION}/cached" ]; then
-    CMAKE_URL="https://cmake.org/files/v3.9/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz"
-    mkdir -p "${TOOLS_DIR}/cmake-${CMAKE_VERSION}"
-    travis_retry wget --no-check-certificate --quiet -O - "${CMAKE_URL}" | tar --strip-components=1 -xz -C "${TOOLS_DIR}/cmake-${CMAKE_VERSION}"
-    touch "${TOOLS_DIR}/cmake-${CMAKE_VERSION}/cached"
-  else
-    echo "Using cached CMake version ${CMAKE_VERSION}"
-  fi
-  export PATH="${TOOLS_DIR}/cmake-${CMAKE_VERSION}/bin:$PATH"
-- ./build-clang.sh
-- export PATH="${LLVM_INSTALL_PREFIX}/bin:$PATH"
-
 before_script:
 - source ./init.sh
 
