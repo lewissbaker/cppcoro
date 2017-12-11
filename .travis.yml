@@ -38,11 +38,14 @@ before_install:
 - export CC="$CC-$CLANG_VERSION"
 - export CXX="$CXX-$CLANG_VERSION"
  
+install:
+- ./build-libcxx.sh
+ 
 before_script:
 - source ./init.sh
 
 script:
-- cake architecture=$ARCH release=$RELEASE --clang-executable="$CC"
+- cake architecture=$ARCH release=$RELEASE --clang-executable="$CC" --libcxx-install-prefix="${LLVM_INSTALL_PREFIX}"
 
 notifications:
   email: false
