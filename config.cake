@@ -176,40 +176,98 @@ if cake.system.isWindows() or cake.system.isCygwin():
     except CompilerNotFoundError, e:
       print str(e)
 
-elif cake.system.isLinux():
+elif cake.system.isLinux() or cake.system.isDarwin():
 
+  def firstExisting(paths, default=None):
+    for p in paths:
+      if os.path.exists(p)
+        return p
+    else:
+      return default
+
+      
+      
+  if cake.system.isLinux():
+    defaultInstallPaths = ["/usr"]
+  elif cake.system.isDarwin():
+    defaultInstallPaths = ["/usr/local/opt/llvm", "/usr"]
+      
+  clangInstallPrefix = engine.options.clangInstallPrefix
+  clangExe = engine.options.clangExecutable
+  
+  if clangInstallPrefix is None:
+    # If no clang install prefix was specified then try to deduce it
+    # from the --clang-executable path.
+    if os.path.isabs(clangExe):
+      clangBinPath = cake.path.dirName(clangExe)
+      if cake.path.baseName(clangBinPath) == 'bin':
+        clangInstallPrefix = cake.path.dirName(clangBinPath)
+
+    # Use sensible system defaults if neither --clang-executable or
+    # --clang-install-prefix command-line arguments are specified.
+    if clangInstallPrefix is None:
+      clangInstallPrefix = firstExisting(defaultInstallPaths, default="/usr")
+
+  libcxxInstallPrefix = engine.options.libcxxInstallPrefix
+  if libcxxInstallPrefix is None:
+    libcxxInstallPrefix = clangInstallPrefix
+
+  # If the user didn't specify an absolute path to clang then look for it in
+  # the installed clang bin directory.
+  if not os.path.isabs(clangExe):
+    clangExe = cake.path.join(clangInstallPrefix, 'bin', clangExe)
+
+  # Extract the clang version suffix from the file-name
+  # We'll try and use other LLVM tools with the same suffix if they exist.
+  clangName = cake.path.baseName(clangExe)
+  versionSuffix = clangName[5:] if clangName.startswith('clang-') else ""
+
+  clangExeDir = cake.path.dirName(clangExe)
+  clangBinPath = cake.path.join(clangInstallPrefix, 'bin')
+
+  binPaths = [clangExeDir]
+  if clangBinPath not in binPaths:
+    binPaths.append(clangBinPath)
+
+  llvmArExe = firstExisting(
+    cake.path.join(binPaths, ['llvm-ar' + versionSuffix, 'llvm-ar', 'ar']),
+    default="/usr/bin/ar")
+
+  # Prefer lld if available, otherwise fall back to system ld
+  lldExe = firstExisting(
+    cake.path.join(binPaths, ['ld.lld' + versionSuffix, 'ld.lld']),
+    )
+    
+  engine.logger.outputInfo(
+    "clang: " + clangExe + "\n" +
+    "llvm-ar: " + llvmArExe + "\n")
+    
   from cake.library.compilers.clang import ClangCompiler
 
+  if cake.system.isLinux():
+    platform = 'linux'
+  elif cake.system.isDarwin():
+    platform = 'darwin'
+  
   clangVariant = baseVariant.clone(compiler='clang',
-                                   platform='linux',
+                                   platform=platform,
                                    architecture='x64')
-
-  # If you have built your own version of Clang, you can modify
-  # this variable to point to the CMAKE_INSTALL_PREFIX for
-  # where you have installed your clang/libcxx build.
-  clangInstallPrefix = '/usr'
-
-  # Set this to the install-prefix of where libc++ is installed.
-  # You only need to set this if it is not installed at the same
-  # location as clangInstallPrefix.
-  libCxxInstallPrefix = None # '/path/to/install'
-
-  clangBinPath = cake.path.join(clangInstallPrefix, 'bin')
 
   compiler = ClangCompiler(
     configuration=configuration,
-    clangExe=cake.path.join(clangBinPath, 'clang'),
-    llvmArExe=cake.path.join(clangBinPath, 'llvm-ar'),
+    clangExe=clangExe,
+    llvmArExe=llvmArExe,
     binPaths=[clangBinPath])
 
   compiler.addCppFlag('-std=c++1z')
   compiler.addCppFlag('-fcoroutines-ts')
   compiler.addCppFlag('-m64')
 
-  compiler.addModuleFlag('-fuse-ld=lld')
-  compiler.addProgramFlag('-fuse-ld=lld')
+  if lldExe:
+    compiler.addModuleFlag('-fuse-ld=' + lldExe)
+    compiler.addProgramFlag('-fuse-ld=' + lldExe)
   
-  if libCxxInstallPrefix:
+  if libCxxInstallPrefix != clangInstallPrefix:
     compiler.addCppFlag('-nostdinc++')
     compiler.addIncludePath(cake.path.join(
       libCxxInstallPrefix, 'include', 'c++', 'v1'))
@@ -229,8 +287,8 @@ elif cake.system.isLinux():
 
   env = clangVariant.tools["env"]
   env["COMPILER"] = "clang"
-  env["COMPILER_VERSION"] = "5.0"
-  env["PLATFORM"] = "linux"
+  env["COMPILER_VERSION"] = ".".join(str(part) for part in compiler.version)
+  env["PLATFORM"] = platform
   env["ARCHITECTURE"] = "x64"
 
   clangDebugVariant = clangVariant.clone(release='debug')
@@ -250,86 +308,11 @@ elif cake.system.isLinux():
   compiler = clangOptimisedVariant.tools["compiler"]
   compiler.addCppFlag('-O3')
   compiler.addCppFlag('-g')
-  compiler.addCppFlag('-flto')
-  compiler.addProgramFlag('-flto')
-  compiler.addModuleFlag('-flto')
-
-  configuration.addVariant(clangOptimisedVariant)
-
-elif cake.system.isDarwin():
-
-  from cake.library.compilers.clang import ClangCompiler
-
-  clangVariant = baseVariant.clone(compiler='clang',
-                                   platform='darwin',
-                                   architecture='x86_64')
-
-  # If you have built your own version of Clang, you can modify
-  # this variable to point to the CMAKE_INSTALL_PREFIX for
-  # where you have installed your clang/libcxx build.
-  clangInstallPrefix = '/usr/local/opt/llvm'
-
-  # Set this to the install-prefix of where libc++ is installed.
-  # You only need to set this if it is not installed at the same
-  # location as clangInstallPrefix.
-  libCxxInstallPrefix = None # '/path/to/install'
-
-  clangBinPath = cake.path.join(clangInstallPrefix, 'bin')
-
-  compiler = ClangCompiler(
-    configuration=configuration,
-    clangExe=cake.path.join(clangBinPath, 'clang'),
-    llvmArExe=cake.path.join(clangBinPath, 'llvm-ar'),
-    binPaths=[clangBinPath])
-
-  compiler.addCppFlag('-std=c++17')
-  compiler.addCppFlag('-fcoroutines-ts')
-  compiler.addCppFlag('-m64')
-
-  compiler.addModuleFlag('-fuse-ld=/usr/bin/ld')
-  compiler.addProgramFlag('-fuse-ld=/usr/bin/ld')
-
-  if libCxxInstallPrefix:
-    compiler.addCppFlag('-nostdinc++')
-    compiler.addIncludePath(cake.path.join(
-      libCxxInstallPrefix, 'include', 'c++', 'v1'))
-    compiler.addLibraryPath(cake.path.join(
-      libCxxInstallPrefix, 'lib'))
-  else:
-    compiler.addCppFlag('-stdlib=libc++')
-
-  compiler.addLibrary('c++')
-
-  #compiler.addProgramFlag('-Wl,--trace')
-  #compiler.addProgramFlag('-Wl,-v')
-
-  clangVariant.tools['compiler'] = compiler
-
-  env = clangVariant.tools["env"]
-  env["COMPILER"] = "clang"
-  env["COMPILER_VERSION"] = "5.0"
-  env["PLATFORM"] = "darwin"
-  env["ARCHITECTURE"] = "x86_64"
-
-  clangDebugVariant = clangVariant.clone(release='debug')
-  clangDebugVariant.tools["env"]["RELEASE"] = 'debug'
-
-  # Configure debug-specific settings here
-  compiler = clangDebugVariant.tools["compiler"]
-  compiler.addCppFlag('-O0')
-  compiler.addCppFlag('-g')
-
-  configuration.addVariant(clangDebugVariant)
-
-  clangOptimisedVariant = clangVariant.clone(release='optimised')
-  clangOptimisedVariant.tools["env"]["RELEASE"] = 'optimised'
-
-  # Configure optimised-specific settings here
-  compiler = clangOptimisedVariant.tools["compiler"]
-  compiler.addCppFlag('-O3')
-  compiler.addCppFlag('-g')
-  compiler.addCppFlag('-flto')
-  compiler.addProgramFlag('-flto')
-  compiler.addModuleFlag('-flto')
+  
+  # Only use link-time optimisation if we're using LLD
+  if lldExe:
+    compiler.addCppFlag('-flto')
+    compiler.addProgramFlag('-flto')
+    compiler.addModuleFlag('-flto')
 
   configuration.addVariant(clangOptimisedVariant)
