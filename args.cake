@@ -20,8 +20,7 @@ parser.add_option(
 
 if cake.system.isLinux() or cake.system.isDarwin():
   parser.add_option(
-      None, "--clang-install-prefix",
-      action="store_value",
+      "--clang-install-prefix",
       dest="clangInstallPrefix",
       type="string",
       metavar="PATH",
@@ -30,8 +29,7 @@ if cake.system.isLinux() or cake.system.isDarwin():
       )
 
   parser.add_option(
-    None, "--clang-executable",
-    action="store_value",
+    "--clang-executable",
     dest="clangExecutable",
     type="string",
     metavar="FILE",
@@ -39,8 +37,7 @@ if cake.system.isLinux() or cake.system.isDarwin():
     help="Name or full-path of clang executable to compile with")
 
   parser.add_option(
-    None, "--libcxx-install-prefix",
-    action="store_value",
+    "--libcxx-install-prefix",
     dest="libcxxInstallPrefix",
     type="string",
     metavar="PATH",
