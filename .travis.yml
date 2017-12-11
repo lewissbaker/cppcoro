@@ -23,23 +23,27 @@ addons:
     - lld-6.0
 
 compiler:
-- clang-6.0
+- clang
     
 env:
   global:
   - TOOLS_DIR=${TRAVIS_BUILD_DIR}/tools
   - LLVM_INSTALL_PREFIX=${TOOLS_DIR}/llvm
   include:
-  - RELEASE=debug ARCH=x86
-  - RELEASE=optimised ARCH=x86
-  - RELEASE=debug ARCH=x64
-  - RELEASE=optimised ARCH=x64
+  - RELEASE=debug ARCH=x86 CLANG_VERSION=6.0
+  - RELEASE=optimised ARCH=x86 CLANG_VERSION=6.0
+  - RELEASE=debug ARCH=x64 CLANG_VERSION=6.0
+  - RELEASE=optimised ARCH=x64 CLANG_VERSION=6.0
+ 
+before_install:
+- export CC="$CC-$CLANG_VERSION"
+- export CXX="$CXX-$CLANG_VERSION"
  
 before_script:
 - source ./init.sh
 
 script:
-- cake architecture=$ARCH release=$RELEASE --clang-executable=$CC
+- cake architecture=$ARCH release=$RELEASE --clang-executable="$CC"
 
 notifications:
   email: false
