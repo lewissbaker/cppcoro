@@ -17,6 +17,7 @@ addons:
     packages:
     - python2.7
     - ninja
+    - cmake
 
 compiler:
 - clang
