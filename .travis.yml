@@ -31,8 +31,6 @@ env:
   - LLVM_INSTALL_PREFIX=${TOOLS_DIR}/llvm
 matrix:
   include:
-  - env: RELEASE=debug ARCH=x86 CLANG_VERSION=6.0
-  - env: RELEASE=optimised ARCH=x86 CLANG_VERSION=6.0
   - env: RELEASE=debug ARCH=x64 CLANG_VERSION=6.0
   - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=6.0
  
