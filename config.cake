@@ -287,7 +287,7 @@ elif cake.system.isLinux() or cake.system.isDarwin():
 
   env = clangVariant.tools["env"]
   env["COMPILER"] = "clang"
-  env["COMPILER_VERSION"] = ".".join(str(part) for part in compiler.version)
+  env["COMPILER_VERSION"] = compiler.version
   env["PLATFORM"] = platform
   env["ARCHITECTURE"] = "x64"
 
