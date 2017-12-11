@@ -267,12 +267,12 @@ elif cake.system.isLinux() or cake.system.isDarwin():
     compiler.addModuleFlag('-fuse-ld=' + lldExe)
     compiler.addProgramFlag('-fuse-ld=' + lldExe)
   
-  if libCxxInstallPrefix != clangInstallPrefix:
+  if libcxxInstallPrefix != clangInstallPrefix:
     compiler.addCppFlag('-nostdinc++')
     compiler.addIncludePath(cake.path.join(
-      libCxxInstallPrefix, 'include', 'c++', 'v1'))
+      libcxxInstallPrefix, 'include', 'c++', 'v1'))
     compiler.addLibraryPath(cake.path.join(
-      libCxxInstallPrefix, 'lib'))
+      libcxxInstallPrefix, 'lib'))
   else:
     compiler.addCppFlag('-stdlib=libc++')
 
