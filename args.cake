@@ -43,7 +43,7 @@ if cake.system.isLinux() or cake.system.isDarwin():
     action="store_value",
     dest="libcxxInstallPrefix",
     type="string",
-    metavar"PATH",
+    metavar="PATH",
     default=None,
     help="Path where libc++ has been installed.\n"
          "Defaults to value of --clang-install-prefix")

@@ -180,7 +180,7 @@ elif cake.system.isLinux() or cake.system.isDarwin():
 
   def firstExisting(paths, default=None):
     for p in paths:
-      if os.path.exists(p)
+      if os.path.exists(p):
         return p
     else:
       return default
