@@ -19,7 +19,7 @@ addons:
     packages:
     - clang
     - lld
-    - python-2.7
+    - python2.7
 
 compiler:
 - clang
