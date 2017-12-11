@@ -39,6 +39,10 @@ matrix:
   include:
   - env: RELEASE=debug ARCH=x64 CLANG_VERSION=6.0
   - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=6.0
+  allow_failures:
+  # Clang 6.0~svn320382 has a bug that causes optimised builds to fail.
+  # See https://bugs.llvm.org/show_bug.cgi?id=34897
+  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=6.0
  
 before_install:
 - export CC="$CC-$CLANG_VERSION"
