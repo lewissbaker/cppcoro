@@ -17,8 +17,8 @@ addons:
     sources:
     - llvm-toolchain-trusty
     packages:
-    - clang
-    - lld
+    - clang-6.0
+    - lld-6.0
     - python2.7
 
 compiler:
