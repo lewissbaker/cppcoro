@@ -23,7 +23,7 @@ addons:
     - lld-6.0
 
 compiler:
-- clang
+- clang-6.0
     
 env:
   global:
@@ -39,7 +39,7 @@ before_script:
 - source ./init.sh
 
 script:
-- cake architecture=$ARCH release=$RELEASE
+- cake architecture=$ARCH release=$RELEASE --clang-executable=$CC
 
 notifications:
   email: false
