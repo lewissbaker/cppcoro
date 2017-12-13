@@ -253,6 +253,17 @@ elif cake.system.isLinux() or cake.system.isDarwin():
                                    platform=platform,
                                    architecture='x64')
 
+  # If libc++ is installed in a non-standard location, add the path to libc++.so
+  # to the library search path by adding libc++'s /lib directory to LD_LIBRARY_PATH
+  if libcxxInstallPrefix not in defaultInstallPaths:
+    libcxxLibPath = os.path.abspath(cake.path.join(libcxxInstallPrefix, 'lib'))
+    ldPaths = [libcxxLibPath]
+    test = clangVariant.tools["test"]
+    oldLdPath = test.env.get('LD_LIBRARY_PATH', None)
+    if oldLdPath:
+      ldPaths.append(oldLdPath)
+    test.env['LD_LIBRARY_PATH'] = os.path.pathsep.join(ldPaths)
+
   compiler = ClangCompiler(
     configuration=configuration,
     clangExe=clangExe,
