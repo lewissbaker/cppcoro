@@ -264,8 +264,9 @@ elif cake.system.isLinux() or cake.system.isDarwin():
   compiler.addCppFlag('-m64')
 
   if lldExe:
-    compiler.addModuleFlag('-fuse-ld=' + lldExe)
-    compiler.addProgramFlag('-fuse-ld=' + lldExe)
+    lldExeAbspath = configuration.abspath(lldExe)
+    compiler.addModuleFlag('-fuse-ld=' + lldExeAbspath)
+    compiler.addProgramFlag('-fuse-ld=' + lldExeAbspath)
   
   if libcxxInstallPrefix != clangInstallPrefix:
     compiler.addCppFlag('-nostdinc++')
