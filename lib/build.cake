@@ -47,6 +47,12 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'file_write_operation.hpp',
   ])
 
+netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'net', [
+  'ipv4_address.hpp',
+  'ipv6_address.hpp',
+  'ip_address.hpp',
+])
+
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
   'continuation.hpp',
   'when_all_awaitable.hpp',
@@ -67,6 +73,7 @@ sources = script.cwd([
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
   'lightweight_manual_reset_event.cpp',
+  'ipv4_address.cpp',
   ])
 
 extras = script.cwd([

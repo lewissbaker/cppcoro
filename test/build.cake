@@ -33,6 +33,7 @@ sources = script.cwd([
   'single_consumer_async_auto_reset_event_tests.cpp',
   'when_all_tests.cpp',
   'when_all_ready_tests.cpp',
+  'ipv4_address_tests.cpp',
 ])
 
 if variant.platform == 'windows':
