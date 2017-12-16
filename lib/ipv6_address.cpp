@@ -52,7 +52,11 @@ namespace
 std::optional<cppcoro::net::ipv6_address>
 cppcoro::net::ipv6_address::from_string(std::string_view string) noexcept
 {
-	if (string.empty())
+	// Longest possible valid IPv6 string is
+	// "xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:nnn.nnn.nnn.nnn"
+	constexpr std::size_t maxLength = 45;
+
+	if (string.empty() || string.length() > maxLength)
 	{
 		return std::nullopt;
 	}
