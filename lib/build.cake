@@ -50,7 +50,6 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
 netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'net', [
   'ipv4_address.hpp',
   'ipv6_address.hpp',
-  'ip_address.hpp',
 ])
 
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
@@ -74,6 +73,7 @@ sources = script.cwd([
   'cancellation_registration.cpp',
   'lightweight_manual_reset_event.cpp',
   'ipv4_address.cpp',
+  'ipv6_address.cpp',
   ])
 
 extras = script.cwd([

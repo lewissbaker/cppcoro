@@ -34,6 +34,7 @@ sources = script.cwd([
   'when_all_tests.cpp',
   'when_all_ready_tests.cpp',
   'ipv4_address_tests.cpp',
+  'ipv6_address_tests.cpp',
 ])
 
 if variant.platform == 'windows':
