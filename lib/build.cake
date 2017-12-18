@@ -48,8 +48,12 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   ])
 
 netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'net', [
+  'ip_address.hpp',
+  'ip_endpoint.hpp',
   'ipv4_address.hpp',
+  'ipv4_endpoint.hpp.',
   'ipv6_address.hpp',
+  'ipv6_endpoint.hpp',
 ])
 
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
@@ -72,8 +76,12 @@ sources = script.cwd([
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
   'lightweight_manual_reset_event.cpp',
+  'ip_address.cpp',
+  'ip_endpoint.cpp',
   'ipv4_address.cpp',
+  'ipv4_endpoint.cpp',
   'ipv6_address.cpp',
+  'ipv6_endpoint.cpp',
   ])
 
 extras = script.cwd([
@@ -117,6 +125,7 @@ vcproj = project.project(
   items={
     'Include': {
       'Detail': detailIncludes,
+      'Net': netIncludes,
       '': includes,
       },
     'Source': sources + privateHeaders,

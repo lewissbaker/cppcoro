@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace cppcoro::net
 {
@@ -76,6 +77,26 @@ namespace cppcoro::net
 		constexpr bool operator!=(ipv4_address other) const
 		{
 			return !(*this == other);
+		}
+
+		constexpr bool operator<(ipv4_address other) const
+		{
+			return to_integer() < other.to_integer();
+		}
+
+		constexpr bool operator>(ipv4_address other) const
+		{
+			return other < *this;
+		}
+
+		constexpr bool operator<=(ipv4_address other) const
+		{
+			return !(other < *this);
+		}
+
+		constexpr bool operator>=(ipv4_address other) const
+		{
+			return !(*this < other);
 		}
 
 		/// Parse a string representation of an IP address.
