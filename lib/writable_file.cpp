@@ -45,10 +45,23 @@ void cppcoro::writable_file::set_size(
 cppcoro::file_write_operation cppcoro::writable_file::write(
 	std::uint64_t offset,
 	const void* buffer,
+	std::size_t byteCount) noexcept
+{
+	return file_write_operation{
+		m_fileHandle.handle(),
+		offset,
+		buffer,
+		byteCount
+	};
+}
+
+cppcoro::file_write_operation_cancellable cppcoro::writable_file::write(
+	std::uint64_t offset,
+	const void* buffer,
 	std::size_t byteCount,
 	cancellation_token ct) noexcept
 {
-	return file_write_operation{
+	return file_write_operation_cancellable{
 		m_fileHandle.handle(),
 		offset,
 		buffer,

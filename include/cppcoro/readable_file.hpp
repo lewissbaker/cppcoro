@@ -47,8 +47,13 @@ namespace cppcoro
 		file_read_operation read(
 			std::uint64_t offset,
 			void* buffer,
+			std::size_t byteCount) const noexcept;
+		[[nodiscard]]
+		file_read_operation_cancellable read(
+			std::uint64_t offset,
+			void* buffer,
 			std::size_t byteCount,
-			cancellation_token ct = {}) const noexcept;
+			cancellation_token ct) const noexcept;
 
 	protected:
 
