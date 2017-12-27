@@ -92,6 +92,7 @@ extras = script.cwd([
 if variant.platform == "windows":
   detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
     'win32.hpp',
+	'win32_overlapped_operation.hpp',
     ]))
   sources.extend(script.cwd([
     'win32.cpp',
