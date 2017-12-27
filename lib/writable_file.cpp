@@ -18,7 +18,7 @@ void cppcoro::writable_file::set_size(
 	position.QuadPart = fileSize;
 
 	BOOL ok = ::SetFilePointerEx(m_fileHandle.handle(), position, nullptr, FILE_BEGIN);
-	if (ok)
+	if (!ok)
 	{
 		DWORD errorCode = ::GetLastError();
 		throw std::system_error
