@@ -253,13 +253,13 @@ namespace cppcoro
 								std::memory_order_release,
 								std::memory_order_acquire))
 							{
-								assert(oldState == state::complete);
+								assert(oldState == state::completed);
 								return false;
 							}
 						}
 						else
 						{
-							assert(oldState == state::complete);
+							assert(oldState == state::completed);
 							return false;
 						}
 					}
