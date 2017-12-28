@@ -53,6 +53,11 @@ namespace cppcoro::net
 				std::uint32_t(m_bytes[3]);
 		}
 
+		static constexpr ipv4_address loopback()
+		{
+			return ipv4_address(127, 0, 0, 1);
+		}
+
 		constexpr bool is_loopback() const
 		{
 			return m_bytes[0] == 127;

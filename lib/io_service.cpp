@@ -12,8 +12,10 @@
 #include <thread>
 
 #if CPPCORO_OS_WINNT
-# define WIN32_LEAN_AND_MEAN
 # define NOMINMAX
+# include <WinSock2.h>
+# include <WS2tcpip.h>
+# include <MSWSock.h>
 # include <Windows.h>
 #endif
 
@@ -326,6 +328,8 @@ cppcoro::io_service::io_service(std::uint32_t concurrencyHint)
 	, m_workCount(0)
 #if CPPCORO_OS_WINNT
 	, m_iocpHandle(create_io_completion_port(concurrencyHint))
+	, m_winsockInitialised(false)
+	, m_winsockInitialisationMutex()
 #endif
 	, m_scheduleOperations(nullptr)
 	, m_timerState(nullptr)
@@ -338,6 +342,15 @@ cppcoro::io_service::~io_service()
 	assert(m_threadState.load(std::memory_order_relaxed) < active_thread_count_increment);
 
 	delete m_timerState.load(std::memory_order_relaxed);
+
+#if CPPCORO_OS_WINNT
+	if (m_winsockInitialised.load(std::memory_order_relaxed))
+	{
+		// TODO: Should we be checking return-code here?
+		// Don't want to throw from the destructor, so perhaps just log an error?
+		(void)::WSACleanup();
+	}
+#endif
 }
 
 cppcoro::io_service::schedule_operation cppcoro::io_service::schedule() noexcept
@@ -457,6 +470,34 @@ cppcoro::detail::win32::handle_t cppcoro::io_service::native_iocp_handle() noexc
 {
 	return m_iocpHandle.handle();
 }
+
+#if CPPCORO_OS_WINNT
+
+void cppcoro::io_service::ensure_winsock_initialised()
+{
+	if (!m_winsockInitialised.load(std::memory_order_acquire))
+	{
+		std::lock_guard<std::mutex> lock(m_winsockInitialisationMutex);
+		if (!m_winsockInitialised.load(std::memory_order_acquire))
+		{
+			const WORD requestedVersion = MAKEWORD(2, 2);
+			WSADATA winsockData;
+			const int result = ::WSAStartup(requestedVersion, &winsockData);
+			if (result == SOCKET_ERROR)
+			{
+				const int errorCode = ::WSAGetLastError();
+				throw std::system_error(
+					errorCode,
+					std::system_category(),
+					"Error initialsing winsock: WSAStartup");
+			}
+
+			m_winsockInitialised.store(true, std::memory_order_release);
+		}
+	}
+}
+
+#endif // CPPCORO_OS_WINNT
 
 void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 {

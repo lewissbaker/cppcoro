@@ -46,6 +46,7 @@ if variant.platform == 'windows':
     'scheduling_operator_tests.cpp',
     'io_service_tests.cpp',
     'file_tests.cpp',
+    'socket_tests.cpp',
     ])
 
 extras = script.cwd([
