@@ -223,12 +223,8 @@ namespace cppcoro
 
 		private:
 
-			friend class socket_accept_operation;
-			friend class socket_accept_operation_cancellable;
-			friend class socket_connect_operation;
-			friend class socket_connect_operation_cancellable;
-			friend class socket_disconnect_operation;
-			friend class socket_disconnect_operation_cancellable;
+			friend class socket_accept_operation_impl;
+			friend class socket_connect_operation_impl;
 
 #if CPPCORO_OS_WINNT
 			explicit socket(

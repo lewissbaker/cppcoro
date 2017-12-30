@@ -23,25 +23,22 @@ namespace cppcoro
 	{
 		class socket;
 
-		class socket_accept_operation
-			: public cppcoro::detail::win32_overlapped_operation<socket_accept_operation>
+		class socket_accept_operation_impl
 		{
 		public:
 
-			socket_accept_operation(
+			socket_accept_operation_impl(
 				socket& listeningSocket,
 				socket& acceptingSocket) noexcept
-				: cppcoro::detail::win32_overlapped_operation<socket_accept_operation>()
-				, m_listeningSocket(listeningSocket)
+				: m_listeningSocket(listeningSocket)
 				, m_acceptingSocket(acceptingSocket)
 			{}
 
+			bool try_start(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+			void cancel(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+			void get_result(cppcoro::detail::win32_overlapped_operation_base& operation);
+
 		private:
-
-			friend class cppcoro::detail::win32_overlapped_operation<socket_accept_operation>;
-
-			bool try_start() noexcept;
-			void get_result();
 
 #if CPPCORO_COMPILER_MSVC
 # pragma warning(push)
@@ -55,6 +52,29 @@ namespace cppcoro
 #if CPPCORO_COMPILER_MSVC
 # pragma warning(pop)
 #endif
+
+		};
+
+		class socket_accept_operation
+			: public cppcoro::detail::win32_overlapped_operation<socket_accept_operation>
+		{
+		public:
+
+			socket_accept_operation(
+				socket& listeningSocket,
+				socket& acceptingSocket) noexcept
+				: m_impl(listeningSocket, acceptingSocket)
+			{}
+
+		private:
+
+			friend class cppcoro::detail::win32_overlapped_operation<socket_accept_operation>;
+
+			bool try_start() noexcept { return m_impl.try_start(*this); }
+			void get_result() { m_impl.get_result(*this); }
+
+			socket_accept_operation_impl m_impl;
+
 		};
 
 		class socket_accept_operation_cancellable
@@ -67,30 +87,18 @@ namespace cppcoro
 				socket& acceptingSocket,
 				cancellation_token&& ct) noexcept
 				: cppcoro::detail::win32_overlapped_operation_cancellable<socket_accept_operation_cancellable>(std::move(ct))
-				, m_listeningSocket(listeningSocket)
-				, m_acceptingSocket(acceptingSocket)
+				, m_impl(listeningSocket, acceptingSocket)
 			{}
 
 		private:
 
-			friend class cppcoro::detail::win32_overlapped_operation<socket_accept_operation>;
+			friend class cppcoro::detail::win32_overlapped_operation_cancellable<socket_accept_operation_cancellable>;
 
-			bool try_start() noexcept;
-			void cancel() noexcept;
-			void get_result();
+			bool try_start() noexcept { return m_impl.try_start(*this); }
+			void cancel() noexcept { m_impl.cancel(*this); }
+			void get_result() { m_impl.get_result(*this); }
 
-#if CPPCORO_COMPILER_MSVC
-# pragma warning(push)
-# pragma warning(disable : 4324) // Structure padded due to alignment
-#endif
-
-			socket& m_listeningSocket;
-			socket& m_acceptingSocket;
-			alignas(8) std::uint8_t m_addressBuffer[88];
-
-#if CPPCORO_COMPILER_MSVC
-# pragma warning(pop)
-#endif
+			socket_accept_operation_impl m_impl;
 
 		};
 	}

@@ -18,6 +18,28 @@ namespace cppcoro::net
 {
 	class socket;
 
+	class socket_send_operation_impl
+	{
+	public:
+
+		socket_send_operation_impl(
+			socket& s,
+			const void* buffer,
+			std::size_t byteCount) noexcept
+			: m_socket(s)
+			, m_buffer(const_cast<void*>(buffer), byteCount)
+		{}
+
+		bool try_start(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+		void cancel(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+
+	private:
+
+		socket& m_socket;
+		cppcoro::detail::win32::wsabuf m_buffer;
+
+	};
+
 	class socket_send_operation
 		: public cppcoro::detail::win32_overlapped_operation<socket_send_operation>
 	{
@@ -26,17 +48,17 @@ namespace cppcoro::net
 		socket_send_operation(
 			socket& s,
 			const void* buffer,
-			std::size_t byteCount) noexcept;
+			std::size_t byteCount) noexcept
+			: m_impl(s, buffer, byteCount)
+		{}
 
 	private:
 
 		friend class cppcoro::detail::win32_overlapped_operation<socket_send_operation>;
 
-		bool try_start() noexcept;
+		bool try_start() noexcept { return m_impl.try_start(*this); }
 
-		cppcoro::detail::win32::socket_t m_socketHandle;
-		cppcoro::detail::win32::wsabuf m_buffer;
-		bool m_skipCompletionOnSuccess;
+		socket_send_operation_impl m_impl;
 
 	};
 
@@ -49,18 +71,19 @@ namespace cppcoro::net
 			socket& s,
 			const void* buffer,
 			std::size_t byteCount,
-			cancellation_token&& ct) noexcept;
+			cancellation_token&& ct) noexcept
+			: cppcoro::detail::win32_overlapped_operation_cancellable<socket_send_operation_cancellable>(std::move(ct))
+			, m_impl(s, buffer, byteCount)
+		{}
 
 	private:
 
-		friend class cppcoro::detail::win32_overlapped_operation<socket_send_operation>;
+		friend class cppcoro::detail::win32_overlapped_operation_cancellable<socket_send_operation_cancellable>;
 
-		bool try_start() noexcept;
-		void cancel() noexcept;
+		bool try_start() noexcept { return m_impl.try_start(*this); }
+		void cancel() noexcept { return m_impl.cancel(*this); }
 
-		cppcoro::detail::win32::socket_t m_socketHandle;
-		cppcoro::detail::win32::wsabuf m_buffer;
-		bool m_skipCompletionOnSuccess;
+		socket_send_operation_impl m_impl;
 
 	};
 

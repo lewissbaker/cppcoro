@@ -18,23 +18,41 @@ namespace cppcoro
 	{
 		class socket;
 
+		class socket_disconnect_operation_impl
+		{
+		public:
+
+			socket_disconnect_operation_impl(socket& socket) noexcept
+				: m_socket(socket)
+			{}
+
+			bool try_start(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+			void cancel(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+			void get_result(cppcoro::detail::win32_overlapped_operation_base& operation);
+
+		private:
+
+			socket& m_socket;
+
+		};
+
 		class socket_disconnect_operation
 			: public cppcoro::detail::win32_overlapped_operation<socket_disconnect_operation>
 		{
 		public:
 
-			socket_disconnect_operation(socket& s) noexcept
-				: m_socket(s)
+			socket_disconnect_operation(socket& socket) noexcept
+				: m_impl(socket)
 			{}
 
 		private:
 
 			friend class cppcoro::detail::win32_overlapped_operation<socket_disconnect_operation>;
 
-			bool try_start() noexcept;
-			void get_result();
+			bool try_start() noexcept { return m_impl.try_start(*this); }
+			void get_result() { m_impl.get_result(*this); }
 
-			socket& m_socket;
+			socket_disconnect_operation_impl m_impl;
 
 		};
 
@@ -43,20 +61,20 @@ namespace cppcoro
 		{
 		public:
 
-			socket_disconnect_operation_cancellable(socket& s, cancellation_token&& ct) noexcept
+			socket_disconnect_operation_cancellable(socket& socket, cancellation_token&& ct) noexcept
 				: cppcoro::detail::win32_overlapped_operation_cancellable<socket_disconnect_operation_cancellable>(std::move(ct))
-				, m_socket(s)
+				, m_impl(socket)
 			{}
 
 		private:
 
-			friend class cppcoro::detail::win32_overlapped_operation<socket_disconnect_operation>;
+			friend class cppcoro::detail::win32_overlapped_operation_cancellable<socket_disconnect_operation_cancellable>;
 
-			bool try_start() noexcept;
-			void cancel() noexcept;
-			void get_result();
+			bool try_start() noexcept { return m_impl.try_start(*this); }
+			void cancel() noexcept { m_impl.cancel(*this); }
+			void get_result() { m_impl.get_result(*this); }
 
-			socket& m_socket;
+			socket_disconnect_operation_impl m_impl;
 
 		};
 	}

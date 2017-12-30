@@ -23,7 +23,7 @@ namespace cppcoro
 		class win32_overlapped_operation_base
 			: protected detail::win32::io_state
 		{
-		protected:
+		public:
 
 			win32_overlapped_operation_base(
 				detail::win32::io_state::callback_type* callback) noexcept

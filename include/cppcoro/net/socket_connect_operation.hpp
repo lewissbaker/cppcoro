@@ -19,6 +19,28 @@ namespace cppcoro
 	{
 		class socket;
 
+		class socket_connect_operation_impl
+		{
+		public:
+
+			socket_connect_operation_impl(
+				socket& socket,
+				const ip_endpoint& remoteEndPoint) noexcept
+				: m_socket(socket)
+				, m_remoteEndPoint(remoteEndPoint)
+			{}
+
+			bool try_start(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+			void cancel(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+			void get_result(cppcoro::detail::win32_overlapped_operation_base& operation);
+
+		private:
+
+			socket& m_socket;
+			ip_endpoint m_remoteEndPoint;
+
+		};
+
 		class socket_connect_operation
 			: public cppcoro::detail::win32_overlapped_operation<socket_connect_operation>
 		{
@@ -27,20 +49,17 @@ namespace cppcoro
 			socket_connect_operation(
 				socket& socket,
 				const ip_endpoint& remoteEndPoint) noexcept
-				: cppcoro::detail::win32_overlapped_operation<socket_connect_operation>()
-				, m_socket(socket)
-				, m_remoteEndPoint(remoteEndPoint)
+				: m_impl(socket, remoteEndPoint)
 			{}
 
 		private:
 
 			friend class cppcoro::detail::win32_overlapped_operation<socket_connect_operation>;
 
-			bool try_start() noexcept;
-			void get_result();
+			bool try_start() noexcept { return m_impl.try_start(*this); }
+			decltype(auto) get_result() { return m_impl.get_result(*this); }
 
-			socket& m_socket;
-			ip_endpoint m_remoteEndPoint;
+			socket_connect_operation_impl m_impl;
 
 		};
 
@@ -54,20 +73,18 @@ namespace cppcoro
 				const ip_endpoint& remoteEndPoint,
 				cancellation_token&& ct) noexcept
 				: cppcoro::detail::win32_overlapped_operation_cancellable<socket_connect_operation_cancellable>(std::move(ct))
-				, m_socket(socket)
-				, m_remoteEndPoint(remoteEndPoint)
+				, m_impl(socket, remoteEndPoint)
 			{}
 
 		private:
 
-			friend class cppcoro::detail::win32_overlapped_operation<socket_connect_operation>;
+			friend class cppcoro::detail::win32_overlapped_operation_cancellable<socket_connect_operation_cancellable>;
 
-			bool try_start() noexcept;
-			void cancel() noexcept;
-			void get_result();
+			bool try_start() noexcept { return m_impl.try_start(*this); }
+			void cancel() noexcept { m_impl.cancel(*this); }
+			void get_result() { m_impl.get_result(*this); }
 
-			socket& m_socket;
-			ip_endpoint m_remoteEndPoint;
+			socket_connect_operation_impl m_impl;
 
 		};
 	}
