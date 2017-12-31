@@ -164,7 +164,7 @@ namespace cppcoro
 			/// An awaitable object that must be co_await'ed to perform the async connect
 			/// operation. The result of the co_await expression is type void.
 			[[nodiscard]]
-			socket_connect_operation connect(const ip_endpoint& remoteEndPoint);
+			socket_connect_operation connect(const ip_endpoint& remoteEndPoint) noexcept;
 
 			/// Connect to the specified remote end-point.
 			///
@@ -184,39 +184,39 @@ namespace cppcoro
 			[[nodiscard]]
 			socket_connect_operation_cancellable connect(
 				const ip_endpoint& remoteEndPoint,
-				cancellation_token ct);
+				cancellation_token ct) noexcept;
 
 			[[nodiscard]]
-			socket_accept_operation accept(socket& acceptingSocket);
+			socket_accept_operation accept(socket& acceptingSocket) noexcept;
 			[[nodiscard]]
 			socket_accept_operation_cancellable accept(
 				socket& acceptingSocket,
-				cancellation_token ct);
+				cancellation_token ct) noexcept;
 
 			[[nodiscard]]
-			socket_disconnect_operation disconnect();
+			socket_disconnect_operation disconnect() noexcept;
 			[[nodiscard]]
-			socket_disconnect_operation_cancellable disconnect(cancellation_token ct);
+			socket_disconnect_operation_cancellable disconnect(cancellation_token ct) noexcept;
 
 			[[nodiscard]]
 			socket_send_operation send(
 				const void* buffer,
-				std::size_t size);
+				std::size_t size) noexcept;
 			[[nodiscard]]
 			socket_send_operation_cancellable send(
 				const void* buffer,
 				std::size_t size,
-				cancellation_token ct);
+				cancellation_token ct) noexcept;
 
 			[[nodiscard]]
 			socket_recv_operation recv(
 				void* buffer,
-				std::size_t size);
+				std::size_t size) noexcept;
 			[[nodiscard]]
 			socket_recv_operation_cancellable recv(
 				void* buffer,
 				std::size_t size,
-				cancellation_token ct);
+				cancellation_token ct) noexcept;
 
 			void close_send();
 			void close_recv();

@@ -373,61 +373,61 @@ void cppcoro::net::socket::listen(std::uint32_t backlog)
 }
 
 cppcoro::net::socket_accept_operation
-cppcoro::net::socket::accept(socket& acceptingSocket)
+cppcoro::net::socket::accept(socket& acceptingSocket) noexcept
 {
 	return socket_accept_operation{ *this, acceptingSocket };
 }
 
 cppcoro::net::socket_accept_operation_cancellable
-cppcoro::net::socket::accept(socket& acceptingSocket, cancellation_token ct)
+cppcoro::net::socket::accept(socket& acceptingSocket, cancellation_token ct) noexcept
 {
 	return socket_accept_operation_cancellable{ *this, acceptingSocket, std::move(ct) };
 }
 
 cppcoro::net::socket_connect_operation
-cppcoro::net::socket::connect(const ip_endpoint& remoteEndPoint)
+cppcoro::net::socket::connect(const ip_endpoint& remoteEndPoint) noexcept
 {
 	return socket_connect_operation{ *this, remoteEndPoint };
 }
 
 cppcoro::net::socket_connect_operation_cancellable
-cppcoro::net::socket::connect(const ip_endpoint& remoteEndPoint, cancellation_token ct)
+cppcoro::net::socket::connect(const ip_endpoint& remoteEndPoint, cancellation_token ct) noexcept
 {
 	return socket_connect_operation_cancellable{ *this, remoteEndPoint, std::move(ct) };
 }
 
 cppcoro::net::socket_disconnect_operation
-cppcoro::net::socket::disconnect()
+cppcoro::net::socket::disconnect() noexcept
 {
 	return socket_disconnect_operation(*this);
 }
 
 cppcoro::net::socket_disconnect_operation_cancellable
-cppcoro::net::socket::disconnect(cancellation_token ct)
+cppcoro::net::socket::disconnect(cancellation_token ct) noexcept
 {
 	return socket_disconnect_operation_cancellable{ *this, std::move(ct) };
 }
 
 cppcoro::net::socket_send_operation
-cppcoro::net::socket::send(const void* buffer, std::size_t byteCount)
+cppcoro::net::socket::send(const void* buffer, std::size_t byteCount) noexcept
 {
 	return socket_send_operation{ *this, buffer, byteCount };
 }
 
 cppcoro::net::socket_send_operation_cancellable
-cppcoro::net::socket::send(const void* buffer, std::size_t byteCount, cancellation_token ct)
+cppcoro::net::socket::send(const void* buffer, std::size_t byteCount, cancellation_token ct) noexcept
 {
 	return socket_send_operation_cancellable{ *this, buffer, byteCount, std::move(ct) };
 }
 
 cppcoro::net::socket_recv_operation
-cppcoro::net::socket::recv(void* buffer, std::size_t byteCount)
+cppcoro::net::socket::recv(void* buffer, std::size_t byteCount) noexcept
 {
 	return socket_recv_operation{ *this, buffer, byteCount };
 }
 
 cppcoro::net::socket_recv_operation_cancellable
-cppcoro::net::socket::recv(void* buffer, std::size_t byteCount, cancellation_token ct)
+cppcoro::net::socket::recv(void* buffer, std::size_t byteCount, cancellation_token ct) noexcept
 {
 	return socket_recv_operation_cancellable{ *this, buffer, byteCount, std::move(ct) };
 }
