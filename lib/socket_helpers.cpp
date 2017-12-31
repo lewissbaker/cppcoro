@@ -22,7 +22,8 @@ cppcoro::net::detail::sockaddr_to_ip_endpoint(const sockaddr& address) noexcept
 {
 	if (address.sa_family == AF_INET)
 	{
-		const auto& ipv4Address = *reinterpret_cast<const sockaddr_in*>(&address);
+		SOCKADDR_IN ipv4Address;
+		std::memcpy(&ipv4Address, &address, sizeof(ipv4Address));
 
 		std::uint8_t addressBytes[4];
 		std::memcpy(addressBytes, &ipv4Address.sin_addr, 4);
@@ -36,7 +37,8 @@ cppcoro::net::detail::sockaddr_to_ip_endpoint(const sockaddr& address) noexcept
 	{
 		assert(address.sa_family == AF_INET6);
 
-		const auto& ipv6Address = *reinterpret_cast<const sockaddr_in6*>(&address);
+		SOCKADDR_IN6 ipv6Address;
+		std::memcpy(&ipv6Address, &address, sizeof(ipv6Address));
 
 		return ipv6_endpoint{
 			ipv6_address{ ipv6Address.sin6_addr.u.Byte },
@@ -52,22 +54,30 @@ int cppcoro::net::detail::ip_endpoint_to_sockaddr(
 	if (endPoint.is_ipv4())
 	{
 		const auto& ipv4EndPoint = endPoint.to_ipv4();
-		auto& ipv4Address = *reinterpret_cast<SOCKADDR_IN*>(&address.get());
+
+		SOCKADDR_IN ipv4Address;
 		ipv4Address.sin_family = AF_INET;
 		std::memcpy(&ipv4Address.sin_addr, ipv4EndPoint.address().bytes(), 4);
 		ipv4Address.sin_port = ipv4EndPoint.port();
 		std::memset(&ipv4Address.sin_zero, 0, sizeof(ipv4Address.sin_zero));
+
+		std::memcpy(&address.get(), &ipv4Address, sizeof(ipv4Address));
+
 		return sizeof(SOCKADDR_IN);
 	}
 	else
 	{
 		const auto& ipv6EndPoint = endPoint.to_ipv6();
-		auto& ipv6Address = *reinterpret_cast<SOCKADDR_IN6*>(&address.get());
+
+		SOCKADDR_IN6 ipv6Address;
 		ipv6Address.sin6_family = AF_INET6;
 		std::memcpy(&ipv6Address.sin6_addr, ipv6EndPoint.address().bytes(), 16);
 		ipv6Address.sin6_port = ipv6EndPoint.port();
 		ipv6Address.sin6_flowinfo = 0;
 		ipv6Address.sin6_scope_struct = SCOPEID_UNSPECIFIED_INIT;
+
+		std::memcpy(&address.get(), &ipv6Address, sizeof(ipv6Address));
+
 		return sizeof(SOCKADDR_IN6);
 	}
 }
