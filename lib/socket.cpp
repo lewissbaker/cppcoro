@@ -432,6 +432,30 @@ cppcoro::net::socket::recv(void* buffer, std::size_t byteCount, cancellation_tok
 	return socket_recv_operation_cancellable{ *this, buffer, byteCount, std::move(ct) };
 }
 
+cppcoro::net::socket_recv_from_operation
+cppcoro::net::socket::recv_from(void* buffer, std::size_t byteCount) noexcept
+{
+	return socket_recv_from_operation{ *this, buffer, byteCount };
+}
+
+cppcoro::net::socket_recv_from_operation_cancellable
+cppcoro::net::socket::recv_from(void* buffer, std::size_t byteCount, cancellation_token ct) noexcept
+{
+	return socket_recv_from_operation_cancellable{ *this, buffer, byteCount, std::move(ct) };
+}
+
+cppcoro::net::socket_send_to_operation
+cppcoro::net::socket::send_to(const ip_endpoint& destination, const void* buffer, std::size_t byteCount) noexcept
+{
+	return socket_send_to_operation{ *this, destination, buffer, byteCount };
+}
+
+cppcoro::net::socket_send_to_operation_cancellable
+cppcoro::net::socket::send_to(const ip_endpoint& destination, const void* buffer, std::size_t byteCount, cancellation_token ct) noexcept
+{
+	return socket_send_to_operation_cancellable{ *this, destination, buffer, byteCount, std::move(ct) };
+}
+
 void cppcoro::net::socket::close_send()
 {
 	int result = ::shutdown(m_handle, SD_SEND);

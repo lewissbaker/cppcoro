@@ -101,8 +101,10 @@ if variant.platform == "windows":
     'socket_accept_operation.hpp',
     'socket_connect_operation.hpp',
     'socket_disconnect_operation.hpp',
-    'socket_send_operation.hpp',
     'socket_recv_operation.hpp',
+    'socket_recv_from_operation.hpp',
+    'socket_send_operation.hpp',
+    'socket_send_to_operation.hpp',
   ]))
   sources.extend(script.cwd([
     'win32.cpp',
@@ -121,7 +123,9 @@ if variant.platform == "windows":
     'socket_connect_operation.cpp',
     'socket_disconnect_operation.cpp',
     'socket_send_operation.cpp',
+    'socket_send_to_operation.cpp',
     'socket_recv_operation.cpp',
+    'socket_recv_from_operation.cpp',
     ]))
 
 buildDir = env.expand('${CPPCORO_BUILD}')

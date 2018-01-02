@@ -12,7 +12,9 @@
 #include <cppcoro/net/socket_connect_operation.hpp>
 #include <cppcoro/net/socket_disconnect_operation.hpp>
 #include <cppcoro/net/socket_recv_operation.hpp>
+#include <cppcoro/net/socket_recv_from_operation.hpp>
 #include <cppcoro/net/socket_send_operation.hpp>
+#include <cppcoro/net/socket_send_to_operation.hpp>
 
 #include <cppcoro/cancellation_token.hpp>
 
@@ -215,6 +217,28 @@ namespace cppcoro
 			[[nodiscard]]
 			socket_recv_operation_cancellable recv(
 				void* buffer,
+				std::size_t size,
+				cancellation_token ct) noexcept;
+
+			[[nodiscard]]
+			socket_recv_from_operation recv_from(
+				void* buffer,
+				std::size_t size) noexcept;
+			[[nodiscard]]
+			socket_recv_from_operation_cancellable recv_from(
+				void* buffer,
+				std::size_t size,
+				cancellation_token ct) noexcept;
+
+			[[nodiscard]]
+			socket_send_to_operation send_to(
+				const ip_endpoint& destination,
+				const void* buffer,
+				std::size_t size) noexcept;
+			[[nodiscard]]
+			socket_send_to_operation_cancellable send_to(
+				const ip_endpoint& destination,
+				const void* buffer,
 				std::size_t size,
 				cancellation_token ct) noexcept;
 
