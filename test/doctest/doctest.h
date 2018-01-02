@@ -5599,7 +5599,14 @@ namespace doctest
 			if ((p->last < p->numTestsPassingFilters && p->first <= p->last) ||
 				(p->first > p->numTestsPassingFilters))
 				continue;
-
+	
+			// Print the test name before running it.
+			// This makes it easier to identify a which test a crash occurs in.
+			if (!p->success) {
+				std::printf("%s\n", data.m_name);
+				std::fflush(stdout);
+			}
+			
 			// execute the test if it passes all the filtering
 			{
 				p->currentTest = &data;
