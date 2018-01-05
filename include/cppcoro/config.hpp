@@ -68,4 +68,50 @@
 /////////////////////////////////////////////////////////////////////////////
 // CPU Detection
 
+/// \def CPPCORO_CPU_X86
+/// Defined to 1 if target CPU is of x86 family.
+#if CPPCORO_COMPILER_MSVC
+# if defined(_M_IX86)
+#  define CPPCORO_CPU_X86 1
+# endif
+#elif CPPCORO_COMPILER_GCC || CPPCORO_COMPILER_CLANG
+# if defined(__i386__)
+#  define CPPCORO_CPU_X86 1
+# endif
+#endif
+#if !defined(CPPCORO_CPU_X86)
+# define CPPCORO_CPU_X86 0
+#endif
+
+/// \def CPPCORO_CPU_X64
+/// Defined to 1 if the target CPU is x64 family.
+#if CPPCORO_COMPILER_MSVC
+# if defined(_M_X64)
+#  define CPPCORO_CPU_X64 1
+# endif
+#elif CPPCORO_COMPILER_GCC || CPPCORO_COMPILER_CLANG
+# if defined(__x86_64__)
+#  define CPPCORO_CPU_X64 1
+# endif
+#endif
+#if !defined(CPPCORO_CPU_X64)
+# define CPPCORO_CPU_X64 0
+#endif
+
+/// \def CPPCORO_CPU_32BIT
+/// Defined if compiling for a 32-bit CPU architecture.
+#if CPPCORO_CPU_X86
+# define CPPCORO_CPU_32BIT 1
+#else
+# define CPPCORO_CPU_32BIT 0
+#endif
+
+/// \def CPPCORO_CPU_64BIT
+/// Defined if compiling for a 64-bit CPU architecture.
+#if CPPCORO_CPU_X64
+# define CPPCORO_CPU_64BIT 1
+#else
+# define CPPCORO_CPU_64BIT 0
+#endif
+
 #endif
