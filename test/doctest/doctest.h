@@ -5036,6 +5036,8 @@ namespace doctest
 			DOCTEST_PRINTF_COLORED(context.c_str(), Color::None);
 			DOCTEST_PRINTF_COLORED("\n", Color::None);
 
+			std::fflush(stdout);
+
 			printToDebugConsole(String(loc) + msg + "  " + info.c_str() + "\n" + context.c_str() +
 				"\n");
 
