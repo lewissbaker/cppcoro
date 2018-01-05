@@ -116,13 +116,13 @@ TEST_CASE("when_all_ready() with all task types")
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		[&]() -> cppcoro::task<>
 	{
-		auto [t0, t1] = co_await std::move(allTask);
+		auto [r0, r1] = co_await std::move(allTask);
 
-		CHECK(t0.is_ready());
-		CHECK(t1.is_ready());
+		CHECK(r0.is_ready());
+		CHECK(r1.is_ready());
 
-		CHECK(co_await t0 == 1);
-		CHECK(co_await t1 == 2);
+		CHECK(co_await r0 == 1);
+		CHECK(co_await r1 == 2);
 	}(),
 		[&]() -> cppcoro::task<>
 	{
