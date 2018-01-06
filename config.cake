@@ -78,6 +78,8 @@ if cake.system.isWindows() or cake.system.isCygwin():
         vcInstallDir=vcInstallDir,
         )
 
+      engine.logger.outputInfo("MSVC (" + arch + "): " + vcInstallDir + "\n")
+
       msvcVariant = baseVariant.clone(
         platform="windows",
         compiler="msvc",
