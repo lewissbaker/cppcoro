@@ -9,6 +9,8 @@
 #include <cppcoro/read_write_file.hpp>
 #include <cppcoro/task.hpp>
 #include <cppcoro/sync_wait.hpp>
+#include <cppcoro/when_all.hpp>
+#include <cppcoro/cancellation_source.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
 #include <random>
@@ -139,12 +141,56 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
 
 		co_await f.read(0, buffer2, 50);
 		CHECK(std::memcmp(buffer1, buffer2, 50) == 0);
-		
+
 		co_await f.read(50, buffer2, 50);
 		CHECK(std::memcmp(buffer1 + 50, buffer2, 50) == 0);
 	};
 
 	cppcoro::sync_wait(run());
+}
+
+TEST_CASE_FIXTURE(temp_dir_fixture, "cancel read")
+{
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
+	{
+		cppcoro::io_work_scope ioScope{ io_service() };
+		auto f = cppcoro::read_write_file::open(io_service(), temp_dir() / "foo.txt");
+
+		f.set_size(20 * 1024 * 1024);
+
+		cppcoro::cancellation_source canceller;
+
+		try
+		{
+			(void)co_await cppcoro::when_all(
+				[&]() -> cppcoro::task<int>
+			{
+				const auto fileSize = f.size();
+				const std::size_t bufferSize = 64 * 1024;
+				auto buffer = std::make_unique<std::uint8_t[]>(bufferSize);
+				std::uint64_t offset = 0;
+				while (offset < fileSize)
+				{
+					auto bytesRead = co_await f.read(offset, buffer.get(), bufferSize, canceller.token());
+					offset += bytesRead;
+				}
+				WARN("should have been cancelled");
+				co_return 0;
+			}(),
+				[&]() -> cppcoro::task<int>
+			{
+				using namespace std::chrono_literals;
+
+				co_await io_service().schedule_after(1ms);
+				canceller.request_cancellation();
+				co_return 0;
+			}());
+			WARN("Expected exception to be thrown");
+		}
+		catch (const cppcoro::operation_cancelled&)
+		{
+		}
+	}());
 }
 
 TEST_SUITE_END();

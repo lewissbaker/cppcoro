@@ -57,7 +57,7 @@ else
    git checkout FETCH_HEAD) || exit
 fi
 
-if [ ! -d llvm/projects/libcxx.git ]; then
+if [ ! -d llvm/projects/libcxx/.git ]; then
   git clone --depth=1 -b "$LIBCXX_REF" -- "$LIBCXX_REPO" llvm/projects/libcxx || exit
   ln -s llvm/projects/libcxx libcxx || exit
 else

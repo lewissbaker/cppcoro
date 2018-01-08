@@ -49,6 +49,15 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'file_write_operation.hpp',
   ])
 
+netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'net', [
+  'ip_address.hpp',
+  'ip_endpoint.hpp',
+  'ipv4_address.hpp',
+  'ipv4_endpoint.hpp.',
+  'ipv6_address.hpp',
+  'ipv6_endpoint.hpp',
+])
+
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
   'void_value.hpp',
   'when_all_ready_awaitable.hpp',
@@ -75,6 +84,12 @@ sources = script.cwd([
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
   'lightweight_manual_reset_event.cpp',
+  'ip_address.cpp',
+  'ip_endpoint.cpp',
+  'ipv4_address.cpp',
+  'ipv4_endpoint.cpp',
+  'ipv6_address.cpp',
+  'ipv6_endpoint.cpp',
   ])
 
 extras = script.cwd([
@@ -85,6 +100,7 @@ extras = script.cwd([
 if variant.platform == "windows":
   detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
     'win32.hpp',
+	'win32_overlapped_operation.hpp',
     ]))
   sources.extend(script.cwd([
     'win32.cpp',
@@ -118,6 +134,7 @@ vcproj = project.project(
   items={
     'Include': {
       'Detail': detailIncludes,
+      'Net': netIncludes,
       '': includes,
       },
     'Source': sources + privateHeaders,

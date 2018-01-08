@@ -78,6 +78,8 @@ if cake.system.isWindows() or cake.system.isCygwin():
         vcInstallDir=vcInstallDir,
         )
 
+      engine.logger.outputInfo("MSVC (" + arch + "): " + vcInstallDir + "\n")
+
       msvcVariant = baseVariant.clone(
         platform="windows",
         compiler="msvc",
@@ -253,6 +255,17 @@ elif cake.system.isLinux() or cake.system.isDarwin():
                                    platform=platform,
                                    architecture='x64')
 
+  # If libc++ is installed in a non-standard location, add the path to libc++.so
+  # to the library search path by adding libc++'s /lib directory to LD_LIBRARY_PATH
+  if libcxxInstallPrefix not in defaultInstallPaths:
+    libcxxLibPath = os.path.abspath(cake.path.join(libcxxInstallPrefix, 'lib'))
+    ldPaths = [libcxxLibPath]
+    test = clangVariant.tools["test"]
+    oldLdPath = test.env.get('LD_LIBRARY_PATH', None)
+    if oldLdPath:
+      ldPaths.append(oldLdPath)
+    test.env['LD_LIBRARY_PATH'] = os.path.pathsep.join(ldPaths)
+
   compiler = ClangCompiler(
     configuration=configuration,
     clangExe=clangExe,
@@ -264,8 +277,9 @@ elif cake.system.isLinux() or cake.system.isDarwin():
   compiler.addCppFlag('-m64')
 
   if lldExe:
-    compiler.addModuleFlag('-fuse-ld=' + lldExe)
-    compiler.addProgramFlag('-fuse-ld=' + lldExe)
+    lldExeAbspath = configuration.abspath(lldExe)
+    compiler.addModuleFlag('-fuse-ld=' + lldExeAbspath)
+    compiler.addProgramFlag('-fuse-ld=' + lldExeAbspath)
   
   if libcxxInstallPrefix != clangInstallPrefix:
     compiler.addCppFlag('-nostdinc++')

@@ -5036,6 +5036,8 @@ namespace doctest
 			DOCTEST_PRINTF_COLORED(context.c_str(), Color::None);
 			DOCTEST_PRINTF_COLORED("\n", Color::None);
 
+			std::fflush(stdout);
+
 			printToDebugConsole(String(loc) + msg + "  " + info.c_str() + "\n" + context.c_str() +
 				"\n");
 
@@ -5599,7 +5601,14 @@ namespace doctest
 			if ((p->last < p->numTestsPassingFilters && p->first <= p->last) ||
 				(p->first > p->numTestsPassingFilters))
 				continue;
-
+	
+			// Print the test name before running it.
+			// This makes it easier to identify a which test a crash occurs in.
+			if (!p->success) {
+				std::printf("%s\n", data.m_name);
+				std::fflush(stdout);
+			}
+			
 			// execute the test if it passes all the filtering
 			{
 				p->currentTest = &data;
