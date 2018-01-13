@@ -85,6 +85,8 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 
 	auto write = [&](cppcoro::io_service& ioService) -> cppcoro::task<>
 	{
+		std::printf(" starting write\n"); std::fflush(stdout);
+
 		auto f = cppcoro::write_only_file::open(ioService, filePath);
 
 		CHECK(f.size() == 0);
@@ -104,6 +106,8 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 
 	auto read = [&](cppcoro::io_service& io) -> cppcoro::task<>
 	{
+		std::printf(" starting read\n"); std::fflush(stdout);
+
 		auto f = cppcoro::read_only_file::open(io, filePath);
 
 		const auto fileSize = f.size();
