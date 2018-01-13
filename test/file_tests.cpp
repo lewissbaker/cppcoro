@@ -27,7 +27,7 @@ namespace fs = std::experimental::filesystem;
 
 namespace
 {
-	class temp_dir_fixture : public io_service_fixture
+	class temp_dir_fixture
 	{
 	public:
 
@@ -69,11 +69,19 @@ namespace
 		std::experimental::filesystem::path m_path;
 
 	};
+
+	class temp_dir_with_io_service_fixture :
+		public io_service_fixture,
+		public temp_dir_fixture
+	{
+	};
 }
 
 TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 {
 	auto filePath = temp_dir() / "foo";
+
+	cppcoro::io_service ioService;
 
 	auto write = [&](cppcoro::io_service& ioService) -> cppcoro::task<>
 	{
@@ -114,16 +122,22 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "write a file")
 		}
 	};
 
-	auto run = [&]() -> cppcoro::task<>
-	{
-		co_await write(io_service());
-		co_await read(io_service());
-	};
-
-	cppcoro::sync_wait(run());
+	cppcoro::sync_wait(cppcoro::when_all(
+		[&]() -> cppcoro::task<int>
+		{
+			auto stopOnExit = cppcoro::on_scope_exit([&] { ioService.stop(); });
+			co_await write(ioService);
+			co_await read(ioService);
+			co_return 0;
+		}(),
+		[&]() -> cppcoro::task<int>
+		{
+			ioService.process_events();
+			co_return 0;
+		}()));
 }
 
-TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
+TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "read write file")
 {
 	auto run = [&]() -> cppcoro::task<>
 	{
@@ -148,7 +162,7 @@ TEST_CASE_FIXTURE(temp_dir_fixture, "read write file")
 	cppcoro::sync_wait(run());
 }
 
-TEST_CASE_FIXTURE(temp_dir_fixture, "cancel read")
+TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "cancel read")
 {
 	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
