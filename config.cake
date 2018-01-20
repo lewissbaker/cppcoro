@@ -117,6 +117,8 @@ if cake.system.isWindows() or cake.system.isCygwin():
       # Enable C++17 features like std::optional<>
       compiler.addCppFlag('/std:c++latest')
 
+      compiler.addDefine('_SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING')
+
       compiler.addProgramFlag('/nodefaultlib')
       compiler.addModuleFlag('/nodefaultlib')
 
