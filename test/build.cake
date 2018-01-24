@@ -22,6 +22,7 @@ sources = script.cwd([
   'generator_tests.cpp',
   'recursive_generator_tests.cpp',
   'async_generator_tests.cpp',
+  'async_stream_tests.cpp',
   'async_auto_reset_event_tests.cpp',
   'async_manual_reset_event_tests.cpp',
   'async_mutex_tests.cpp',
