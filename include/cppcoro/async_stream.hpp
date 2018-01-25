@@ -320,6 +320,8 @@ namespace cppcoro
 
 	public:
 
+		using value_type = std::remove_reference_t<T>;
+
 		async_stream(handle_t coroutine) noexcept
 			: m_coroutine(coroutine)
 		{}

@@ -5,6 +5,8 @@
 #ifndef CPPCORO_CONSUME_HPP_INCLUDED
 #define CPPCORO_CONSUME_HPP_INCLUDED
 
+#include <functional>
+
 namespace cppcoro
 {
 	template<typename SUBSCRIBABLE, typename CONSUME_FUNC>
