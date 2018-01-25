@@ -89,25 +89,25 @@ auto take(COUNT n, SUBSCRIBABLE&& s)
 		{
 			auto[sourceStream, sourceTask] = s.subscribe();
 
-		using value_type = typename std::remove_reference_t<decltype(sourceStream)>::value_type;
+			using value_type = typename std::remove_reference_t<decltype(sourceStream)>::value_type;
 
-		auto[outputStream, outputTask] = [](COUNT n, auto stream) -> async_stream_subscription<value_type>
-		{
-			auto localStream = std::move(stream);
-			if (n > 0)
+			auto[outputStream, outputTask] = [](COUNT n, auto stream) -> async_stream_subscription<value_type>
 			{
-				for co_await(auto&& value : localStream)
+				auto localStream = std::move(stream);
+				if (n > 0)
 				{
-					bool produceMore = co_yield value;
-					if (!produceMore) break;
-					if (--n == 0) break;
+					for co_await(auto&& value : localStream)
+					{
+						bool produceMore = co_yield value;
+						if (!produceMore) break;
+						if (--n == 0) break;
+					}
 				}
-			}
-		}(n, std::move(sourceStream));
+			}(n, std::move(sourceStream));
 
-		return std::make_tuple(
-			std::move(outputStream),
-			when_all(std::move(sourceTask), std::move(outputTask)) | fmap([](auto) {}));
+			return std::make_tuple(
+				std::move(outputStream),
+				when_all(std::move(sourceTask), std::move(outputTask)) | fmap([](auto) {}));
 		});
 }
 
