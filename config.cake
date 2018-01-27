@@ -221,7 +221,9 @@ elif cake.system.isLinux():
   compiler.addLibrary('c++')
   compiler.addLibrary('c')
   compiler.addLibrary('pthread')
-
+  compiler.addLibrary('rt')
+  compiler.addLibrary('uuid')	
+  
   #compiler.addProgramFlag('-Wl,--trace')
   #compiler.addProgramFlag('-Wl,-v')
 

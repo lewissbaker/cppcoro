@@ -17,51 +17,72 @@
 
 TEST_SUITE_BEGIN("schedule/resume_on");
 
+#if CPPCORO_OS_WINNT
+#define THREAD_ID std::thread::id
+#define GET_THIS_THREAD_ID std::this_thread::get_id()
+#endif
+
+#if CPPCORO_OS_LINUX
+#define THREAD_ID unsigned long long
+#define GET_THIS_THREAD_ID get_thread_id()
+
+#include <sstream>
+
+static unsigned long long get_thread_id()
+{
+  unsigned long long id;
+  std::stringstream ss;
+  ss << std::this_thread::get_id();
+  id = std::stoull(ss.str());
+  return id;
+}
+#endif
+
 TEST_CASE_FIXTURE(io_service_fixture, "schedule_on task<> function")
 {
-	auto mainThreadId = std::this_thread::get_id();
+	auto mainThreadId = GET_THIS_THREAD_ID;
 
-	std::thread::id ioThreadId;
+	THREAD_ID ioThreadId;
 
 	auto start = [&]() -> cppcoro::task<>
 	{
-		ioThreadId = std::this_thread::get_id();
+		ioThreadId = GET_THIS_THREAD_ID;
 		CHECK(ioThreadId != mainThreadId);
 		co_return;
 	};
 
 	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 
 		co_await schedule_on(io_service(), start());
 
-		CHECK(std::this_thread::get_id() == ioThreadId);
+		CHECK(GET_THIS_THREAD_ID == ioThreadId);
 	}());
 }
 
 TEST_CASE_FIXTURE(io_service_fixture, "schedule_on async_generator<> function")
 {
-	auto mainThreadId = std::this_thread::get_id();
+	auto mainThreadId = GET_THIS_THREAD_ID;
 
-	std::thread::id ioThreadId;
+	THREAD_ID ioThreadId;
 
 	auto makeSequence = [&]() -> cppcoro::async_generator<int>
 	{
-		ioThreadId = std::this_thread::get_id();
+		ioThreadId = GET_THIS_THREAD_ID;
 		CHECK(ioThreadId != mainThreadId);
 
 		co_yield 1;
 
-		CHECK(std::this_thread::get_id() == ioThreadId);
+		CHECK(GET_THIS_THREAD_ID == ioThreadId);
 
 		co_yield 2;
 
-		CHECK(std::this_thread::get_id() == ioThreadId);
+		CHECK(GET_THIS_THREAD_ID == ioThreadId);
 
 		co_yield 3;
 
-		CHECK(std::this_thread::get_id() == ioThreadId);
+		CHECK(GET_THIS_THREAD_ID == ioThreadId);
 
 		co_return;
 	};
@@ -71,7 +92,7 @@ TEST_CASE_FIXTURE(io_service_fixture, "schedule_on async_generator<> function")
 	cppcoro::sync_wait(cppcoro::when_all_ready(
 		[&]() -> cppcoro::task<>
 	{
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 
 		auto seq = schedule_on(io_service(), makeSequence());
 
@@ -97,35 +118,35 @@ TEST_CASE_FIXTURE(io_service_fixture, "schedule_on async_generator<> function")
 
 TEST_CASE_FIXTURE(io_service_fixture, "resume_on task<> function")
 {
-	auto mainThreadId = std::this_thread::get_id();
+	auto mainThreadId = GET_THIS_THREAD_ID;
 
 	auto start = [&]() -> cppcoro::task<>
 	{
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 		co_return;
 	};
 
 	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 
 		co_await resume_on(io_service(), start());
 
-		CHECK(std::this_thread::get_id() != mainThreadId);
+		CHECK(GET_THIS_THREAD_ID != mainThreadId);
 	}());
 }
 
 TEST_CASE_FIXTURE(io_service_fixture, "resume_on async_generator<> function")
 {
-	auto mainThreadId = std::this_thread::get_id();
+	auto mainThreadId = GET_THIS_THREAD_ID;
 
-	std::thread::id ioThreadId;
+	THREAD_ID ioThreadId;
 
 	auto makeSequence = [&]() -> cppcoro::async_generator<int>
 	{
 		co_await io_service().schedule();
 
-		ioThreadId = std::this_thread::get_id();
+		ioThreadId = GET_THIS_THREAD_ID;
 
 		CHECK(ioThreadId != mainThreadId);
 
@@ -149,7 +170,7 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on async_generator<> function")
 	{
 		auto stopOnExit = cppcoro::on_scope_exit([&] { otherIoService.stop(); });
 
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 
 		auto seq = resume_on(otherIoService, makeSequence());
 
@@ -158,7 +179,7 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on async_generator<> function")
 		{
 			// Every time we receive a value it should be on our requested
 			// scheduler (ie. main thread)
-			CHECK(std::this_thread::get_id() == mainThreadId);
+			CHECK(GET_THIS_THREAD_ID == mainThreadId);
 			CHECK(value == expected++);
 
 			// Occasionally transfer execution to a different thread before
@@ -180,17 +201,17 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on async_generator<> function")
 
 TEST_CASE_FIXTURE(io_service_fixture, "schedule_on task<> pipe syntax")
 {
-	auto mainThreadId = std::this_thread::get_id();
+	auto mainThreadId = GET_THIS_THREAD_ID;
 
 	auto makeTask = [&]() -> cppcoro::task<int>
 	{
-		CHECK(std::this_thread::get_id() != mainThreadId);
+		CHECK(GET_THIS_THREAD_ID != mainThreadId);
 		co_return 123;
 	};
 
 	auto triple = [&](int x)
 	{
-		CHECK(std::this_thread::get_id() != mainThreadId);
+		CHECK(GET_THIS_THREAD_ID != mainThreadId);
 		return x * 3;
 	};
 
@@ -204,11 +225,11 @@ TEST_CASE_FIXTURE(io_service_fixture, "schedule_on task<> pipe syntax")
 
 TEST_CASE_FIXTURE(io_service_fixture, "resume_on task<> pipe syntax")
 {
-	auto mainThreadId = std::this_thread::get_id();
+	auto mainThreadId = GET_THIS_THREAD_ID;
 
 	auto makeTask = [&]() -> cppcoro::task<int>
 	{
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 		co_return 123;
 	};
 
@@ -216,23 +237,23 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on task<> pipe syntax")
 	{
 		cppcoro::task<int> t = makeTask() | cppcoro::resume_on(io_service());
 		CHECK(co_await t == 123);
-		CHECK(std::this_thread::get_id() != mainThreadId);
+		CHECK(GET_THIS_THREAD_ID != mainThreadId);
 	}());
 }
 
 TEST_CASE_FIXTURE(io_service_fixture, "resume_on task<> pipe syntax multiple uses")
 {
-	auto mainThreadId = std::this_thread::get_id();
+	auto mainThreadId = GET_THIS_THREAD_ID;
 
 	auto makeTask = [&]() -> cppcoro::task<int>
 	{
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 		co_return 123;
 	};
 
 	auto triple = [&](int x)
 	{
-		CHECK(std::this_thread::get_id() != mainThreadId);
+		CHECK(GET_THIS_THREAD_ID != mainThreadId);
 		return x * 3;
 	};
 
@@ -243,7 +264,7 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on task<> pipe syntax multiple use
 	{
 		auto stopOnExit = cppcoro::on_scope_exit([&] { otherIoService.stop(); });
 
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 
 		cppcoro::task<int> t =
 			makeTask()
@@ -253,7 +274,7 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on task<> pipe syntax multiple use
 
 		CHECK(co_await t == 369);
 
-		CHECK(std::this_thread::get_id() == mainThreadId);
+		CHECK(GET_THIS_THREAD_ID == mainThreadId);
 	}(),
 		[&]() -> cppcoro::task<>
 	{

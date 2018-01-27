@@ -65,6 +65,7 @@ sources = script.cwd([
   'cancellation_source.cpp',
   'cancellation_registration.cpp',
   'lightweight_manual_reset_event.cpp',
+  'io_service.cpp',
   ])
 
 extras = script.cwd([
@@ -72,13 +73,20 @@ extras = script.cwd([
   'use.cake',
   ])
 
+if variant.platform == "linux":
+  detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
+    'linux.hpp',
+    ]))
+  sources.extend(script.cwd([
+    'linux.cpp',
+    ]))
+    
 if variant.platform == "windows":
   detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
     'win32.hpp',
     ]))
   sources.extend(script.cwd([
     'win32.cpp',
-    'io_service.cpp',
     'file.cpp',
     'readable_file.cpp',
     'writable_file.cpp',
