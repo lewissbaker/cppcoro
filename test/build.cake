@@ -39,12 +39,12 @@ sources = script.cwd([
   'ipv4_endpoint_tests.cpp',
   'ipv6_address_tests.cpp',
   'ipv6_endpoint_tests.cpp',
+  'scheduling_operator_tests.cpp',
+  'io_service_tests.cpp',
   ])
 
 if variant.platform == 'windows':
   sources += script.cwd([
-    'scheduling_operator_tests.cpp',
-    'io_service_tests.cpp',
     'file_tests.cpp',
     ])
 

@@ -13,6 +13,10 @@
 # include <cppcoro/detail/win32.hpp>
 #endif
 
+#if CPPCORO_OS_LINUX
+#include <cppcoro/detail/linux.hpp>
+#endif
+
 #include <optional>
 #include <chrono>
 #include <cstdint>
@@ -42,8 +46,12 @@ namespace cppcoro
 		/// actively processing events.
 		/// Note that the number of active threads may temporarily go
 		/// above this number.
-		io_service(std::uint32_t concurrencyHint);
-
+#if CPPCORO_OS_WINNT
+	        io_service(std::uint32_t concurrencyHint);
+#endif
+#if CPPCORO_OS_LINUX
+	        io_service(size_t queue_length);
+#endif
 		~io_service();
 
 		io_service(io_service&& other) = delete;
@@ -147,6 +155,10 @@ namespace cppcoro
 
 		void try_reschedule_overflow_operations() noexcept;
 
+	  void queue_overflow_operation_to_head(schedule_operation* operation) noexcept;
+
+	  void queue_overflow_operation_to_tail(schedule_operation* operation) noexcept;
+	  
 		bool try_enter_event_loop() noexcept;
 		void exit_event_loop() noexcept;
 
@@ -169,6 +181,9 @@ namespace cppcoro
 		detail::win32::safe_handle m_iocpHandle;
 #endif
 
+#if CPPCORO_OS_LINUX
+	        detail::linux::message_queue* m_mq;
+#endif
 		// Head of a linked-list of schedule operations that are
 		// ready to run but that failed to be queued to the I/O
 		// completion port (eg. due to low memory).
