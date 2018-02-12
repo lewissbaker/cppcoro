@@ -14,7 +14,7 @@
 
 typedef int DWORD;
 #define INFINITE (DWORD)-1
-			
+
 namespace cppcoro
 {
 	namespace detail

@@ -47,10 +47,10 @@ namespace cppcoro
 		/// Note that the number of active threads may temporarily go
 		/// above this number.
 #if CPPCORO_OS_WINNT
-	        io_service(std::uint32_t concurrencyHint);
+		io_service(std::uint32_t concurrencyHint);
 #endif
 #if CPPCORO_OS_LINUX
-	        io_service(size_t queue_length);
+		io_service(size_t queue_length);
 #endif
 		~io_service();
 
@@ -84,8 +84,8 @@ namespace cppcoro
 		template<typename REP, typename PERIOD>
 		[[nodiscard]]
 		timed_schedule_operation schedule_after(
-			const std::chrono::duration<REP, PERIOD>& delay,
-			cancellation_token cancellationToken = {}) noexcept;
+							const std::chrono::duration<REP, PERIOD>& delay,
+							cancellation_token cancellationToken = {}) noexcept;
 
 		/// Process events until the io_service is stopped.
 		///
@@ -155,10 +155,10 @@ namespace cppcoro
 
 		void try_reschedule_overflow_operations() noexcept;
 
-	  void queue_overflow_operation_to_head(schedule_operation* operation) noexcept;
+		void queue_overflow_operation_to_head(schedule_operation* operation) noexcept;
 
-	  void queue_overflow_operation_to_tail(schedule_operation* operation) noexcept;
-	  
+		void queue_overflow_operation_to_tail(schedule_operation* operation) noexcept;
+
 		bool try_enter_event_loop() noexcept;
 		void exit_event_loop() noexcept;
 
@@ -182,7 +182,7 @@ namespace cppcoro
 #endif
 
 #if CPPCORO_OS_LINUX
-	        detail::linux::message_queue* m_mq;
+		detail::linux::message_queue* m_mq;
 #endif
 		// Head of a linked-list of schedule operations that are
 		// ready to run but that failed to be queued to the I/O
@@ -221,9 +221,9 @@ namespace cppcoro
 	public:
 
 		timed_schedule_operation(
-			io_service& service,
-			std::chrono::high_resolution_clock::time_point resumeTime,
-			cppcoro::cancellation_token cancellationToken) noexcept;
+					 io_service& service,
+					 std::chrono::high_resolution_clock::time_point resumeTime,
+					 cppcoro::cancellation_token cancellationToken) noexcept;
 
 		timed_schedule_operation(timed_schedule_operation&& other) noexcept;
 
@@ -318,14 +318,14 @@ namespace cppcoro
 template<typename REP, typename RATIO>
 cppcoro::io_service::timed_schedule_operation
 cppcoro::io_service::schedule_after(
-	const std::chrono::duration<REP, RATIO>& duration,
-	cppcoro::cancellation_token cancellationToken) noexcept
+				    const std::chrono::duration<REP, RATIO>& duration,
+				    cppcoro::cancellation_token cancellationToken) noexcept
 {
 	return timed_schedule_operation{
 		*this,
-		std::chrono::high_resolution_clock::now() + duration,
-		std::move(cancellationToken)
-	};
+			std::chrono::high_resolution_clock::now() + duration,
+			std::move(cancellationToken)
+			};
 }
 
 #endif
