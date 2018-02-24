@@ -19,8 +19,8 @@ addons:
     - llvm-toolchain-trusty
     packages:
     - python2.7
-    - clang-7.0
-    - lld-7.0
+    - clang-7
+    - lld-7
     - ninja-build
 
 cache:
