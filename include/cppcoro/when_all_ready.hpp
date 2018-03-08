@@ -7,6 +7,7 @@
 
 #include <cppcoro/task.hpp>
 #include <cppcoro/shared_task.hpp>
+#include <cppcoro/async_generator.hpp>
 
 #include <cppcoro/detail/when_all_awaitable.hpp>
 
@@ -100,6 +101,23 @@ namespace cppcoro
 		}
 
 		co_return std::move(tasks);
+	}
+
+	template<typename T>
+	[[nodiscard]]
+	task<> when_all_ready(async_generator<task<T>> tasks)
+	{
+		detail::when_all_auto_awaitable awaitable;
+
+		for co_await(task<T>& t : tasks)
+		{
+			// NOTE: We are relying on the fact that the 'starter' type returned by get_starter()
+			// is not required to live until the task completes.
+			t.get_starter().start(awaitable.get_continuation());
+			t.enable_auto_destruction();
+		}
+
+		co_await awaitable;
 	}
 }
 

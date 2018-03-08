@@ -9,6 +9,7 @@
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/async_manual_reset_event.hpp>
+#include <cppcoro/async_generator.hpp>
 
 #include "counted.hpp"
 
@@ -291,6 +292,74 @@ TEST_CASE("when_all_ready() doesn't rethrow exceptions")
 			FAIL("Shouldn't throw");
 		}
 	}());
+}
+
+TEST_CASE("when_all_ready() with async_generator<task<T>>")
+{
+	cppcoro::async_manual_reset_event event1;
+	cppcoro::async_manual_reset_event event2;
+	bool afterEvent1 = false;
+	bool afterEvent2 = false;
+	cppcoro::async_manual_reset_event eventFinishTasks;
+
+	auto setTrue = [&](bool& value) -> cppcoro::task<>
+	{
+		value = true;
+		co_await eventFinishTasks;
+	};
+
+	auto whenAllGenerator = cppcoro::when_all_ready(
+		[&]() -> cppcoro::async_generator<cppcoro::task<>>
+	{
+		co_await event1;
+		co_yield setTrue(afterEvent1);
+		co_await event2;
+		co_yield setTrue(afterEvent2);
+	}());
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		std::move(whenAllGenerator),
+		[&]() -> cppcoro::task<>
+	{
+		CHECK(!afterEvent1);
+		CHECK(!afterEvent2);
+
+		event1.set();
+		CHECK(afterEvent1);
+		CHECK(!afterEvent2);
+
+		event2.set();
+		CHECK(afterEvent1);
+		CHECK(afterEvent2);
+
+		eventFinishTasks.set();
+
+		co_return;
+	}()));
+}
+
+TEST_CASE("when_all_ready() with empty async_generator<task<T>>")
+{
+	cppcoro::async_manual_reset_event event1;
+	bool afterEvent1 = false;
+
+	auto whenAllGenerator = cppcoro::when_all_ready(
+		[&]() -> cppcoro::async_generator<cppcoro::task<>>
+	{
+		co_await(event1);
+		afterEvent1 = true;
+	}());
+
+	cppcoro::sync_wait(cppcoro::when_all_ready(
+		std::move(whenAllGenerator),
+		[&]() -> cppcoro::task<>
+	{
+		CHECK(!afterEvent1);
+		event1.set();
+		CHECK(afterEvent1);
+
+		co_return;
+	}()));
 }
 
 TEST_SUITE_END();
