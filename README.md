@@ -1144,6 +1144,9 @@ namespace cppcoro
     std::uint64_t process_one_event();
     std::uint64_t process_one_pending_event();
 
+    template<typename TASK>
+    decltype(auto) process_events_until_complete(TASK&& task);
+
     // Request that all threads processing events exit their event loops.
     void stop() noexcept;
 

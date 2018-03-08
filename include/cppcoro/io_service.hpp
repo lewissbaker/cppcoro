@@ -79,6 +79,13 @@ namespace cppcoro
 			const std::chrono::duration<REP, PERIOD>& delay,
 			cancellation_token cancellationToken = {}) noexcept;
 
+		/// Process events until the task completes.
+		///
+		/// \return
+		/// Result of the co_await task.
+		template<typename TASK>
+		decltype(auto) process_events_until_complete(TASK&& task);
+
 		/// Process events until the io_service is stopped.
 		///
 		/// \return
@@ -177,6 +184,26 @@ namespace cppcoro
 		std::atomic<timer_thread_state*> m_timerState;
 
 	};
+
+	template<typename TASK>
+	decltype(auto) io_service::process_events_until_complete(TASK&& task)
+	{
+		if (!task.is_ready())
+		{
+			auto callback = [](void* io) noexcept
+			{
+				static_cast<io_service*>(io)->stop();
+			};
+
+			auto starter = task.get_starter();
+			starter.start(cppcoro::detail::continuation{ callback, this });
+
+			process_events();
+			reset();
+		}
+
+		return std::forward<TASK>(task).operator co_await().await_resume();
+	}
 
 	class io_service::schedule_operation
 	{
