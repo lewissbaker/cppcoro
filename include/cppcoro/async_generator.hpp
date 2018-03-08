@@ -117,8 +117,8 @@ namespace cppcoro
 			// State transition diagram
 			//   VNRCA - value_not_ready_consumer_active
 			//   VNRCS - value_not_ready_consumer_suspended
-			//   VRPA  - value_ready_consumer_active
-			//   VRPS  - value_ready_consumer_suspended
+			//   VRPA  - value_ready_producer_active
+			//   VRPS  - value_ready_producer_suspended
 			//
 			//       A         +---  VNRCA --[C]--> VNRCS   yield_value()
 			//       |         |     |  A           |  A       |   .
