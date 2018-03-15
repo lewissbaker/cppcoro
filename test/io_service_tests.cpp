@@ -239,6 +239,8 @@ TEST_CASE("io_service::process_events_until_complete(task<T>)")
 	auto task = makeTask(ioService);
 
 	CHECK(ioService.process_events_until_complete(task) == "foo");
+	CHECK(task.is_ready());
+	CHECK(ioService.process_events_until_complete(task) == "foo");
 	CHECK(ioService.process_events_until_complete(makeTask(ioService)) == "foo");
 }
 
@@ -254,6 +256,8 @@ TEST_CASE("io_service::process_events_until_complete(shared_task<T>)")
 
 	auto task = makeTask(ioService);
 
+	CHECK(ioService.process_events_until_complete(task) == "foo");
+	CHECK(task.is_ready());
 	CHECK(ioService.process_events_until_complete(task) == "foo");
 	CHECK(ioService.process_events_until_complete(makeTask(ioService)) == "foo");
 }
