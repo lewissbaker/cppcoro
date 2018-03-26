@@ -333,16 +333,19 @@ namespace
 	}
 }
 
-TEST_CASE("when_all() with vector<task<T>>")
-{
-	check_when_all_vector_of_task_value<cppcoro::task>();
-}
-
 #if defined(CPPCORO_RELEASE_OPTIMISED)
 constexpr bool isOptimised = true;
 #else
 constexpr bool isOptimised = false;
 #endif
+
+// Disable test on MSVC x86 optimised due to bad codegen bug in
+// `co_await whenAllTask` expression under MSVC 15.7 (Preview 2) and earlier.
+TEST_CASE("when_all() with vector<task<T>>"
+* doctest::skip(CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC <= 191426316 && CPPCORO_CPU_X86 && isOptimised))
+{
+	check_when_all_vector_of_task_value<cppcoro::task>();
+}
 
 // Disable test on MSVC x64 optimised due to bad codegen bug in
 // 'co_await whenAllTask' expression.
