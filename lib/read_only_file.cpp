@@ -6,7 +6,9 @@
 #include <cppcoro\read_only_file.hpp>
 
 #if CPPCORO_OS_WINNT
-# define WIN32_LEAN_AND_MEAN
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
 # include <Windows.h>
 
 cppcoro::read_only_file cppcoro::read_only_file::open(
