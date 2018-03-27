@@ -1906,7 +1906,7 @@ task<> example()
 ```
 
 API Summary:
-```
+```c++
 // <cppcoro/schedule_on.hpp>
 namespace cppcoro
 {
