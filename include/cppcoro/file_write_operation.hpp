@@ -66,7 +66,7 @@ namespace cppcoro
 
 	private:
 
-		friend class cppcoro::detail::win32_overlapped_operation<file_write_operation>;
+		friend class cppcoro::detail::win32_overlapped_operation_cancellable<file_write_operation_cancellable>;
 
 		bool try_start() noexcept;
 		void cancel() noexcept;
