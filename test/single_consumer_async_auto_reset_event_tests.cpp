@@ -57,18 +57,6 @@ TEST_CASE("single waiter")
 
 TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 {
-#if (CPPCORO_CPU_X86)
-#if (1)
-	const int iterations = 10'000;
-#else
-	// Will cause "RangeChecks instrumentation code detected an out of range array access"
-	// exception for Optimized, x86 build
-#  define iterations 10'000
-#endif
-#else
-	const int iterations = 10'000;
-#endif
-
 	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
 		cppcoro::single_consumer_async_auto_reset_event valueChangedEvent;
@@ -77,7 +65,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 
 		auto consumer = [&]() -> cppcoro::task<int>
 		{
-			while (value.load(std::memory_order_relaxed) < iterations)
+			while (value.load(std::memory_order_relaxed) < 10'000)
 			{
 				co_await valueChangedEvent;
 			}
@@ -101,7 +89,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 			value.store(0, std::memory_order_relaxed);
 
 			// Really just checking that we don't deadlock here due to a missed wake-up.
-			(void)co_await cppcoro::when_all(consumer(), modifier(iterations / 2), modifier(iterations / 2));
+			(void)co_await cppcoro::when_all(consumer(), modifier(5'000), modifier(5'000));
 		}
 	}());
 }
