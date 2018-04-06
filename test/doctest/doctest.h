@@ -418,7 +418,8 @@ extern "C" __declspec(dllimport) void __stdcall DebugBreak();
 #ifdef _LIBCPP_VERSION
 // not forward declaring ostream for libc++ because I had some problems (inline namespaces vs c++98)
 // so the <iosfwd> header is used - also it is very light and doesn't drag a ton of stuff
-#include <iosfwd>
+//#include <iosfwd>
+#include <ostream>
 #else // _LIBCPP_VERSION
 #ifndef DOCTEST_CONFIG_USE_IOSFWD
 namespace std
