@@ -25,7 +25,10 @@ public:
 		m_ioThreads.reserve(threadCount);
 		try
 		{
-			m_ioThreads.emplace_back([this] { m_ioService.process_events(); });
+			for (std::uint32_t i = 0; i < threadCount; ++i)
+			{
+				m_ioThreads.emplace_back([this] { m_ioService.process_events(); });
+			}
 		}
 		catch (...)
 		{
