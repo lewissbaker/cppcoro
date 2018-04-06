@@ -25,9 +25,10 @@ TEST_CASE("consume async_stream")
 	auto subscribable = make_subscribable(
 		[]() -> async_stream_subscription<int>
 		{
-			co_yield 1;
-			co_yield 2;
-			co_return;
+			bool shouldContinue = co_yield 1;
+			if (!shouldContinue) co_return;
+			shouldContinue = co_yield 2;
+			if (!shouldContinue) co_return;
 		});
 
 	int result = sync_wait(consume(subscribable, [](async_stream<int> stream) -> task<int>
