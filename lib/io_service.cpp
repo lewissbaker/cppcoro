@@ -18,6 +18,11 @@
 # include <Windows.h>
 #endif
 
+#if CPPCORO_OS_LINUX
+typedef int DWORD;
+#define INFINITE (DWORD)-1 //needed for timeout values in io_service::timer_thread_state::run()
+#endif
+
 namespace
 {
 #if CPPCORO_OS_WINNT
@@ -301,7 +306,7 @@ public:
 
 	void run();
 
-	void wake_up_timer_thread();
+	void wake_up_timer_thread() noexcept;
 
 #if CPPCORO_OS_WINNT
 	detail::win32::safe_handle m_wakeUpEvent;
@@ -309,9 +314,9 @@ public:
 #endif
 
 #if CPPCORO_OS_LINUX
-	int m_wakeupfd;
-	int m_timerfd;
-	int m_epollfd;
+	detail::linux::safe_fd m_wakeupfd;
+	detail::linux::safe_fd m_timerfd;
+	detail::linux::safe_fd m_epollfd;
 #endif
 
 	std::atomic<io_service::timed_schedule_operation*> m_newlyQueuedTimers;
@@ -326,7 +331,7 @@ cppcoro::io_service::io_service()
 	: io_service(0)
 #endif
 #if CPPCORO_OS_LINUX
-	  : io_service(1) //queue size of message queue must be at least 1
+	  : io_service(10) //queue size of message queue must be at least 10
 #endif
 {
 }
@@ -771,11 +776,11 @@ cppcoro::io_service::timer_thread_state::timer_thread_state() :
 	, m_thread([this] { this->run(); })
 {
 #if CPPCORO_OS_LINUX
-	struct epoll_event wake_ev = {0};
+	epoll_event wake_ev = {0};
 	wake_ev.events = EPOLLIN;
-	wake_ev.data.fd = m_wakeupfd;
+	wake_ev.data.fd = m_wakeupfd.fd();
 
-	if(epoll_ctl(m_epollfd, EPOLL_CTL_ADD, m_wakeupfd, &wake_ev) == -1)
+	if(epoll_ctl(m_epollfd.fd(), EPOLL_CTL_ADD, m_wakeupfd.fd(), &wake_ev) == -1)
 	{
 		throw std::system_error
 		{
@@ -785,11 +790,11 @@ cppcoro::io_service::timer_thread_state::timer_thread_state() :
 				};
 	}
 	
-	struct epoll_event timer_ev = {0};
+	epoll_event timer_ev = {0};
 	timer_ev.events = EPOLLIN;
-	timer_ev.data.fd = m_timerfd;
+	timer_ev.data.fd = m_timerfd.fd();
 
-	if(epoll_ctl(m_epollfd, EPOLL_CTL_ADD, m_timerfd, &timer_ev) == -1)
+	if(epoll_ctl(m_epollfd.fd(), EPOLL_CTL_ADD, m_timerfd.fd(), &timer_ev) == -1)
 	{
 		throw std::system_error
 		{
@@ -806,11 +811,6 @@ cppcoro::io_service::timer_thread_state::~timer_thread_state()
 	m_shutDownRequested.store(true, std::memory_order_release);
 	wake_up_timer_thread();
 	m_thread.join();
-#if CPPCORO_OS_LINUX
-	close(m_wakeupfd);
-	close(m_timerfd);
-	close(m_epollfd);
-#endif
 }
 
 void cppcoro::io_service::timer_thread_state::request_timer_cancellation() noexcept
@@ -877,8 +877,8 @@ void cppcoro::io_service::timer_thread_state::run()
 			timerEvent = true;
 		}
 #elif CPPCORO_OS_LINUX
-		struct epoll_event ev;
-		const int status = epoll_wait(m_epollfd, &ev, 1, timeout);
+		epoll_event ev;
+		const int status = epoll_wait(m_epollfd.fd(), &ev, 1, timeout);
 
 		if(status == -1)
 		{
@@ -890,10 +890,10 @@ void cppcoro::io_service::timer_thread_state::run()
 					};
 		}
 
-		if(status == 0 || (status == 1 && ev.data.fd == m_wakeupfd))
+		if(status == 0 || (status == 1 && ev.data.fd == m_wakeupfd.fd()))
 		{
 			uint64_t count;
-			if(read(m_wakeupfd, &count, sizeof(uint64_t)) != sizeof(uint64_t))
+			if(read(m_wakeupfd.fd(), &count, sizeof(uint64_t)) != sizeof(uint64_t))
 			{
 				throw std::system_error
 				{
@@ -904,10 +904,10 @@ void cppcoro::io_service::timer_thread_state::run()
 			}
 
 			waitEvent = true;
-		} else if (status == 1 && ev.data.fd == m_timerfd)
+		} else if (status == 1 && ev.data.fd == m_timerfd.fd())
 		{
 			uint64_t count;
-			if(read(m_timerfd, &count, sizeof(uint64_t)) != sizeof(uint64_t))
+			if(read(m_timerfd.fd(), &count, sizeof(uint64_t)) != sizeof(uint64_t))
 			{
 				throw std::system_error
 				{
@@ -993,15 +993,15 @@ void cppcoro::io_service::timer_thread_state::run()
 								     nullptr,
 								     resumeFromSuspend);
 #elif CPPCORO_OS_LINUX
-					struct itimerspec alarm_time = {0};
+					itimerspec alarm_time = {0};
 					alarm_time.it_value.tv_sec =
 						std::chrono::
 						duration_cast<std::chrono::
 							      seconds>(timeUntilNextDueTime).count();
 					alarm_time.it_value.tv_nsec =
 						(std::chrono::
-						 duration_cast<ticks>(timeUntilNextDueTime).count()
-						 % 10000000) * 100;
+						 duration_cast<std::chrono::
+						 nanoseconds>(timeUntilNextDueTime).count() % 10000000);
 					if(alarm_time.it_value.tv_sec == 0 && alarm_time.it_value.tv_nsec == 0)
 					{
 						//linux timer of 0 time will not generate events
@@ -1009,7 +1009,7 @@ void cppcoro::io_service::timer_thread_state::run()
 						alarm_time.it_value.tv_nsec = 1;
 					}
 
-					if(timerfd_settime(m_timerfd, 0, &alarm_time, NULL) == -1)
+					if(timerfd_settime(m_timerfd.fd(), 0, &alarm_time, NULL) == -1)
 					{
 						ok = false;
 					}
@@ -1075,21 +1075,13 @@ void cppcoro::io_service::timer_thread_state::run()
 	}
 }
 
-void cppcoro::io_service::timer_thread_state::wake_up_timer_thread()
+void cppcoro::io_service::timer_thread_state::wake_up_timer_thread() noexcept
 {
 #if CPPCORO_OS_WINNT
 	(void)::SetEvent(m_wakeUpEvent.handle());
 #elif CPPCORO_OS_LINUX
 	uint64_t count = 1;
-	if(write(m_wakeupfd, &count, sizeof(uint64_t)) != sizeof(uint64_t))
-	{
-		throw std::system_error
-		{
-			static_cast<int>(errno),
-				std::system_category(),
-				"Error in waking up: writing to wake up eventfd"
-				};
-	}
+	(void)write(m_wakeupfd.fd(), &count, sizeof(uint64_t));
 #endif
 }
 
