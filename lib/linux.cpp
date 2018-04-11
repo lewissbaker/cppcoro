@@ -16,7 +16,7 @@ namespace cppcoro
 				uuid_t unique_name;
 				const char* cppcoro_qname_prefix = "/cppcoro-";
 
-				if(NAME_MAX < UUID_STRING_SIZE + sizeof(cppcoro_qname_prefix) + 1)
+				if(NAME_MAX < UUID_STRING_SIZE + strlen(cppcoro_qname_prefix) + 1)
 				{
 					throw std::system_error
 					{
@@ -39,7 +39,7 @@ namespace cppcoro
 					attr.mq_msgsize = sizeof(cppcoro::detail::linux::message);
 					attr.mq_curmsgs = 0;
 
-					m_mqdt = mq_open((const char*)m_qname, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, S_IRWXU, &attr);
+					m_mqdt = mq_open(m_qname, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, S_IRWXU, &attr);
 
 					if( m_mqdt == -1 && errno == EEXIST)
 					{
@@ -59,11 +59,11 @@ namespace cppcoro
 					break;
 				}
 
-				m_epollfd = create_epoll_fd();
+				m_epollfd = safe_fd{create_epoll_fd()};
 				m_ev.data.fd = m_mqdt;
 				m_ev.events = EPOLLIN;
 
-				if(epoll_ctl(m_epollfd, EPOLL_CTL_ADD, m_mqdt, &m_ev) == -1)
+				if(epoll_ctl(m_epollfd.fd(), EPOLL_CTL_ADD, m_mqdt, &m_ev) == -1)
 				{
 					throw std::system_error
 					{
@@ -76,7 +76,6 @@ namespace cppcoro
 
 			message_queue::~message_queue()
 			{
-				close(m_epollfd);
 				assert(mq_close(m_mqdt) == 0);
 				assert(mq_unlink(m_qname) == 0);
 			}
@@ -93,7 +92,7 @@ namespace cppcoro
 			bool message_queue::dequeue_message(void*& msg, message_type& type, bool wait)
 			{
 				struct epoll_event ev = {0};
-				int nfds = epoll_wait(m_epollfd, &ev, 1, wait?-1:0);
+				int nfds = epoll_wait(m_epollfd.fd(), &ev, 1, wait?-1:0);
 
 				if(nfds == -1)
 				{
@@ -138,7 +137,7 @@ namespace cppcoro
 				return true;
 			}
 
-			int create_event_fd()
+			safe_fd create_event_fd()
 			{
 				int fd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK | EFD_CLOEXEC);
 
@@ -152,10 +151,10 @@ namespace cppcoro
 							};
 				}
 
-				return fd;
+				return safe_fd{fd};
 			}
 
-			int create_timer_fd()
+			safe_fd create_timer_fd()
 			{
 				int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
 
@@ -169,10 +168,10 @@ namespace cppcoro
 							};
 				}
 
-				return fd;
+				return safe_fd{fd};
 			}
 
-			int create_epoll_fd()
+			safe_fd create_epoll_fd()
 			{
 				int fd = epoll_create1(EPOLL_CLOEXEC);
 
@@ -186,7 +185,16 @@ namespace cppcoro
 							};
 				}
 
-				return fd;
+				return safe_fd{fd};
+			}
+
+			void safe_fd::close() noexcept
+			{
+				if(m_fd != -1)
+				{
+					::close(m_fd);
+					m_fd = -1;
+				}
 			}
 		}
 	}
