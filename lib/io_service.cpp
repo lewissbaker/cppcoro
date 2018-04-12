@@ -1001,7 +1001,7 @@ void cppcoro::io_service::timer_thread_state::run()
 					alarm_time.it_value.tv_sec =
 						std::chrono::
 						duration_cast<std::chrono::
-							      seconds>(timeUntilNextDueTime).count();
+						seconds>(timeUntilNextDueTime).count();
 					alarm_time.it_value.tv_nsec =
 						(std::chrono::
 						 duration_cast<std::chrono::

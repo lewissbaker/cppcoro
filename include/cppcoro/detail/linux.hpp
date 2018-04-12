@@ -22,12 +22,12 @@ namespace cppcoro
 			using fd_t = int;
 			
 			enum message_type
-			{
-				CALLBACK_TYPE,
-				RESUME_TYPE
-			};
+				{
+					CALLBACK_TYPE,
+					RESUME_TYPE
+				};
 
-						class safe_fd
+			class safe_fd
 			{
 			public:
 
