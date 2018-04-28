@@ -139,7 +139,7 @@ if cake.system.isWindows() or cake.system.isCygwin():
       compiler.runtimeLibraries = 'debug-dll'
       compiler.addLibrary('msvcrtd')
       compiler.addLibrary('msvcprtd')
-      compiler.addLibrary('msvcurtd')
+      compiler.addLibrary('vcruntimed')
       compiler.addLibrary('ucrtd')
       compiler.addLibrary('oldnames')
 
@@ -161,7 +161,7 @@ if cake.system.isWindows() or cake.system.isCygwin():
       compiler.runtimeLibraries = 'release-dll'
       compiler.addLibrary('msvcrt')
       compiler.addLibrary('msvcprt')
-      compiler.addLibrary('msvcurt')
+      compiler.addLibrary('vcruntime')
       compiler.addLibrary('ucrt')
       compiler.addLibrary('oldnames')
 
