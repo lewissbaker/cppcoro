@@ -27,6 +27,8 @@ clone_script:
 
 build_script:
 - cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=stack architecture=%PLATFORM% release=%CONFIGURATION% lib/build.cake test/build.cake@programs"
+- cmd: tools\cmake\build.cmd
 
 test_script:
 - cmd: "C:\\Python27-x64\\python.exe tools\\cake\\src\\run.py --debug=stack architecture=%PLATFORM% release=%CONFIGURATION% test/build.cake"
+- cmd: tools\cmake\build.cmd run
