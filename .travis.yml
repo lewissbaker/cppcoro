@@ -34,7 +34,7 @@ env:
   global:
   - TOOLS_DIR=${TRAVIS_BUILD_DIR}/tools
   - LLVM_INSTALL_PREFIX=${TOOLS_DIR}/llvm
-  - CMAKE_VERSION="3.9.1"
+  - CMAKE_VERSION="3.11.0"
 matrix:
   include:
   - env: RELEASE=debug ARCH=x64 CLANG_VERSION=7
@@ -49,7 +49,7 @@ before_install:
 - export CXX="$CXX-$CLANG_VERSION"
 - |
   if [ ! -f "${TOOLS_DIR}/cmake-${CMAKE_VERSION}/cached" ]; then
-    CMAKE_URL="https://cmake.org/files/v3.9/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz"
+    CMAKE_URL="https://cmake.org/files/v3.11/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz"
     mkdir -p "${TOOLS_DIR}/cmake-${CMAKE_VERSION}"
     travis_retry wget --no-check-certificate --quiet -O - "${CMAKE_URL}" | tar --strip-components=1 -xz -C "${TOOLS_DIR}/cmake-${CMAKE_VERSION}"
     touch "${TOOLS_DIR}/cmake-${CMAKE_VERSION}/cached"
@@ -67,6 +67,7 @@ before_script:
 
 script:
 - cake architecture=$ARCH release=$RELEASE --clang-executable="$CC" --libcxx-install-prefix="${LLVM_INSTALL_PREFIX}"
+- tools/cmake/build.sh run
 
 notifications:
   email: false
