@@ -124,16 +124,16 @@ private:
 		timer_entry(cppcoro::io_service::timed_schedule_operation* timer)
 			: m_dueTime(timer->m_resumeTime)
 			, m_timer(timer)
-			{}
+		{}
 
 		time_point m_dueTime;
 		cppcoro::io_service::timed_schedule_operation* m_timer;
 	};
 
 	static bool compare_entries(const timer_entry& a, const timer_entry& b) noexcept
-		{
-			return a.m_dueTime > b.m_dueTime;
-		}
+	{
+		return a.m_dueTime > b.m_dueTime;
+	}
 
 	// A heap-sorted list of active timer entries
 	// Earliest due timer is at the front of the queue
@@ -278,22 +278,22 @@ void cppcoro::io_service::timer_queue::remove_cancelled_timers(
 			compare_entries);
 	}
 
+	{
+		timed_schedule_operation** current = &m_overflowTimers;
+		while ((*current) != nullptr)
 		{
-			timed_schedule_operation** current = &m_overflowTimers;
-			while ((*current) != nullptr)
+			auto* timer = (*current);
+			if (timer->m_cancellationToken.is_cancellation_requested())
 			{
-				auto* timer = (*current);
-				if (timer->m_cancellationToken.is_cancellation_requested())
-				{
-					*current = timer->m_next;
-					addTimerToList(timer);
-				}
-				else
-				{
-					current = &timer->m_next;
-				}
+				*current = timer->m_next;
+				addTimerToList(timer);
+			}
+			else
+			{
+				current = &timer->m_next;
 			}
 		}
+	}
 }
 
 class cppcoro::io_service::timer_thread_state
@@ -502,7 +502,7 @@ void cppcoro::io_service::queue_overflow_operation_to_tail(schedule_operation* o
 	{
 		tail = tail->m_next;
 	}
-  
+
 	schedule_operation* head = nullptr;
 	while (!m_scheduleOperations.compare_exchange_weak(
 		       head,
@@ -512,7 +512,7 @@ void cppcoro::io_service::queue_overflow_operation_to_tail(schedule_operation* o
 	{
 		tail->m_next = head;
 	}
-  
+
 	return;
 }
 
