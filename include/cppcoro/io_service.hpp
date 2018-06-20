@@ -305,7 +305,7 @@ namespace cppcoro
 
 	private:
 
-		io_service* m_service;
+		io_service * m_service;
 
 	};
 

@@ -148,8 +148,8 @@ private:
 };
 
 cppcoro::io_service::timer_queue::timer_queue() noexcept
-: m_timerEntries()
- , m_overflowTimers(nullptr)
+	: m_timerEntries()
+	, m_overflowTimers(nullptr)
 {}
 
 cppcoro::io_service::timer_queue::~timer_queue()
@@ -257,8 +257,8 @@ void cppcoro::io_service::timer_queue::remove_cancelled_timers(
 		addTimerToList(nonCancelledEnd->m_timer);
 
 		for (auto iter = firstCancelledEntry + 1;
-		     iter != m_timerEntries.end();
-		     ++iter)
+			iter != m_timerEntries.end();
+			++iter)
 		{
 			if (isTimerCancelled(*iter))
 			{
@@ -335,7 +335,7 @@ cppcoro::io_service::io_service()
 	: io_service(0)
 #endif
 #if CPPCORO_OS_LINUX
-	  : io_service(10) //queue size of message queue must be at least 10
+	: io_service(10) //queue size of message queue must be at least 10
 #endif
 {
 }
@@ -347,7 +347,7 @@ cppcoro::io_service::io_service(
 #if CPPCORO_OS_LINUX
 	size_t queue_length
 #endif
-				)
+)
 	: m_threadState(0)
 	, m_workCount(0)
 #if CPPCORO_OS_WINNT
@@ -452,8 +452,8 @@ void cppcoro::io_service::stop() noexcept
 	if ((oldState & stop_requested_flag) == 0)
 	{
 		for (auto activeThreadCount = oldState / active_thread_count_increment;
-		     activeThreadCount > 0;
-		     --activeThreadCount)
+			activeThreadCount > 0;
+			--activeThreadCount)
 		{
 			post_wake_up_event();
 		}
@@ -505,10 +505,10 @@ void cppcoro::io_service::queue_overflow_operation_to_tail(schedule_operation* o
 
 	schedule_operation* head = nullptr;
 	while (!m_scheduleOperations.compare_exchange_weak(
-		       head,
-		       operation,
-		       std::memory_order_release,
-		       std::memory_order_relaxed))
+		head,
+		operation,
+		std::memory_order_release,
+		std::memory_order_relaxed))
 	{
 		tail->m_next = head;
 	}
@@ -530,17 +530,17 @@ void cppcoro::io_service::queue_overflow_operation_to_head(schedule_operation* o
 	{
 		operation->m_next = head;
 	} while (!m_scheduleOperations.compare_exchange_weak(
-			 head,
-			 operation,
-			 std::memory_order_release,
-			 std::memory_order_acquire));
+		head,
+		operation,
+		std::memory_order_release,
+		std::memory_order_acquire));
 }
 
 void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 {
 #if CPPCORO_OS_LINUX
 	const bool ok = m_mq->enqueue_message(reinterpret_cast<void*>(operation->m_awaiter.address()),
-					      detail::linux::RESUME_TYPE);
+		detail::linux::RESUME_TYPE);
 #elif CPPCORO_OS_WINNT
 	const BOOL ok = ::PostQueuedCompletionStatus(
 		m_iocpHandle.handle(),
@@ -568,10 +568,10 @@ void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
 			nullptr);
 #elif CPPCORO_OS_LINUX
 		bool ok = m_mq->enqueue_message(reinterpret_cast<void*>(operation->m_awaiter.address()),
-						detail::linux::RESUME_TYPE);
+			detail::linux::RESUME_TYPE);
 #endif
 
-		if(!ok)
+		if (!ok)
 		{
 			queue_overflow_operation_to_tail(operation);
 		}
@@ -590,9 +590,9 @@ bool cppcoro::io_service::try_enter_event_loop() noexcept
 			return false;
 		}
 	} while (!m_threadState.compare_exchange_weak(
-			 currentState,
-			 currentState + active_thread_count_increment,
-			 std::memory_order_relaxed));
+		currentState,
+		currentState + active_thread_count_increment,
+		std::memory_order_relaxed));
 
 	return true;
 }
@@ -604,13 +604,13 @@ void cppcoro::io_service::exit_event_loop() noexcept
 
 bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 {
-	if(is_stop_requested())
+	if (is_stop_requested())
 	{
 		return false;
 	}
 
 #if CPPCORO_OS_LINUX
-	while(true)
+	while (true)
 	{
 		try_reschedule_overflow_operations();
 		void* message = NULL;
@@ -618,16 +618,16 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 
 		bool status = m_mq->dequeue_message(message, type, waitForEvent);
 
-		if(!status)
+		if (!status)
 		{
 			return false;
 		}
 
-		if(type == detail::linux::CALLBACK_TYPE)
+		if (type == detail::linux::CALLBACK_TYPE)
 		{
 			auto* state =
-			static_cast<detail::linux
-				    ::io_state*>(reinterpret_cast<detail::linux::io_state*>(message));
+				static_cast<detail::linux
+				::io_state*>(reinterpret_cast<detail::linux::io_state*>(message));
 
 			state->m_callback(state);
 
@@ -635,10 +635,10 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 		}
 		else
 		{
-			if((unsigned long long)message != 0)
+			if ((unsigned long long)message != 0)
 			{
 				std::experimental
-				::coroutine_handle<>::from_address(reinterpret_cast<void*>(message)).resume();
+					::coroutine_handle<>::from_address(reinterpret_cast<void*>(message)).resume();
 				return true;
 			}
 
@@ -673,8 +673,8 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 			DWORD errorCode = ok ? ERROR_SUCCESS : ::GetLastError();
 
 			auto* state = static_cast<detail::win32
-						  ::io_state*>(reinterpret_cast<detail::win32
-							       ::overlapped*>(overlapped));
+				::io_state*>(reinterpret_cast<detail::win32
+					::overlapped*>(overlapped));
 
 			state->m_callback(
 				state,
@@ -691,8 +691,8 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 				// This was a coroutine scheduled via a call to
 				// io_service::schedule().
 				std::experimental
-				::coroutine_handle<>
-				::from_address(reinterpret_cast<void*>(completionKey)).resume();
+					::coroutine_handle<>
+					::from_address(reinterpret_cast<void*>(completionKey)).resume();
 				return true;
 			}
 
@@ -749,10 +749,10 @@ cppcoro::io_service::ensure_timer_thread_started()
 	{
 		auto newTimerState = std::make_unique<timer_thread_state>();
 		if (m_timerState.compare_exchange_strong(
-			    timerState,
-			    newTimerState.get(),
-			    std::memory_order_release,
-			    std::memory_order_acquire))
+			timerState,
+			newTimerState.get(),
+			std::memory_order_release,
+			std::memory_order_acquire))
 		{
 			// We managed to install our timer_thread_state before some
 			// other thread did, don't free it here - it will be freed in
@@ -780,11 +780,11 @@ cppcoro::io_service::timer_thread_state::timer_thread_state() :
 	, m_thread([this] { this->run(); })
 {
 #if CPPCORO_OS_LINUX
-	epoll_event wake_ev = {0};
+	epoll_event wake_ev = { 0 };
 	wake_ev.events = EPOLLIN;
 	wake_ev.data.fd = m_wakeupfd.fd();
 
-	if(epoll_ctl(m_epollfd.fd(), EPOLL_CTL_ADD, m_wakeupfd.fd(), &wake_ev) == -1)
+	if (epoll_ctl(m_epollfd.fd(), EPOLL_CTL_ADD, m_wakeupfd.fd(), &wake_ev) == -1)
 	{
 		throw std::system_error
 		{
@@ -794,11 +794,11 @@ cppcoro::io_service::timer_thread_state::timer_thread_state() :
 		};
 	}
 
-	epoll_event timer_ev = {0};
+	epoll_event timer_ev = { 0 };
 	timer_ev.events = EPOLLIN;
 	timer_ev.data.fd = m_timerfd.fd();
 
-	if(epoll_ctl(m_epollfd.fd(), EPOLL_CTL_ADD, m_timerfd.fd(), &timer_ev) == -1)
+	if (epoll_ctl(m_epollfd.fd(), EPOLL_CTL_ADD, m_timerfd.fd(), &timer_ev) == -1)
 	{
 		throw std::system_error
 		{
@@ -820,7 +820,7 @@ cppcoro::io_service::timer_thread_state::~timer_thread_state()
 void cppcoro::io_service::timer_thread_state::request_timer_cancellation() noexcept
 {
 	const bool wasTimerCancellationAlreadyRequested =
-	m_timerCancellationRequested.exchange(true, std::memory_order_release);
+		m_timerCancellationRequested.exchange(true, std::memory_order_release);
 	if (!wasTimerCancellationAlreadyRequested)
 	{
 		wake_up_timer_thread();
@@ -860,7 +860,7 @@ void cppcoro::io_service::timer_thread_state::run()
 			timeout,
 			FALSE); // alertable
 
-		if(waitResult == WAIT_OBJECT_0 || waitResult == WAIT_FAILED)
+		if (waitResult == WAIT_OBJECT_0 || waitResult == WAIT_FAILED)
 		{
 			// Wake-up event (WAIT_OBJECT_0)
 			//
@@ -876,7 +876,7 @@ void cppcoro::io_service::timer_thread_state::run()
 
 			waitEvent = true;
 		}
-		else if(waitResult == WAIT_OBJECT_0 + 1)
+		else if (waitResult == WAIT_OBJECT_0 + 1)
 		{
 			timerEvent = true;
 		}
@@ -884,7 +884,7 @@ void cppcoro::io_service::timer_thread_state::run()
 		epoll_event ev;
 		const int status = epoll_wait(m_epollfd.fd(), &ev, 1, timeout);
 
-		if(status == -1)
+		if (status == -1)
 		{
 			throw std::system_error
 			{
@@ -894,10 +894,10 @@ void cppcoro::io_service::timer_thread_state::run()
 			};
 		}
 
-		if(status == 0 || (status == 1 && ev.data.fd == m_wakeupfd.fd()))
+		if (status == 0 || (status == 1 && ev.data.fd == m_wakeupfd.fd()))
 		{
 			uint64_t count;
-			if(read(m_wakeupfd.fd(), &count, sizeof(uint64_t)) != sizeof(uint64_t))
+			if (read(m_wakeupfd.fd(), &count, sizeof(uint64_t)) != sizeof(uint64_t))
 			{
 				throw std::system_error
 				{
@@ -908,10 +908,11 @@ void cppcoro::io_service::timer_thread_state::run()
 			}
 
 			waitEvent = true;
-		} else if (status == 1 && ev.data.fd == m_timerfd.fd())
+		}
+		else if (status == 1 && ev.data.fd == m_timerfd.fd())
 		{
 			uint64_t count;
-			if(read(m_timerfd.fd(), &count, sizeof(uint64_t)) != sizeof(uint64_t))
+			if (read(m_timerfd.fd(), &count, sizeof(uint64_t)) != sizeof(uint64_t))
 			{
 				throw std::system_error
 				{
@@ -925,7 +926,7 @@ void cppcoro::io_service::timer_thread_state::run()
 		}
 #endif
 
-		if(waitEvent)
+		if (waitEvent)
 		{
 			if (m_timerCancellationRequested.exchange(false, std::memory_order_acquire))
 			{
@@ -949,7 +950,8 @@ void cppcoro::io_service::timer_thread_state::run()
 					timerQueue.enqueue_timer(timer);
 				}
 			}
-		} else if (timerEvent)
+		}
+		else if (timerEvent)
 		{
 			lastSetWaitEventTime = time_point::max();
 		}
@@ -971,7 +973,7 @@ void cppcoro::io_service::timer_thread_state::run()
 				if (earliestDueTime != lastSetWaitEventTime)
 				{
 					using ticks = std::chrono::duration<long long int,
-									    std::ratio<1, 10'000'000>>;
+						std::ratio<1, 10'000'000>>;
 
 					auto timeUntilNextDueTime = earliestDueTime - currentTime;
 
@@ -979,7 +981,7 @@ void cppcoro::io_service::timer_thread_state::run()
 #if CPPCORO_OS_WINNT
 					LARGE_INTEGER dueTime;
 					dueTime.QuadPart = -std::chrono::duration_cast<ticks>
-					(timeUntilNextDueTime).count();
+						(timeUntilNextDueTime).count();
 
 					// Period of 0 indicates no repeat on the timer.
 					const LONG period = 0;
@@ -997,23 +999,23 @@ void cppcoro::io_service::timer_thread_state::run()
 						resumeFromSuspend);
 #elif CPPCORO_OS_LINUX
 					bool ok = false;
-					itimerspec alarm_time = {0};
+					itimerspec alarm_time = { 0 };
 					alarm_time.it_value.tv_sec =
-					std::chrono::
-					duration_cast<std::chrono::
-					seconds>(timeUntilNextDueTime).count();
+						std::chrono::
+						duration_cast<std::chrono::
+						seconds>(timeUntilNextDueTime).count();
 					alarm_time.it_value.tv_nsec =
-					(std::chrono::
-					 duration_cast<std::chrono::
-					 nanoseconds>(timeUntilNextDueTime).count() % 10000000);
-					if(alarm_time.it_value.tv_sec == 0 && alarm_time.it_value.tv_nsec == 0)
+						(std::chrono::
+							duration_cast<std::chrono::
+							nanoseconds>(timeUntilNextDueTime).count() % 10000000);
+					if (alarm_time.it_value.tv_sec == 0 && alarm_time.it_value.tv_nsec == 0)
 					{
 						//linux timer of 0 time will not generate events
 						//so let's set it to 1 nsec
 						alarm_time.it_value.tv_nsec = 1;
 					}
 
-					if(timerfd_settime(m_timerfd.fd(), 0, &alarm_time, NULL) == -1)
+					if (timerfd_settime(m_timerfd.fd(), 0, &alarm_time, NULL) == -1)
 					{
 						ok = false;
 					}
@@ -1045,9 +1047,9 @@ void cppcoro::io_service::timer_thread_state::run()
 						else if (timeUntilNextDueTime > 1ms)
 						{
 							timeout = static_cast<DWORD>
-							(std::chrono::
-							 duration_cast<std::chrono
-							 ::milliseconds>(timeUntilNextDueTime).count());
+								(std::chrono::
+									duration_cast<std::chrono
+									::milliseconds>(timeUntilNextDueTime).count());
 						}
 						else
 						{
@@ -1100,19 +1102,19 @@ cppcoro::io_service::timed_schedule_operation::timed_schedule_operation(
 	io_service& service,
 	std::chrono::high_resolution_clock::time_point resumeTime,
 	cppcoro::cancellation_token cancellationToken) noexcept
-: m_scheduleOperation(service)
- , m_resumeTime(resumeTime)
- , m_cancellationToken(std::move(cancellationToken))
- , m_refCount(2)
+	: m_scheduleOperation(service)
+	, m_resumeTime(resumeTime)
+	, m_cancellationToken(std::move(cancellationToken))
+	, m_refCount(2)
 {
 }
 
 cppcoro::io_service::timed_schedule_operation::timed_schedule_operation(
 	timed_schedule_operation&& other) noexcept
-: m_scheduleOperation(std::move(other.m_scheduleOperation))
- , m_resumeTime(std::move(other.m_resumeTime))
- , m_cancellationToken(std::move(other.m_cancellationToken))
- , m_refCount(2)
+	: m_scheduleOperation(std::move(other.m_scheduleOperation))
+	, m_resumeTime(std::move(other.m_resumeTime))
+	, m_cancellationToken(std::move(other.m_cancellationToken))
+	, m_refCount(2)
 {
 }
 
@@ -1138,9 +1140,9 @@ void cppcoro::io_service::timed_schedule_operation::await_suspend(
 	if (m_cancellationToken.can_be_cancelled())
 	{
 		m_cancellationRegistration.emplace(m_cancellationToken, [timerState]
-						   {
-							   timerState->request_timer_cancellation();
-						   });
+		{
+			timerState->request_timer_cancellation();
+		});
 	}
 
 	// Queue the timer schedule to the queue of incoming new timers.
@@ -1170,10 +1172,10 @@ void cppcoro::io_service::timed_schedule_operation::await_suspend(
 	{
 		m_next = prev;
 	} while (!timerState->m_newlyQueuedTimers.compare_exchange_weak(
-			 prev,
-			 this,
-			 std::memory_order_release,
-			 std::memory_order_acquire));
+		prev,
+		this,
+		std::memory_order_release,
+		std::memory_order_acquire));
 
 	if (prev == nullptr)
 	{
