@@ -975,7 +975,6 @@ void cppcoro::io_service::timer_thread_state::run()
 
 					auto timeUntilNextDueTime = earliestDueTime - currentTime;
 
-					bool ok = false;
 					// Negative value indicates relative time.
 #if CPPCORO_OS_WINNT
 					LARGE_INTEGER dueTime;
@@ -997,6 +996,7 @@ void cppcoro::io_service::timer_thread_state::run()
 								     nullptr,
 								     resumeFromSuspend);
 #elif CPPCORO_OS_LINUX
+					bool ok = false;
 					itimerspec alarm_time = {0};
 					alarm_time.it_value.tv_sec =
 						std::chrono::

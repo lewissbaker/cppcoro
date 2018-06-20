@@ -18,7 +18,7 @@
 TEST_SUITE_BEGIN("schedule/resume_on");
 
 #if CPPCORO_OS_WINNT
-typedef thread_id std::thread::id
+#define thread_id std::thread::id
 #define get_thread_id std::this_thread::get_id
 #endif
 
