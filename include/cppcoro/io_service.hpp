@@ -84,8 +84,8 @@ namespace cppcoro
 		template<typename REP, typename PERIOD>
 		[[nodiscard]]
 		timed_schedule_operation schedule_after(
-							const std::chrono::duration<REP, PERIOD>& delay,
-							cancellation_token cancellationToken = {}) noexcept;
+			const std::chrono::duration<REP, PERIOD>& delay,
+			cancellation_token cancellationToken = {}) noexcept;
 
 		/// Process events until the io_service is stopped.
 		///
@@ -199,7 +199,7 @@ namespace cppcoro
 
 		schedule_operation(io_service& service) noexcept
 			: m_service(service)
-		{}
+			{}
 
 		bool await_ready() const noexcept { return false; }
 		void await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
@@ -221,9 +221,9 @@ namespace cppcoro
 	public:
 
 		timed_schedule_operation(
-					 io_service& service,
-					 std::chrono::high_resolution_clock::time_point resumeTime,
-					 cppcoro::cancellation_token cancellationToken) noexcept;
+			io_service& service,
+			std::chrono::high_resolution_clock::time_point resumeTime,
+			cppcoro::cancellation_token cancellationToken) noexcept;
 
 		timed_schedule_operation(timed_schedule_operation&& other) noexcept;
 
@@ -260,48 +260,48 @@ namespace cppcoro
 
 		explicit io_work_scope(io_service& service) noexcept
 			: m_service(&service)
-		{
-			service.notify_work_started();
-		}
+			{
+				service.notify_work_started();
+			}
 
 		io_work_scope(const io_work_scope& other) noexcept
 			: m_service(other.m_service)
-		{
-			if (m_service != nullptr)
 			{
-				m_service->notify_work_started();
+				if (m_service != nullptr)
+				{
+					m_service->notify_work_started();
+				}
 			}
-		}
 
 		io_work_scope(io_work_scope&& other) noexcept
 			: m_service(other.m_service)
-		{
-			other.m_service = nullptr;
-		}
+			{
+				other.m_service = nullptr;
+			}
 
 		~io_work_scope()
-		{
-			if (m_service != nullptr)
 			{
-				m_service->notify_work_finished();
+				if (m_service != nullptr)
+				{
+					m_service->notify_work_finished();
+				}
 			}
-		}
 
 		void swap(io_work_scope& other) noexcept
-		{
-			std::swap(m_service, other.m_service);
-		}
+			{
+				std::swap(m_service, other.m_service);
+			}
 
 		io_work_scope& operator=(io_work_scope other) noexcept
-		{
-			swap(other);
-			return *this;
-		}
+			{
+				swap(other);
+				return *this;
+			}
 
 		io_service& service() noexcept
-		{
-			return *m_service;
-		}
+			{
+				return *m_service;
+			}
 
 	private:
 
@@ -318,14 +318,14 @@ namespace cppcoro
 template<typename REP, typename RATIO>
 cppcoro::io_service::timed_schedule_operation
 cppcoro::io_service::schedule_after(
-				    const std::chrono::duration<REP, RATIO>& duration,
-				    cppcoro::cancellation_token cancellationToken) noexcept
+	const std::chrono::duration<REP, RATIO>& duration,
+	cppcoro::cancellation_token cancellationToken) noexcept
 {
 	return timed_schedule_operation{
 		*this,
-			std::chrono::high_resolution_clock::now() + duration,
-			std::move(cancellationToken)
-			};
+		std::chrono::high_resolution_clock::now() + duration,
+		std::move(cancellationToken)
+	};
 }
 
 #endif
