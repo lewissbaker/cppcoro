@@ -10,7 +10,6 @@
 #include <cassert>
 #include <algorithm>
 #include <thread>
-#include <vector>
 
 #if CPPCORO_OS_WINNT
 # ifndef WIN32_LEAN_AND_MEAN
@@ -493,49 +492,6 @@ cppcoro::detail::win32::handle_t cppcoro::io_service::native_iocp_handle() noexc
 }
 #endif
 
-void cppcoro::io_service::queue_overflow_operation_to_tail(schedule_operation* operation) noexcept
-{
-	// Still unable to queue these operations.
-	// Put them back on the list of overflow operations.
-	auto* tail = operation;
-	while (tail->m_next != nullptr)
-	{
-		tail = tail->m_next;
-	}
-
-	schedule_operation* head = nullptr;
-	while (!m_scheduleOperations.compare_exchange_weak(
-		head,
-		operation,
-		std::memory_order_release,
-		std::memory_order_relaxed))
-	{
-		tail->m_next = head;
-	}
-
-	return;
-}
-
-void cppcoro::io_service::queue_overflow_operation_to_head(schedule_operation* operation) noexcept
-{
-	// Failed to post to the I/O completion port.
-	//
-	// This is most-likely because the queue is currently full.
-	//
-	// We'll queue up the operation to a linked-list using a lock-free
-	// push and defer the dispatch to the completion port until some I/O
-	// thread next enters its event loop.
-	auto* head = m_scheduleOperations.load(std::memory_order_acquire);
-	do
-	{
-		operation->m_next = head;
-	} while (!m_scheduleOperations.compare_exchange_weak(
-		head,
-		operation,
-		std::memory_order_release,
-		std::memory_order_acquire));
-}
-
 void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 {
 #if CPPCORO_OS_LINUX
@@ -550,7 +506,22 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 #endif
 	if (!ok)
 	{
-		queue_overflow_operation_to_head(operation);
+		// Failed to post to the I/O completion port.
+		//
+		// This is most-likely because the queue is currently full.
+		//
+		// We'll queue up the operation to a linked-list using a lock-free
+		// push and defer the dispatch to the completion port until some I/O
+		// thread next enters its event loop.
+		auto* head = m_scheduleOperations.load(std::memory_order_acquire);
+		do
+		{
+			operation->m_next = head;
+		} while (!m_scheduleOperations.compare_exchange_weak(
+			head,
+			operation,
+			std::memory_order_release,
+			std::memory_order_acquire));
 	}
 }
 
@@ -573,7 +544,23 @@ void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
 
 		if (!ok)
 		{
-			queue_overflow_operation_to_tail(operation);
+			// Still unable to queue these operations.
+			// Put them back on the list of overflow operations.
+			auto* tail = operation;
+			while (tail->m_next != nullptr)
+			{
+				tail = tail->m_next;
+			}
+
+			schedule_operation* head = nullptr;
+			while (!m_scheduleOperations.compare_exchange_weak(
+				head,
+				operation,
+				std::memory_order_release,
+				std::memory_order_relaxed))
+			{
+				tail->m_next = head;
+			}
 		}
 
 		operation = next;
@@ -1023,8 +1010,6 @@ void cppcoro::io_service::timer_thread_state::run()
 					{
 						ok = true;
 					}
-
-					lastSetWaitEventTime = earliestDueTime;
 #endif
 					if (ok)
 					{
