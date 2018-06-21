@@ -24,7 +24,7 @@
 #if CPPCORO_OS_LINUX
 typedef int DWORD;
 #define INFINITE (DWORD)-1 //needed for timeout values in io_service::timer_thread_state::run()
-typedef long long int LONGLONG
+typedef long long int LONGLONG;
 #endif
 
 namespace
@@ -308,7 +308,7 @@ public:
 
 	void request_timer_cancellation() noexcept;
 
-	void run() noexcept;
+	void run();
 
 	void wake_up_timer_thread() noexcept;
 
@@ -345,7 +345,7 @@ cppcoro::io_service::io_service(
 #if CPPCORO_OS_WINNT
 	std::uint32_t concurrencyHint
 #elif CPPCORO_OS_LINUX
-	std::uint32_t queue_length
+	size_t queue_length
 #endif
 )
 	: m_threadState(0)
@@ -485,10 +485,12 @@ void cppcoro::io_service::notify_work_finished() noexcept
 	}
 }
 
+#if CPPCORO_OS_WINNT
 cppcoro::detail::win32::handle_t cppcoro::io_service::native_iocp_handle() noexcept
 {
 	return m_iocpHandle.handle();
 }
+#endif
 
 void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 {
@@ -751,7 +753,7 @@ cppcoro::io_service::timer_thread_state::timer_thread_state()
 #elif CPPCORO_OS_LINUX
 	:m_wakeupfd(detail::linux::create_event_fd())
 	, m_timerfd(detail::linux::create_timer_fd())
-	, m_epollfd(detail::linux::create_epoll_fd()),
+	, m_epollfd(detail::linux::create_epoll_fd())
 #endif
 	, m_newlyQueuedTimers(nullptr)
 	, m_timerCancellationRequested(false)
@@ -806,7 +808,7 @@ void cppcoro::io_service::timer_thread_state::request_timer_cancellation() noexc
 	}
 }
 
-void cppcoro::io_service::timer_thread_state::run() noexcept
+void cppcoro::io_service::timer_thread_state::run()
 {
 	using clock = std::chrono::high_resolution_clock;
 	using time_point = clock::time_point;
@@ -850,17 +852,7 @@ void cppcoro::io_service::timer_thread_state::run() noexcept
 		epoll_event ev;
 		const int status = epoll_wait(m_epollfd.fd(), &ev, 1, timeout);
 
-		if (status == -1)
-		{
-			throw std::system_error
-			{
-				static_cast<int>(errno),
-				std::system_category(),
-				"Error in timer thread: epoll wait"
-			};
-		}
-
-		if (status == 0 || (status == 1 && ev.data.fd == m_wakeupfd.fd()))
+		if (status == 0 || status == -1 || (status == 1 && ev.data.fd == m_wakeupfd.fd()))
 		{
 			uint64_t count;
 			if (read(m_wakeupfd.fd(), &count, sizeof(uint64_t)) != sizeof(uint64_t))

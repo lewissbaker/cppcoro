@@ -23,6 +23,7 @@
 #include <atomic>
 #include <utility>
 #include <experimental/coroutine>
+#include <vector>
 
 namespace cppcoro
 {
@@ -48,8 +49,7 @@ namespace cppcoro
 		/// above this number.
 #if CPPCORO_OS_WINNT
 		io_service(std::uint32_t concurrencyHint);
-#endif
-#if CPPCORO_OS_LINUX
+#elif CPPCORO_OS_LINUX
 		io_service(size_t queue_length);
 #endif
 		~io_service();
