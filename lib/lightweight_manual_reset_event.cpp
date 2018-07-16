@@ -15,6 +15,8 @@
 
 # if CPPCORO_OS_WINNT >= 0x0602
 
+#pragma comment(lib, "Synchronization.lib")
+
 cppcoro::detail::lightweight_manual_reset_event::lightweight_manual_reset_event(bool initiallySet)
 	: m_value(initiallySet ? 1 : 0)
 {}

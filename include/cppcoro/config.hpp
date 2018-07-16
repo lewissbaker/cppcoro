@@ -5,6 +5,8 @@
 #ifndef CPPCORO_CONFIG_HPP_INCLUDED
 #define CPPCORO_CONFIG_HPP_INCLUDED
 
+#include "config_options.hpp"
+
 /////////////////////////////////////////////////////////////////////////////
 // Compiler Detection
 

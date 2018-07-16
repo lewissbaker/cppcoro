@@ -10,7 +10,7 @@
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 
-#if CPPCORO_OS_WINNT
+#ifdef CPPCORO_IO_ENABLED
 # include <cppcoro/io_service.hpp>
 # include "io_service_fixture.hpp"
 #endif
@@ -55,7 +55,7 @@ TEST_CASE("sync_wait(shared_task<T>)")
 	CHECK(cppcoro::sync_wait(makeTask()) == "foo");
 }
 
-#if CPPCORO_OS_WINNT
+#ifdef CPPCORO_IO_ENABLED
 
 TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "multiple threads")
 {
