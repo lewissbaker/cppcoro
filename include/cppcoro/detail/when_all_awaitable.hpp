@@ -39,8 +39,10 @@ namespace cppcoro
 
 			void await_resume() noexcept {}
 
-		private:
+		protected:
+			std::atomic<std::size_t> m_refCount;
 
+		private:
 			static void resumer_callback(void* state) noexcept
 			{
 				auto* that = static_cast<when_all_awaitable*>(state);
@@ -50,8 +52,21 @@ namespace cppcoro
 				}
 			}
 
-			std::atomic<std::size_t> m_refCount;
 			std::experimental::coroutine_handle<> m_awaiter;
+		};
+
+		class when_all_auto_awaitable : public when_all_awaitable
+		{
+		public:
+			when_all_auto_awaitable() noexcept
+				: when_all_awaitable(0)
+			{}
+
+			detail::continuation get_continuation() noexcept
+			{
+				m_refCount.fetch_add(1, std::memory_order_relaxed);
+				return when_all_awaitable::get_continuation();
+			}
 		};
 	}
 }

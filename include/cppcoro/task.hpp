@@ -34,9 +34,18 @@ namespace cppcoro
 				bool await_ready() const noexcept { return false; }
 
 				template<typename PROMISE>
-				void await_suspend(std::experimental::coroutine_handle<PROMISE> coroutine)
+				bool await_suspend(std::experimental::coroutine_handle<PROMISE> coroutine)
 				{
 					task_promise_base& promise = coroutine.promise();
+
+					// After the continuation is resumed and finished promise
+					// may be already destroyed and invalid.
+					bool autoDestruct = promise.m_autoDestruct;
+					if (autoDestruct && promise.completed_with_unhandled_exception())
+					{
+						// There is no one who can handle this exception.
+						std::terminate();
+					}
 
 					// Use 'release' memory semantics in case we finish before the
 					// awaiter can suspend so that the awaiting thread sees our
@@ -48,6 +57,8 @@ namespace cppcoro
 					{
 						promise.m_continuation.resume();
 					}
+
+					return !autoDestruct;
 				}
 
 				void await_resume() noexcept {}
@@ -57,6 +68,7 @@ namespace cppcoro
 
 			task_promise_base() noexcept
 				: m_state(false)
+				, m_autoDestruct(false)
 			{}
 
 			auto initial_suspend() noexcept
@@ -78,6 +90,11 @@ namespace cppcoro
 			{
 				m_continuation = c;
 				return !m_state.exchange(true, std::memory_order_acq_rel);
+			}
+
+			void set_auto_destruct() noexcept
+			{
+				m_autoDestruct = true;
 			}
 
 		protected:
@@ -109,6 +126,10 @@ namespace cppcoro
 			// or when the coroutine has run to completion. Whichever operation
 			// successfully transitions from false->true got there first.
 			std::atomic<bool> m_state;
+
+			// If true disables final suspension so that coroutine frame will be
+			// destructed right after coroutine finishes execution.
+			bool m_autoDestruct;
 
 		};
 
@@ -409,6 +430,16 @@ namespace cppcoro
 			};
 
 			return starter{ m_coroutine };
+		}
+
+		// Used internally for when_all_ready() implementation.
+		void enable_auto_destruction() noexcept
+		{
+			if (!is_ready())
+			{
+				m_coroutine.promise().set_auto_destruct();
+				m_coroutine = nullptr;
+			}
 		}
 
 	private:
