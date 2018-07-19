@@ -145,6 +145,8 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_link_libraries(cppcoro c++ c++abi c++experimental)
 endif()
 
+set_target_properties(cppcoro PROPERTIES DEBUG_POSTFIX d)
+
 ##############################################
 # Installation instructions
 
