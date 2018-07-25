@@ -295,6 +295,8 @@ elif cake.system.isLinux() or cake.system.isDarwin():
   compiler.addLibrary('c++')
   compiler.addLibrary('c')
   compiler.addLibrary('pthread')
+  compiler.addLibrary('rt')
+  compiler.addLibrary('uuid')
 
   #compiler.addProgramFlag('-Wl,--trace')
   #compiler.addProgramFlag('-Wl,-v')

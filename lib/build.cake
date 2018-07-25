@@ -82,6 +82,7 @@ sources = script.cwd([
   'ipv4_endpoint.cpp',
   'ipv6_address.cpp',
   'ipv6_endpoint.cpp',
+  'io_service.cpp',
   ])
 
 extras = script.cwd([
@@ -89,6 +90,14 @@ extras = script.cwd([
   'use.cake',
   ])
 
+if variant.platform == "linux":
+  detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
+    'linux.hpp',
+    ]))
+  sources.extend(script.cwd([
+    'linux.cpp',
+    ]))
+    
 if variant.platform == "windows":
   detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
     'win32.hpp',
@@ -96,7 +105,6 @@ if variant.platform == "windows":
     ]))
   sources.extend(script.cwd([
     'win32.cpp',
-    'io_service.cpp',
     'file.cpp',
     'readable_file.cpp',
     'writable_file.cpp',
