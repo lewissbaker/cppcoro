@@ -65,6 +65,9 @@ detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 
 
 privateHeaders = script.cwd([
   'cancellation_state.hpp',
+  'auto_reset_event.hpp',
+  'spin_wait.hpp',
+  'spin_mutex.hpp',
   ])
 
 sources = script.cwd([
@@ -82,6 +85,9 @@ sources = script.cwd([
   'ipv4_endpoint.cpp',
   'ipv6_address.cpp',
   'ipv6_endpoint.cpp',
+  'auto_reset_event.cpp',
+  'spin_wait.cpp',
+  'spin_mutex.cpp',
   ])
 
 extras = script.cwd([
