@@ -11,6 +11,8 @@
 #include <vector>
 #include <thread>
 #include <cassert>
+#include <chrono>
+#include <iostream>
 
 #include "doctest/doctest.h"
 
@@ -91,14 +93,37 @@ cppcoro::task<std::uint64_t> sum_of_squares(
 
 TEST_CASE("launch sub-task with many sub-tasks")
 {
+	using namespace std::chrono_literals;
+
+	constexpr std::uint64_t limit = 1'000'000'000;
+
 	cppcoro::static_thread_pool tp;
-	auto result = cppcoro::sync_wait(sum_of_squares(0, 1'000'000'000, tp));
+
+	// Wait for the thread-pool thread to start up.
+	std::this_thread::sleep_for(1ms);
+
+	auto start = std::chrono::high_resolution_clock::now();
+
+	auto result = cppcoro::sync_wait(sum_of_squares(0, limit , tp));
+
+	auto end = std::chrono::high_resolution_clock::now();
 
 	std::uint64_t sum = 0;
-	for (std::uint64_t i = 0; i < 1'000'000'000; ++i)
+	for (std::uint64_t i = 0; i < limit; ++i)
 	{
 		sum += i * i;
 	}
+
+	auto end2 = std::chrono::high_resolution_clock::now();
+
+	auto toNs = [](auto time)
+	{
+		return std::chrono::duration_cast<std::chrono::nanoseconds>(time).count();
+	};
+
+	std::cout
+		<< "multi-threaded version took " << toNs(end - start) << "ns\n"
+		<< "single-threaded version took " << toNs(end2 - end) << "ns" << std::endl;
 
 	CHECK(result == sum);
 }

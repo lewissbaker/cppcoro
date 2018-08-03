@@ -48,7 +48,6 @@ namespace cppcoro
 			static_thread_pool* m_threadPool;
 			std::experimental::coroutine_handle<> m_awaitingCoroutine;
 			schedule_operation* m_next;
-			schedule_operation* m_prev;
 
 		};
 
@@ -85,8 +84,8 @@ namespace cppcoro
 		static thread_local thread_state* s_currentState;
 		static thread_local static_thread_pool* s_currentThreadPool;
 
-		std::uint32_t m_threadCount;
-		std::unique_ptr<thread_state[]> m_threadStates;
+		const std::uint32_t m_threadCount;
+		const std::unique_ptr<thread_state[]> m_threadStates;
 
 		std::vector<std::thread> m_threads;
 

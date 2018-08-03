@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <mutex>
+#include <chrono>
 
 namespace
 {
@@ -34,7 +35,7 @@ namespace cppcoro
 			: m_localQueue(
 				std::make_unique<std::atomic<schedule_operation*>[]>(
 					local::initial_local_queue_size))
-			, m_mask(local::initial_local_queue_size)
+			, m_mask(local::initial_local_queue_size - 1)
 			, m_head(0)
 			, m_tail(0)
 			, m_isSleeping(false)
@@ -45,7 +46,7 @@ namespace cppcoro
 		{
 			if (m_isSleeping.load(std::memory_order_seq_cst))
 			{
-				if (m_isSleeping.exchange(false, std::memory_order_relaxed))
+				if (m_isSleeping.exchange(false, std::memory_order_seq_cst))
 				{
 					m_wakeUpEvent.set();
 					return true;
@@ -101,20 +102,55 @@ namespace cppcoro
 				m_head.store(head + 1, std::memory_order_seq_cst);
 				return true;
 			}
-			else
+
+			if (m_mask == local::max_local_queue_size)
 			{
-				if (!m_remoteMutex.try_lock())
-				{
-					// Don't wait to acquire the lock if we can't get it immediately.
-					// Fail and let the thread queue it up to the global queue.
-					return false;
-				}
+				// No space in the buffer and we don't want to grow
+				// it any further.
+				return false;
 			}
 
-			// TODO: try to enlarge the buffer?
-			// Or try to give the bottom half of our tasks away to the global queue?
+			// Allocate the new buffer before taking out the lock so that
+			// we ensure we hold the lock for as short a time as possible.
+			const size_t newSize = (m_mask + 1) * 2;
 
-			return false;
+			std::unique_ptr<std::atomic<schedule_operation*>[]> newLocalQueue{
+				new (std::nothrow) std::atomic<schedule_operation*>[newSize]
+			};
+			if (!newLocalQueue)
+			{
+				// Unable to allocate more memory.
+				return false;
+			}
+
+			if (!m_remoteMutex.try_lock())
+			{
+				// Don't wait to acquire the lock if we can't get it immediately.
+				// Fail and let the thread queue it up to the global queue.
+				return false;
+			}
+
+			std::scoped_lock lock{ std::adopt_lock, m_remoteMutex };
+
+			// We can now re-read tail, guaranteed that we are not seeing a stale version.
+			tail = m_tail.load(std::memory_order_relaxed);
+
+			// Copy the existing operations.
+			const size_t newMask = newSize - 1;
+			for (size_t i = tail; i != head; ++i)
+			{
+				newLocalQueue[i & newMask].store(
+					m_localQueue[i & m_mask].load(std::memory_order_relaxed),
+					std::memory_order_relaxed);
+			}
+
+			// Finally, write the new operation to the queue.
+			newLocalQueue[head & newMask].store(operation, std::memory_order_relaxed);
+
+			m_head.store(head + 1, std::memory_order_relaxed);
+			m_localQueue = std::move(newLocalQueue);
+			m_mask = newMask;
+			return true;
 		}
 
 		schedule_operation* try_local_pop() noexcept
@@ -125,7 +161,7 @@ namespace cppcoro
 			if (difference(head, tail) <= 0)
 			{
 				// Empty
-				return false;
+				return nullptr;
 			}
 
 			// 3 classes of interleaving of try_local_pop() and try_remote_steal()
@@ -347,7 +383,15 @@ namespace cppcoro
 			}
 			else
 			{
-				localState.sleep_until_woken();
+				try
+				{
+					localState.sleep_until_woken();
+				}
+				catch (...)
+				{
+					using namespace std::chrono_literals;
+					std::this_thread::sleep_for(1ms);
+				}
 			}
 		}
 	}
@@ -390,7 +434,7 @@ namespace cppcoro
 		auto* tail = m_globalQueueTail.load(std::memory_order_relaxed);
 		do
 		{
-			operation->m_prev = tail;
+			operation->m_next = tail;
 		} while (!m_globalQueueTail.compare_exchange_weak(
 			tail,
 			operation,
@@ -402,6 +446,7 @@ namespace cppcoro
 	static_thread_pool::try_global_dequeue() noexcept
 	{
 		std::scoped_lock lock{ m_globalQueueMutex };
+
 		auto* head = m_globalQueueHead;
 		if (head == nullptr)
 		{
@@ -415,24 +460,18 @@ namespace cppcoro
 			}
 
 			// Acquire the entire set of queued operations in a single operation.
-			head = m_globalQueueTail.exchange(nullptr, std::memory_order_acquire);
-			if (head == nullptr)
+			auto* tail = m_globalQueueTail.exchange(nullptr, std::memory_order_acquire);
+			if (tail == nullptr)
 			{
 				return nullptr;
 			}
 
-			// Populate the forward links in the linked list while reversing the
-			// list. This allows us to ensure that operations are dequeued in a
-			// FIFO order (they are pushed onto the queue in reverse order).
-			head->m_next = nullptr;
-
-			auto* prev = head->m_prev;
-			while (prev != nullptr)
+			// Reverse the list 
+			do
 			{
-				prev->m_next = head;
-				head = prev;
-				prev = prev->m_prev;
-			}
+				auto* next = std::exchange(tail->m_next, head);
+				head = std::exchange(tail, next);
+			} while (tail != nullptr);
 		}
 
 		m_globalQueueHead = head->m_next;
