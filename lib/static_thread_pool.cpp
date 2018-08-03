@@ -275,13 +275,13 @@ namespace cppcoro
 # pragma warning(disable : 4324)
 #endif
 
-		alignas(std::hardware_destructive_interference_size)
+		//alignas(std::hardware_destructive_interference_size)
 		std::atomic<std::size_t> m_head;
 
-		alignas(std::hardware_destructive_interference_size)
+		//alignas(std::hardware_destructive_interference_size)
 		std::atomic<std::size_t> m_tail;
 
-		alignas(std::hardware_destructive_interference_size)
+		//alignas(std::hardware_destructive_interference_size)
 		std::atomic<bool> m_isSleeping;
 		spin_mutex m_remoteMutex;
 

@@ -93,6 +93,8 @@ namespace cppcoro
 
 		std::mutex m_globalQueueMutex;
 		schedule_operation* m_globalQueueHead;
+
+		//alignas(std::hardware_destructive_interference_size)
 		std::atomic<schedule_operation*> m_globalQueueTail;
 
 	};
