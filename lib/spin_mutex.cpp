@@ -23,7 +23,10 @@ namespace cppcoro
 		spin_wait wait;
 		while (!try_lock())
 		{
-			wait.spin_one();
+			while (m_isLocked.load(std::memory_order_relaxed))
+			{
+				wait.spin_one();
+			}
 		}
 	}
 
