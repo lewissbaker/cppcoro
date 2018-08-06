@@ -185,6 +185,7 @@ cppcoro::task<void> for_each_async(SCHEDULER& scheduler, RANGE& range, FUNC func
 
 		bool await_ready() noexcept { return false; }
 
+		CPPCORO_NOINLINE
 		void await_suspend(std::experimental::coroutine_handle<> coro) noexcept
 		{
 			fork_join_operation& forkJoin = m_forkJoin;
