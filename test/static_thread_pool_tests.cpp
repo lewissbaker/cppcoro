@@ -13,6 +13,7 @@
 #include <cassert>
 #include <chrono>
 #include <iostream>
+#include <numeric>
 
 #include "doctest/doctest.h"
 
