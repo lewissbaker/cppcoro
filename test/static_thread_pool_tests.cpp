@@ -128,4 +128,159 @@ TEST_CASE("launch sub-task with many sub-tasks")
 	CHECK(result == sum);
 }
 
+struct fork_join_operation
+{
+	std::atomic<std::size_t> m_count;
+	std::experimental::coroutine_handle<> m_coro;
+
+	fork_join_operation() : m_count(1) {}
+
+	void begin_work() noexcept
+	{
+		m_count.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void end_work() noexcept
+	{
+		if (m_count.fetch_sub(1, std::memory_order_acq_rel) == 1)
+		{
+			m_coro.resume();
+		}
+	}
+
+	bool await_ready() noexcept { return m_count.load(std::memory_order_acquire) == 1; }
+
+	bool await_suspend(std::experimental::coroutine_handle<> coro) noexcept
+	{
+		m_coro = coro;
+		return m_count.fetch_sub(1, std::memory_order_acq_rel) != 1;
+	}
+
+	void await_resume() noexcept {};
+};
+
+template<typename FUNC, typename RANGE, typename SCHEDULER>
+cppcoro::task<void> for_each_async(SCHEDULER& scheduler, RANGE& range, FUNC func)
+{
+	using reference_type = decltype(*range.begin());
+
+	// TODO: Use awaiter_t here instead. This currently assumes that
+	// result of scheduler.schedule() doesn't have an operator co_await().
+	using schedule_operation = decltype(scheduler.schedule());
+
+	struct work_operation
+	{
+		fork_join_operation& m_forkJoin;
+		FUNC& m_func;
+		reference_type m_value;
+		schedule_operation m_scheduleOp;
+
+		work_operation(fork_join_operation& forkJoin, SCHEDULER& scheduler, FUNC& func, reference_type&& value)
+			: m_forkJoin(forkJoin)
+			, m_func(func)
+			, m_value(static_cast<reference_type&&>(value))
+			, m_scheduleOp(scheduler.schedule())
+		{
+		}
+
+		bool await_ready() noexcept { return false; }
+
+		void await_suspend(std::experimental::coroutine_handle<> coro) noexcept
+		{
+			fork_join_operation& forkJoin = m_forkJoin;
+			FUNC& func = m_func;
+			reference_type value = static_cast<reference_type&&>(m_value);
+
+			static_assert(std::is_same_v<decltype(m_scheduleOp.await_suspend(coro)), void>);
+
+			forkJoin.begin_work();
+
+			// Schedule the next iteration of the loop to run
+			m_scheduleOp.await_suspend(coro);
+
+			func(static_cast<reference_type&&>(value));
+
+			forkJoin.end_work();
+		}
+
+		void await_resume() noexcept {}
+	};
+
+	fork_join_operation forkJoin;
+
+	for (auto&& x : range)
+	{
+		co_await work_operation{
+			forkJoin,
+			scheduler,
+			func,
+			static_cast<decltype(x)>(x)
+		};
+	}
+
+	co_await forkJoin;
+}
+
+std::uint64_t collatz_distance(std::uint64_t number)
+{
+	std::uint64_t count = 0;
+	while (number > 1)
+	{
+		if (number % 2 == 0) number /= 2;
+		else number = number * 3 + 1;
+		++count;
+	}
+	return count;
+}
+
+TEST_CASE("for_each_async")
+{
+	cppcoro::static_thread_pool tp;
+
+	{
+		std::vector<std::uint64_t> values(1'000'000);
+		std::iota(values.begin(), values.end(), 1);
+
+		cppcoro::sync_wait([&]() -> cppcoro::task<>
+		{
+			auto start = std::chrono::high_resolution_clock::now();
+
+			co_await for_each_async(tp, values, [](std::uint64_t& value)
+			{
+				value = collatz_distance(value);
+			});
+
+			auto end = std::chrono::high_resolution_clock::now();
+
+			std::cout << "for_each_async of " << values.size()
+				<< " took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+				<< "us" << std::endl;
+
+			for (std::uint64_t i = 0; i < 1'000'000; ++i)
+			{
+				CHECK(values[i] == collatz_distance(i + 1));
+			}
+		}());
+	}
+
+	{
+		std::vector<std::uint64_t> values(1'000'000);
+		std::iota(values.begin(), values.end(), 1);
+
+		auto start = std::chrono::high_resolution_clock::now();
+
+		for (auto&& x : values)
+		{
+			x = collatz_distance(x);
+		}
+
+		auto end = std::chrono::high_resolution_clock::now();
+
+		std::cout << "single-threaded for loop of " << values.size()
+			<< " took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+			<< "us" << std::endl;
+	}
+
+}
+
 TEST_SUITE_END();
