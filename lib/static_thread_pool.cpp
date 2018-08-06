@@ -7,6 +7,7 @@
 
 #include "auto_reset_event.hpp"
 #include "spin_mutex.hpp"
+#include "spin_wait.hpp"
 
 #include <cassert>
 #include <mutex>
@@ -48,7 +49,14 @@ namespace cppcoro
 			{
 				if (m_isSleeping.exchange(false, std::memory_order_seq_cst))
 				{
-					m_wakeUpEvent.set();
+					try
+					{
+						m_wakeUpEvent.set();
+					}
+					catch (...)
+					{
+						// TODO: What do we do here?
+					}
 					return true;
 				}
 			}
@@ -58,19 +66,35 @@ namespace cppcoro
 
 		void notify_intent_to_sleep() noexcept
 		{
-			m_isSleeping.store(true, std::memory_order_seq_cst);
+			m_isSleeping.store(true, std::memory_order_relaxed);
 		}
 
-		void sleep_until_woken()
+		void sleep_until_woken() noexcept
 		{
-			m_wakeUpEvent.wait();
+			try
+			{
+				m_wakeUpEvent.wait();
+			}
+			catch (...)
+			{
+				using namespace std::chrono_literals;
+				std::this_thread::sleep_for(1ms);
+			}
 		}
 
-		bool has_any_queued_work_approx() const noexcept
+		bool approx_has_any_queued_work() const noexcept
 		{
 			return difference(
 				m_head.load(std::memory_order_relaxed),
 				m_tail.load(std::memory_order_relaxed)) > 0;
+		}
+
+		bool has_any_queued_work() noexcept
+		{
+			std::scoped_lock lock{ m_remoteMutex };
+			auto tail = m_tail.load(std::memory_order_relaxed);
+			auto head = m_head.load(std::memory_order_seq_cst);
+			return difference(head, tail) > 0;
 		}
 
 		bool try_local_enqueue(schedule_operation*& operation) noexcept
@@ -126,7 +150,8 @@ namespace cppcoro
 			if (!m_remoteMutex.try_lock())
 			{
 				// Don't wait to acquire the lock if we can't get it immediately.
-				// Fail and let the thread queue it up to the global queue.
+				// Fail and let it be enqueued to the global queue.
+				// TODO: Should we have a per-thread overflow queue instead?
 				return false;
 			}
 
@@ -223,7 +248,7 @@ namespace cppcoro
 			std::scoped_lock lock{ std::adopt_lock, m_remoteMutex };
 
 			auto tail = m_tail.load(std::memory_order_relaxed);
-			auto head = m_head.load(std::memory_order_relaxed);
+			auto head = m_head.load(std::memory_order_seq_cst);
 			if (difference(head, tail) <= 0)
 			{
 				return nullptr;
@@ -346,53 +371,122 @@ namespace cppcoro
 		s_currentState = &localState;
 		s_currentThreadPool = this;
 
-		while (!m_stopRequested.load(std::memory_order_relaxed))
+		auto tryGetRemote = [&]()
 		{
-			while (true)
-			{
-				auto* op = localState.try_local_pop();
-				if (op == nullptr)
-				{
-					op = try_global_dequeue();
-					if (op == nullptr)
-					{
-						op = try_steal_from_other_thread(threadIndex);
-					}
-				}
-
-				if (op == nullptr) break;
-
-				op->m_awaitingCoroutine.resume();
-			}
-
-			localState.notify_intent_to_sleep();
-
-			// One last check to see if there is any work to steal.
-			//
-			// TODO: Do we need these retries to be seq_cst?
-
+			// Try to get some new work first from the global queue
+			// then if that queue is empty then try to steal from
+			// the local queues of other worker threads.
+			// We try to get new work from the global queue first
+			// before stealing as stealing from other threads has
+			// the side-effect of those threads running out of work
+			// sooner and then having to steal work which increases
+			// contention.
 			auto* op = try_global_dequeue();
 			if (op == nullptr)
 			{
 				op = try_steal_from_other_thread(threadIndex);
 			}
+			return op;
+		};
 
-			if (op != nullptr)
+		while (true)
+		{
+			// Process operations from the local queue.
+			schedule_operation* op;
+
+			while (true)
 			{
+				op = localState.try_local_pop();
+				if (op == nullptr)
+				{
+					op = tryGetRemote();
+					if (op == nullptr)
+					{
+						break;
+					}
+				}
+
 				op->m_awaitingCoroutine.resume();
 			}
-			else
+
+			// No more operations in the local queue or remote queue.
+			//
+			// We spin for a little while waiting for new items
+			// to be enqueued. This avoids the expensive operation
+			// of putting the thread to sleep and waking it up again
+			// in the case that an external thread is queueing new work
+
+			cppcoro::spin_wait spinWait;
+			while (true)
 			{
-				try
+				for (int i = 0; i < 30; ++i)
 				{
-					localState.sleep_until_woken();
+					if (is_shutdown_requested())
+					{
+						return;
+					}
+
+					spinWait.spin_one();
+
+					if (approx_has_any_queued_work_for(threadIndex))
+					{
+						op = tryGetRemote();
+						if (op != nullptr)
+						{
+							// Now that we've executed some work we can
+							// return to normal processing since this work
+							// might have queued some more work to the local
+							// queue which we should process first.
+							goto normal_processing;
+						}
+					}
 				}
-				catch (...)
+
+				// We didn't find any work after spinning for a while, let's
+				// put ourselves to sleep and wait to be woken up.
+
+				// First, let other threads know we're going to sleep.
+				notify_intent_to_sleep(threadIndex);
+
+				// As notifying the other threads that we're sleeping may have
+				// raced with other threads enqueueing more work, we need to
+				// re-check whether there is any more work to be done so that
+				// we don't get into a situation where we go to sleep and another
+				// thread has enqueued some work and doesn't know to wake us up.
+
+				if (has_any_queued_work_for(threadIndex))
 				{
-					using namespace std::chrono_literals;
-					std::this_thread::sleep_for(1ms);
+					op = tryGetRemote();
+					if (op != nullptr)
+					{
+						// Try to clear the intent to sleep so that some other thread
+						// that subsequently enqueues some work won't mistakenly try
+						// to wake this threadup when we are already running as there
+						// might have been some other thread that it could have woken
+						// up instead which could have resulted in increased parallelism.
+						//
+						// However, it's possible that some other thread may have already
+						// tried to wake us up, in which case the auto_reset_event used to
+						// wake up this thread may already be in the 'set' state. Leaving
+						// it in this state won't really hurt. It'll just mean we might get
+						// a spurious wake-up next time we try to go to sleep.
+						try_clear_intent_to_sleep(threadIndex);
+
+						goto normal_processing;
+					}
 				}
+
+				if (is_shutdown_requested())
+				{
+					return;
+				}
+
+				localState.sleep_until_woken();
 			}
+
+		normal_processing:
+			assert(op != nullptr);
+			op->m_awaitingCoroutine.resume();
 		}
 	}
 
@@ -407,7 +501,7 @@ namespace cppcoro
 			// We should not be shutting down the thread pool if there is any
 			// outstanding work in the queue. It is up to the application to
 			// ensure all enqueued work has completed first.
-			assert(!threadState.has_any_queued_work_approx());
+			assert(!threadState.has_any_queued_work());
 
 			threadState.try_wake_up();
 		}
@@ -442,12 +536,115 @@ namespace cppcoro
 			std::memory_order_relaxed));
 	}
 
+	bool static_thread_pool::has_any_queued_work_for(std::uint32_t threadIndex) noexcept
+	{
+		if (m_globalQueueTail.load(std::memory_order_seq_cst) != nullptr)
+		{
+			return true;
+		}
+
+		if (m_globalQueueHead.load(std::memory_order_seq_cst) != nullptr)
+		{
+			return true;
+		}
+
+		for (std::uint32_t i = 0; i < m_threadCount; ++i)
+		{
+			if (i == threadIndex) continue;
+			if (m_threadStates[i].has_any_queued_work())
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool static_thread_pool::approx_has_any_queued_work_for(std::uint32_t threadIndex) const noexcept
+	{
+		// Cheap, approximate, read-only implementation that checks whether any work has
+		// been queued in the system somewhere. We try to avoid writes here so that we
+		// don't bounce cache-lines around between threads/cores unnecessarily when
+		// multiple threads are all spinning waiting for work.
+
+		if (m_globalQueueTail.load(std::memory_order_relaxed) != nullptr)
+		{
+			return true;
+		}
+
+		if (m_globalQueueHead.load(std::memory_order_relaxed) != nullptr)
+		{
+			return true;
+		}
+
+		for (std::uint32_t i = 0; i < m_threadCount; ++i)
+		{
+			if (i == threadIndex) continue;
+			if (m_threadStates[i].approx_has_any_queued_work())
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool static_thread_pool::is_shutdown_requested() const noexcept
+	{
+		return m_stopRequested.load(std::memory_order_relaxed);
+	}
+
+	void static_thread_pool::notify_intent_to_sleep(std::uint32_t threadIndex) noexcept
+	{
+		// First mark the thread as asleep
+		m_threadStates[threadIndex].notify_intent_to_sleep();
+
+		// Then publish the fact that a thread is asleep by incrementing the count
+		// of threads that are asleep.
+		m_sleepingThreadCount.fetch_add(1, std::memory_order_seq_cst);
+	}
+
+	void static_thread_pool::try_clear_intent_to_sleep(std::uint32_t threadIndex) noexcept
+	{
+		// First try to claim that we are waking up one of the threads.
+		std::uint32_t oldSleepingCount = m_sleepingThreadCount.load(std::memory_order_relaxed);
+		do
+		{
+			if (oldSleepingCount == 0)
+			{
+				// No more sleeping threads.
+				// Someone must have woken us up.
+				return;
+			}
+		} while (!m_sleepingThreadCount.compare_exchange_weak(
+			oldSleepingCount,
+			oldSleepingCount - 1,
+			std::memory_order_acquire,
+			std::memory_order_relaxed));
+
+		// Then preferentially try to wake up our thread.
+		// If some other thread has already requested that this thread wake up
+		// then we will wake up another thread - the one that should have been woken
+		// up by the thread that woke this thread up.
+		if (!m_threadStates[threadIndex].try_wake_up())
+		{
+			for (std::uint32_t i = 0; i < m_threadCount; ++i)
+			{
+				if (i == threadIndex) continue;
+				if (m_threadStates[i].try_wake_up())
+				{
+					return;
+				}
+			}
+		}
+	}
+
 	static_thread_pool::schedule_operation*
 	static_thread_pool::try_global_dequeue() noexcept
 	{
 		std::scoped_lock lock{ m_globalQueueMutex };
 
-		auto* head = m_globalQueueHead;
+		auto* head = m_globalQueueHead.load(std::memory_order_relaxed);
 		if (head == nullptr)
 		{
 			// Use seq-cst memory order so that when we check for an item in the
@@ -517,20 +714,37 @@ namespace cppcoro
 
 	void static_thread_pool::wake_one_thread() noexcept
 	{
-		for (std::uint32_t threadIndex = 0; threadIndex < m_threadCount; ++threadIndex)
+		// First try to claim responsibility for waking up one thread.
+		// This first read must be seq_cst to ensure that either we have
+		// visibility of another thread going to sleep or they have
+		// visibility of our prior enqueue of an item.
+		std::uint32_t oldSleepingCount = m_sleepingThreadCount.load(std::memory_order_seq_cst);
+		do
 		{
-			auto& threadState = m_threadStates[threadIndex];
-			try
+			if (oldSleepingCount == 0)
 			{
-				if (threadState.try_wake_up())
-				{
-					return;
-				}
+				// No sleeping threads.
+				// Someone must have woken us up.
+				return;
 			}
-			catch (...)
+		} while (!m_sleepingThreadCount.compare_exchange_weak(
+			oldSleepingCount,
+			oldSleepingCount - 1,
+			std::memory_order_acquire,
+			std::memory_order_relaxed));
+
+		// Now that we have claimed responsibility for waking a thread up
+		// we need to find a sleeping thread and wake it up. We should be
+		// guaranteed of finding a thread to wake-up here.
+
+		for (std::uint32_t i = 0; i < m_threadCount; ++i)
+		{
+			if (m_threadStates[i].try_wake_up())
 			{
-				// Ignore. Just go on to waking up the next thread.
+				return;
 			}
 		}
+
+		assert(false && "Error, no sleeping threads found to wake up");
 	}
 }

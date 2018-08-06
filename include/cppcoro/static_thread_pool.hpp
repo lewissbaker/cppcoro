@@ -67,6 +67,15 @@ namespace cppcoro
 
 		void remote_enqueue(schedule_operation* operation) noexcept;
 
+		bool has_any_queued_work_for(std::uint32_t threadIndex) noexcept;
+
+		bool approx_has_any_queued_work_for(std::uint32_t threadIndex) const noexcept;
+
+		bool is_shutdown_requested() const noexcept;
+
+		void notify_intent_to_sleep(std::uint32_t threadIndex) noexcept;
+		void try_clear_intent_to_sleep(std::uint32_t threadIndex) noexcept;
+
 		schedule_operation* try_global_dequeue() noexcept;
 
 		/// Try to steal a task from another thread.
@@ -92,10 +101,13 @@ namespace cppcoro
 		std::atomic<bool> m_stopRequested;
 
 		std::mutex m_globalQueueMutex;
-		schedule_operation* m_globalQueueHead;
+		std::atomic<schedule_operation*> m_globalQueueHead;
 
 		//alignas(std::hardware_destructive_interference_size)
 		std::atomic<schedule_operation*> m_globalQueueTail;
+
+		//alignas(std::hardware_destructive_interference_size)
+		std::atomic<std::uint32_t> m_sleepingThreadCount;
 
 	};
 }
