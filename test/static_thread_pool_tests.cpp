@@ -258,7 +258,7 @@ TEST_CASE("for_each_async")
 				<< " took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 				<< "us" << std::endl;
 
-			for (std::uint64_t i = 0; i < 1'000'000; ++i)
+			for (std::size_t i = 0; i < 1'000'000; ++i)
 			{
 				CHECK(values[i] == collatz_distance(i + 1));
 			}
