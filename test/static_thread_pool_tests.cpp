@@ -208,6 +208,8 @@ cppcoro::task<void> for_each_async(SCHEDULER& scheduler, RANGE& range, FUNC func
 		void await_resume() noexcept {}
 	};
 
+	co_await scheduler.schedule();
+
 	fork_join_operation forkJoin;
 
 	for (auto&& x : range)
