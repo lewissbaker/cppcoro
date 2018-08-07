@@ -336,6 +336,7 @@ namespace cppcoro
 		, m_stopRequested(false)
 		, m_globalQueueHead(nullptr)
 		, m_globalQueueTail(nullptr)
+		, m_sleepingThreadCount(0)
 	{
 		m_threads.reserve(threadCount);
 		try
