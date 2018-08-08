@@ -736,16 +736,18 @@ namespace cppcoro
 
 		// Now that we have claimed responsibility for waking a thread up
 		// we need to find a sleeping thread and wake it up. We should be
-		// guaranteed of finding a thread to wake-up here.
-
-		for (std::uint32_t i = 0; i < m_threadCount; ++i)
+		// guaranteed of finding a thread to wake-up here, but not necessarily
+		// in a single pass due to threads potentially waking themselves up
+		// in try_clear_intent_to_sleep().
+		while (true)
 		{
-			if (m_threadStates[i].try_wake_up())
+			for (std::uint32_t i = 0; i < m_threadCount; ++i)
 			{
-				return;
+				if (m_threadStates[i].try_wake_up())
+				{
+					return;
+				}
 			}
 		}
-
-		assert(false && "Error, no sleeping threads found to wake up");
 	}
 }
