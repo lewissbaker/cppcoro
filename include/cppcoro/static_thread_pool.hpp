@@ -53,7 +53,8 @@ namespace cppcoro
 
 		std::uint32_t thread_count() const noexcept { return m_threadCount; }
 
-		schedule_operation schedule() { return schedule_operation{ this }; }
+		[[nodiscard]]
+		schedule_operation schedule() noexcept { return schedule_operation{ this }; }
 
 	private:
 
