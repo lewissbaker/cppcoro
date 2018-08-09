@@ -28,6 +28,7 @@ These include:
   * `cancellation_source`
   * `cancellation_registration`
 * Schedulers and I/O
+  * `static_thread_pool`
   * `io_service`
   * `io_work_scope`
   * `file`, `readable_file`, `writable_file`
@@ -1074,6 +1075,109 @@ cppcoro::task<> cancellable_timer_wait(cppcoro::cancellation_token token)
   });
 
   co_await timer;
+}
+```
+
+## `static_thread_pool`
+
+The `static_thread_pool` class provides an abstraction that lets you schedule work
+on a fixed-size pool of threads.
+
+This class implements the **Scheduler** concept (see below).
+
+You can enqueue work to the thread-pool by executing `co_await threadPool.schedule()`.
+This operation will suspend the current coroutine, enqueue it for execution on the
+thread-pool and the thread pool will then resume the coroutine when a thread in the
+thread-pool is next free to run the coroutine. **This operation is guaranteed not
+to throw and, in the common case, will not allocate any memory**.
+
+This class makes use of a work-stealing algorithm to load-balance work across multiple
+threads. Work enqueued to the thread-pool from a thread-pool thread will be scheduled
+for execution on the same thread in a LIFO queue. Work enqueued to the thread-pool from
+a remote thread will be enqueued to a global FIFO queue. When a worker thread runs out
+of work from its local queue it first tries to dequeue work from the global queue. If
+that queue is empty then it next tries to steal work from the back of the queues of
+the other worker threads.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class static_thread_pool
+  {
+  public:
+    // Initialise the thread-pool with a number of threads equal to
+    // std::thread::hardware_concurrency().
+    static_thread_pool();
+
+    // Initialise the thread pool with the specified number of threads.
+    explicit static_thread_pool(std::uint32_t threadCount);
+
+    std::uint32_t thread_count() const noexcept;
+
+    class schedule_operation
+    {
+    public:
+      schedule_operation(static_thread_pool* tp) noexcept;
+
+      bool await_ready() noexcept;
+      bool await_suspend(std::experimental::coroutine_handle<> h) noexcept;
+      bool await_resume() noexcept;
+
+    private:
+      // unspecified
+    };
+
+    // Return an operation that can be awaited by a coroutine.
+    //
+    // 
+    [[nodiscard]]
+    schedule_operation schedule() noexcept;
+
+  private:
+
+    // Unspecified
+
+  };
+}
+```
+
+Example usage: Simple
+```c++
+cppcoro<std::string> do_something_on_threadpool(static_thread_pool& tp, int digitCount)
+{
+  // First schedule the coroutine onto the threadpool.
+  co_await tp.schedule();
+
+  // When it resumes, this coroutine is now running on the threadpool.
+  do_something();
+}
+```
+
+Example usage: Doing things in parallel, using `schedule_on()` operator.
+```c++
+cppcoro::task<double> dot_product(static_thread_pool& tp, double a[], double b[], size_t count)
+{
+  if (count > 1000)
+  {
+    // Subdivide the work recursively into two equal tasks
+    // The first half is scheduled to the thread pool so it can run concurrently
+    // with the second half which continues on this thread.
+    size_t halfCount = count / 2;
+    auto [first, second] = co_await when_all(
+      schedule_on(tp, dot_product(tp, a, b, halfCount),
+      dot_product(tp, a + halfCount, b + halfCount, count - halfCount));
+    co_return first + second;
+  }
+  else
+  {
+    double sum = 0.0;
+    for (size_t i = 0; i < count; ++i)
+    {
+      sum += a[i] * b[i];
+    }
+    co_return sum;
+  }
 }
 ```
 
