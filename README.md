@@ -1144,7 +1144,7 @@ namespace cppcoro
 
 Example usage: Simple
 ```c++
-cppcoro<std::string> do_something_on_threadpool(static_thread_pool& tp, int digitCount)
+cppcoro::task<std::string> do_something_on_threadpool(cppcoro::static_thread_pool& tp)
 {
   // First schedule the coroutine onto the threadpool.
   co_await tp.schedule();
@@ -1154,7 +1154,7 @@ cppcoro<std::string> do_something_on_threadpool(static_thread_pool& tp, int digi
 }
 ```
 
-Example usage: Doing things in parallel, using `schedule_on()` operator.
+Example usage: Doing things in parallel - using `schedule_on()` operator with `static_thread_pool`.
 ```c++
 cppcoro::task<double> dot_product(static_thread_pool& tp, double a[], double b[], size_t count)
 {
