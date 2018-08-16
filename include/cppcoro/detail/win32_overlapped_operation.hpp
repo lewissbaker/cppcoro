@@ -172,9 +172,9 @@ namespace cppcoro
 				: win32_overlapped_operation_base(std::move(other))
 				, m_state(other.m_state.load(std::memory_order_relaxed))
 				, m_cancellationToken(std::move(other.m_cancellationToken))
-				, m_errorCode(other.m_errorCode)
-				, m_numberOfBytesTransferred(other.m_numberOfBytesTransferred)
 			{
+				assert(m_errorCode == other.m_errorCode);
+				assert(m_numberOfBytesTransferred == other.m_numberOfBytesTransferred);
 			}
 
 		public:
