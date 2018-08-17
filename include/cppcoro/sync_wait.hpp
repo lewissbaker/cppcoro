@@ -21,7 +21,8 @@ namespace cppcoro
 #if CPPCORO_COMPILER_MSVC
 		// HACK: Need to explicitly specify template argument to make_sync_wait_task
 		// here to work around a bug in MSVC when passing parameters by universal
-		// reference to
+		// reference to a coroutine which causes the compiler to think it needs to
+		// 'move' parameters passed by rvalue reference.
 		auto task = detail::make_sync_wait_task<AWAITABLE>(awaitable);
 #else
 		auto task = detail::make_sync_wait_task(std::forward<AWAITABLE>(awaitable));
