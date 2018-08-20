@@ -37,6 +37,7 @@ These include:
   * `awaitable_traits<T>`
 * Concepts
   * `Awaitable<T>`
+  * `Awaiter<T>`
   * `Scheduler`
   * `DelayedScheduler`
 
@@ -130,8 +131,8 @@ namespace cppcoro
     // If the task is not yet ready then the awaiting coroutine will be
     // suspended until the task completes. If the the task is_ready() then
     // this operation will return the result synchronously without suspending.
-    <unspecified> operator co_await() const & noexcept;
-    <unspecified> operator co_await() const && noexcept;
+    Awaiter<T&> operator co_await() const & noexcept;
+    Awaiter<T&&> operator co_await() const && noexcept;
 
     // Returns an awaitable that can be co_await'ed to suspend the current
     // coroutine until the task completes.
@@ -142,7 +143,7 @@ namespace cppcoro
     //
     // This can be useful if you want to synchronise with the task without
     // the possibility of it throwing an exception.
-    <unspecified> when_ready() const noexcept;
+    Awaitable<void> when_ready() const noexcept;
   };
 
   template<typename T>
@@ -201,7 +202,7 @@ the result of the task to be created. It also allows multiple coroutines to
 concurrently await the result.
 
 The task will start executing on the thread that first `co_await`s the task.
-Subsequent awaiters will either be suspended and queued for resumption
+Subsequent awaiters will either be suspended and be queued for resumption
 when the task completes or will continue synchronously if the task has
 already run to completion.
 
@@ -242,7 +243,7 @@ namespace cppcoro
     // is void in which case the expression has type 'void').
     // If the task completed with an unhandled exception then the
     // exception will be rethrown by the co_await expression.
-    <unspecified> operator co_await() const noexcept;
+    Awaiter<T&> operator co_await() const noexcept;
 
     // Returns an operation that when awaited will suspend the
     // calling coroutine until the task completes and the result
@@ -251,7 +252,7 @@ namespace cppcoro
     // The result is not returned from the co_await expression.
     // This can be used to synchronise with the task without the
     // possibility of the co_await expression throwing an exception.
-    <unspecified> when_ready() const noexcept;
+    Awaiter<void> when_ready() const noexcept;
 
   };
 
@@ -272,8 +273,10 @@ namespace cppcoro
 }
 ```
 
-All const-methods on `shared_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
-It is not safe to call non-const methods of `shared_task<T>` concurrently with any other method on the same instance of a `shared_task<T>`.
+All const-methods on `shared_task<T>` are safe to call concurrently with other 
+const-methods on the same instance from multiple threads. It is not safe to call
+non-const methods of `shared_task<T>` concurrently with any other method on the
+same instance of a `shared_task<T>`.
 
 ### Comparison to `task<T>`
 
@@ -499,7 +502,7 @@ namespace cppcoro
       // will subsequently become equal to the end() iterator.
       // If the coroutine completes with an unhandled exception then
       // that exception will be rethrown from the co_await expression.
-      <unspecified> operator++() noexcept;
+      Awaitable<iterator&> operator++() noexcept;
 
       // Dereference the iterator.
       pointer operator->() const noexcept;
@@ -527,7 +530,7 @@ namespace cppcoro
     //
     // This method is not valid to be called once the coroutine has
     // run to completion.
-    <unspecified> begin() noexcept;
+    Awaitable<iterator> begin() noexcept;
     iterator end() noexcept;
 
   };
@@ -573,7 +576,7 @@ namespace cppcoro
     bool is_set() const noexcept;
     void set();
     void reset() noexcept;
-    <unspecified> operator co_await() const noexcept;
+    Awaiter<void> operator co_await() const noexcept;
   };
 }
 ```
@@ -639,7 +642,7 @@ namespace cppcoro
     // continues without suspending.
     // The event is automatically reset back to the 'not set' state
     // before resuming the coroutine.
-    Awaitable<void> operator co_await() const noexcept;
+    Awaiter<void> operator co_await() const noexcept;
 
   };
 }
@@ -810,7 +813,7 @@ namespace cppcoro
     async_manual_reset_event& operator=(async_manual_reset_event&&) = delete;
 
     // Wait until the event becomes set.
-    <unspecified> operator co_await() const noexcept;
+    async_manual_reset_event_operation operator co_await() const noexcept;
 
     bool is_set() const noexcept;
 
@@ -1483,8 +1486,8 @@ void example_task()
   auto task = makeTask();
 
   // start the lazy task and wait until it completes
-  sync_wait(task) == "foo";
-  sync_wait(makeTask()) == "foo";
+  sync_wait(task); // -> "foo"
+  sync_wait(makeTask()); // -> "foo"
 }
 
 void example_shared_task()
@@ -1552,7 +1555,7 @@ namespace cppcoro
   // one for each input awaitable and where T is the result-type of the co_await expression
   // on the corresponding awaitable.
   //
-  // AWAITABLES must be awaitable types and must be movable (if passes as rvalue) or copyable
+  // AWAITABLES must be awaitable types and must be movable (if passed as rvalue) or copyable
   // (if passed as lvalue). The co_await expression will be executed on an rvalue of the
   // copied awaitable.
   template<typename... AWAITABLES>
@@ -1949,7 +1952,7 @@ will be if applied to an expression of type `T`.
 
 Note that this assumes the value of type `T` is being awaited in a context where it is unaffected by
 any `await_transform` applied by the coroutine's promise object. The results may differ if a value
-of type T is awaited in such a context.
+of type `T` is awaited in such a context.
 
 The `awaitable_traits<T>` template metafunction does not define the `awaiter_t` or `await_result_t`
 nested typedefs if type, `T`, is not awaitable. This allows its use in SFINAE contexts that disables
@@ -1964,7 +1967,7 @@ namespace cppcoro
   struct awaitable_traits
   {
     // The type that results from applying `operator co_await()` to a value
-    // of type T, if T supports an `operator co_await()`, otherwise is type T.
+    // of type T, if T supports an `operator co_await()`, otherwise is type `T&&`.
     typename awaiter_t = <unspecified>;
 
     // The type of the result of co_await'ing a value of type T.
@@ -2002,6 +2005,19 @@ that has no `await_transform` overloads and that the result of the `co_await` ex
 For example, the type `task<T>` implements the concept `Awaitable<T&&>` whereas the type `task<T>&`
 implements the concept `Awaitable<T&>`.
 
+## `Awaiter<T>` concept
+
+An `Awaiter<T>` is a concept that indicates a type contains the `await_ready`, `await_suspend` and
+`await_resume` methods required to implement the protocol for suspending/resuming an awaiting
+coroutine.
+
+A type that satisfies `Awaiter<T>` must have, for an instance of the type, `awaiter`:
+- `awaiter.await_ready()` -> `bool`
+- `awaiter.await_suspend(std::experimental::coroutine_handle<void>{})` -> `void` or `bool` or `std::experimental::coroutine_handle<P>` for some `P`.
+- `awaiter.await_resume()` -> `T`
+
+Any type that implements the `Awaiter<T>` concept also implements the `Awaitable<T>` concept.
+
 ## `Scheduler` concept
 
 A `Scheduler` is a concept that allows scheduling execution of coroutines within some execution context.
@@ -2009,7 +2025,7 @@ A `Scheduler` is a concept that allows scheduling execution of coroutines within
 ```c++
 concept Scheduler
 {
-  <awaitable-type> schedule();
+  Awaitable<void> schedule();
 }
 ```
 
