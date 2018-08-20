@@ -8,6 +8,9 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/async_generator.hpp>
+#include <cppcoro/awaitable_traits.hpp>
+
+#include <cppcoro/detail/remove_rvalue_reference.hpp>
 
 namespace cppcoro
 {
@@ -33,11 +36,12 @@ namespace cppcoro
 		return schedule_on(transform.scheduler, std::forward<T>(value));
 	}
 
-	template<typename T, typename SCHEDULER>
-	task<T> schedule_on(SCHEDULER& scheduler, task<T> task)
+	template<typename SCHEDULER, typename AWAITABLE>
+	auto schedule_on(SCHEDULER& scheduler, AWAITABLE awaitable)
+		-> task<detail::remove_rvalue_reference_t<typename awaitable_traits<AWAITABLE>::await_result_t>>
 	{
 		co_await scheduler.schedule();
-		co_return co_await std::move(task);
+		co_return co_await std::move(awaitable);
 	}
 
 	template<typename T, typename SCHEDULER>
