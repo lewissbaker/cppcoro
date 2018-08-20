@@ -44,6 +44,14 @@
 # define CPPCORO_NOINLINE
 #endif
 
+#if CPPCORO_COMPILER_MSVC
+# define CPPCORO_FORCE_INLINE __forceinline
+#elif CPPCORO_COMPILER_CLANG
+# define CPPCORO_FORCE_INLINE __attribute__((always_inline))
+#else
+# define CPPCORO_FORCE_INLINE inline
+#endif
+
 /////////////////////////////////////////////////////////////////////////////
 // OS Detection
 

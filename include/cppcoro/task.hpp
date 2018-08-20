@@ -6,10 +6,10 @@
 #define CPPCORO_TASK_HPP_INCLUDED
 
 #include <cppcoro/config.hpp>
+#include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/broken_promise.hpp>
-#include <cppcoro/fmap.hpp>
 
-#include <cppcoro/detail/continuation.hpp>
+#include <cppcoro/detail/remove_rvalue_reference.hpp>
 
 #include <atomic>
 #include <exception>
@@ -74,9 +74,9 @@ namespace cppcoro
 				m_exception = std::current_exception();
 			}
 
-			bool try_set_continuation(continuation c)
+			bool try_set_continuation(std::experimental::coroutine_handle<> continuation)
 			{
-				m_continuation = c;
+				m_continuation = continuation;
 				return !m_state.exchange(true, std::memory_order_acq_rel);
 			}
 
@@ -102,7 +102,7 @@ namespace cppcoro
 
 		private:
 
-			continuation m_continuation;
+			std::experimental::coroutine_handle<> m_continuation;
 			std::exception_ptr m_exception;
 
 			// Initially false. Set to true when either a continuation is registered
@@ -144,7 +144,18 @@ namespace cppcoro
 				return *reinterpret_cast<T*>(&m_valueStorage);
 			}
 
-			T&& result() &&
+			// HACK: Need to have co_await of task<int> return prvalue rather than
+			// rvalue-reference to work around an issue with MSVC where returning
+			// rvalue reference of a fundamental type from await_resume() will
+			// cause the value to be copied to a temporary. This breaks the
+			// sync_wait() implementation.
+			// See https://github.com/lewissbaker/cppcoro/issues/40#issuecomment-326864107
+			using rvalue_type = std::conditional_t<
+				std::is_arithmetic_v<T> || std::is_pointer_v<T>,
+				T,
+				T&&>;
+
+			rvalue_type result() &&
 			{
 				rethrow_if_unhandled_exception();
 				return std::move(*reinterpret_cast<T*>(&m_valueStorage));
@@ -246,7 +257,7 @@ namespace cppcoro
 				return !m_coroutine || m_coroutine.done();
 			}
 
-			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+			bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
 			{
 				// NOTE: We are using the bool-returning version of await_suspend() here
 				// to work around a potential stack-overflow issue if a coroutine
@@ -265,7 +276,7 @@ namespace cppcoro
 				// as this will provide ability to suspend the awaiting coroutine and
 				// resume another coroutine with a guaranteed tail-call to resume().
 				m_coroutine.resume();
-				return m_coroutine.promise().try_set_continuation(detail::continuation{ awaiter });
+				return m_coroutine.promise().try_set_continuation(awaitingCoroutine);
 			}
 		};
 
@@ -378,39 +389,6 @@ namespace cppcoro
 			return awaitable{ m_coroutine };
 		}
 
-		// Internal helper method for when_all() implementation.
-		auto get_starter() const noexcept
-		{
-			class starter
-			{
-			public:
-
-				starter(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
-					: m_coroutine(coroutine)
-				{}
-
-				void start(detail::continuation continuation) noexcept
-				{
-					if (m_coroutine && !m_coroutine.done())
-					{
-						m_coroutine.resume();
-						if (m_coroutine.promise().try_set_continuation(continuation))
-						{
-							return;
-						}
-					}
-
-					continuation.resume();
-				}
-
-			private:
-
-				std::experimental::coroutine_handle<promise_type> m_coroutine;
-			};
-
-			return starter{ m_coroutine };
-		}
-
 	private:
 
 		std::experimental::coroutine_handle<promise_type> m_coroutine;
@@ -437,29 +415,11 @@ namespace cppcoro
 		}
 	}
 
-	// fmap() overloads for task<T>
-
-	template<typename FUNC, typename T>
-	task<std::result_of_t<FUNC&&(T&&)>> fmap(FUNC func, task<T> t)
+	template<typename AWAITABLE>
+	auto make_task(AWAITABLE awaitable)
+		-> task<detail::remove_rvalue_reference_t<typename awaitable_traits<AWAITABLE>::await_result_t>>
 	{
-		static_assert(
-			!std::is_reference_v<FUNC>,
-			"Passing by reference to task<T> coroutine is unsafe. "
-			"Use std::ref or std::cref to explicitly pass by reference.");
-
-		co_return std::invoke(std::move(func), co_await std::move(t));
-	}
-
-	template<typename FUNC>
-	task<std::result_of_t<FUNC&&()>> fmap(FUNC func, task<> t)
-	{
-		static_assert(
-			!std::is_reference_v<FUNC>,
-			"Passing by reference to task<T> coroutine is unsafe. "
-			"Use std::ref or std::cref to explicitly pass by reference.");
-
-		co_await t;
-		co_return std::invoke(std::move(func));
+		co_return co_await static_cast<AWAITABLE&&>(awaitable);
 	}
 }
 

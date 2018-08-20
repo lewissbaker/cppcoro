@@ -8,6 +8,8 @@ import cake.path
 from cake.tools import compiler, script, env, project, variant
 
 includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
+  'awaitable_traits.hpp',
+  'is_awaitable.hpp',
   'async_auto_reset_event.hpp',
   'async_manual_reset_event.hpp',
   'async_generator.hpp',
@@ -58,8 +60,14 @@ netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'ne
 ])
 
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
-  'continuation.hpp',
-  'when_all_awaitable.hpp',
+  'void_value.hpp',
+  'when_all_ready_awaitable.hpp',
+  'when_all_counter.hpp',
+  'when_all_task.hpp',
+  'get_awaiter.hpp',
+  'is_awaiter.hpp',
+  'any.hpp',
+  'sync_wait_task.hpp',
   'unwrap_reference.hpp',
   'lightweight_manual_reset_event.hpp',
   ])
