@@ -37,6 +37,14 @@
 #endif
 
 #if CPPCORO_COMPILER_MSVC
+# define CPPCORO_NOINLINE __declspec(noinline)
+#elif CPPCORO_COMPILER_CLANG || CPPCORO_COMPILER_GCC
+# define CPPCORO_NOINLINE __attribute__((noinline))
+#else
+# define CPPCORO_NOINLINE
+#endif
+
+#if CPPCORO_COMPILER_MSVC
 # define CPPCORO_FORCE_INLINE __forceinline
 #elif CPPCORO_COMPILER_CLANG
 # define CPPCORO_FORCE_INLINE __attribute__((always_inline))
