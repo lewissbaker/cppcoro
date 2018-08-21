@@ -28,10 +28,19 @@ These include:
   * `cancellation_source`
   * `cancellation_registration`
 * Schedulers and I/O
+  * `static_thread_pool`
   * `io_service`
   * `io_work_scope`
   * `file`, `readable_file`, `writable_file`
   * `read_only_file`, `write_only_file`, `read_write_file`
+* Metafunctions
+  * `is_awaitable<T>`
+  * `awaitable_traits<T>`
+* Concepts
+  * `Awaitable<T>`
+  * `Awaiter<T>`
+  * `Scheduler`
+  * `DelayedScheduler`
 
 This library is an experimental library that is exploring the space of high-performance,
 scalable asynchronous programming abstractions that can be built on top of the C++ coroutines
@@ -123,8 +132,8 @@ namespace cppcoro
     // If the task is not yet ready then the awaiting coroutine will be
     // suspended until the task completes. If the the task is_ready() then
     // this operation will return the result synchronously without suspending.
-    <unspecified> operator co_await() const & noexcept;
-    <unspecified> operator co_await() const && noexcept;
+    Awaiter<T&> operator co_await() const & noexcept;
+    Awaiter<T&&> operator co_await() const && noexcept;
 
     // Returns an awaitable that can be co_await'ed to suspend the current
     // coroutine until the task completes.
@@ -135,21 +144,21 @@ namespace cppcoro
     //
     // This can be useful if you want to synchronise with the task without
     // the possibility of it throwing an exception.
-    <unspecified> when_ready() const noexcept;
+    Awaitable<void> when_ready() const noexcept;
   };
 
   template<typename T>
   void swap(task<T>& a, task<T>& b);
 
-  // Apply func() to the result of the task, returning a new task that
-  // yields the result of 'func(co_await task)'.
-  template<typename FUNC, typename T>
-  task<std::invoke_result_t<FUNC, T&&>> fmap(FUNC func, task<T> task);
-
-  // Call func() after task completes, returning a task containing the
-  // result of func().
-  template<typename FUNC>
-  task<std::invoke_result_t<FUNC>> fmap(FUNC func, task<void> task);
+  // Creates a task that yields the result of co_await'ing the specified awaitable.
+  //
+  // This can be used as a form of type-erasure of the concrete awaitable, allowing
+  // different awaitables that return the same await-result type to be stored in
+  // the same task<RESULT> type.
+  template<
+    typename AWAITABLE,
+    typename RESULT = typename awaitable_traits<AWAITABLE>::await_result_t>
+  task<RESULT> make_task(AWAITABLE awaitable);
 }
 ```
 
@@ -177,10 +186,9 @@ execution of the coroutine.
 If the task has already run to completion then awaiting it again will obtain
 the already-computed result without suspending the awaiting coroutine.
 
-If the `task` value is destroyed before it is awaited then the coroutine
+If the `task` object is destroyed before it is awaited then the coroutine
 never executes and the destructor simply destructs the captured parameters
 and frees any memory used by the coroutine frame.
-
 
 ## `shared_task<T>`
 
@@ -195,7 +203,7 @@ the result of the task to be created. It also allows multiple coroutines to
 concurrently await the result.
 
 The task will start executing on the thread that first `co_await`s the task.
-Subsequent awaiters will either be suspended and queued for resumption
+Subsequent awaiters will either be suspended and be queued for resumption
 when the task completes or will continue synchronously if the task has
 already run to completion.
 
@@ -236,7 +244,7 @@ namespace cppcoro
     // is void in which case the expression has type 'void').
     // If the task completed with an unhandled exception then the
     // exception will be rethrown by the co_await expression.
-    <unspecified> operator co_await() const noexcept;
+    Awaiter<T&> operator co_await() const noexcept;
 
     // Returns an operation that when awaited will suspend the
     // calling coroutine until the task completes and the result
@@ -245,7 +253,7 @@ namespace cppcoro
     // The result is not returned from the co_await expression.
     // This can be used to synchronise with the task without the
     // possibility of the co_await expression throwing an exception.
-    <unspecified> when_ready() const noexcept;
+    Awaiter<void> when_ready() const noexcept;
 
   };
 
@@ -257,31 +265,25 @@ namespace cppcoro
   template<typename T>
   void swap(shared_task<T>& a, shared_task<T>& b) noexcept;
 
-  // Wrap a task in a shared_task to allow multiple coroutines to concurrently
-  // await the result.
-  template<typename T>
-  shared_task<T> make_shared_task(task<T> task);
-
-  // Apply func() to the result of the task, returning a new task that
-  // yields the result of 'func(co_await task)'.
-  template<typename FUNC, typename T>
-  task<std::invoke_result_t<FUNC, T&&>> fmap(FUNC func, shared_task<T> task);
-
-  // Call func() after task completes, returning a task containing the
-  // result of func().
-  template<typename FUNC>
-  task<std::invoke_result_t<FUNC>> fmap(FUNC func, shared_task<void> task);
+  // Wrap an awaitable value in a shared_task to allow multiple coroutines
+  // to concurrently await the result.
+  template<
+    typename AWAITABLE,
+    typename RESULT = typename awaitable_traits<AWAITABLE>::await_result_t>
+  shared_task<RESULT> make_shared_task(AWAITABLE awaitable);
 }
 ```
 
-All const-methods on `shared_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
-It is not safe to call non-const methods of `shared_task<T>` concurrently with any other method on the same instance of a `shared_task<T>`.
+All const-methods on `shared_task<T>` are safe to call concurrently with other 
+const-methods on the same instance from multiple threads. It is not safe to call
+non-const methods of `shared_task<T>` concurrently with any other method on the
+same instance of a `shared_task<T>`.
 
 ### Comparison to `task<T>`
 
 The `shared_task<T>` class is similar to `task<T>` in that the task does
-not start execution immediately upon the coroutine function being called. The task
-only starts executing when it is first awaited.
+not start execution immediately upon the coroutine function being called.
+The task only starts executing when it is first awaited.
 
 It differs from `task<T>` in that the resulting task object can be copied,
 allowing multiple task objects to reference the same asynchronous result.
@@ -295,10 +297,12 @@ a reference count and support multiple awaiters.
 
 ## `generator<T>`
 
-A `generator` represents a coroutine type that produces a sequence of values of type, `T`, where values are produced lazily and synchronously.
+A `generator` represents a coroutine type that produces a sequence of values of type, `T`,
+where values are produced lazily and synchronously.
 
 The coroutine body is able to yield values of type `T` using the `co_yield` keyword.
-Note, however, that the coroutine body is not able to use the `co_await` keyword; values must be produced synchronously.
+Note, however, that the coroutine body is not able to use the `co_await` keyword;
+values must be produced synchronously.
 
 For example:
 ```c++
@@ -328,11 +332,14 @@ When a coroutine function returning a `generator<T>` is called the coroutine is 
 Execution of the coroutine enters the coroutine body when the `generator<T>::begin()` method is called and continues until
 either the first `co_yield` statement is reached or the coroutine runs to completion.
 
-If the returned iterator is not equal to the `end()` iterator then dereferencing the iterator will return a reference to the value passed to the `co_yield` statement.
+If the returned iterator is not equal to the `end()` iterator then dereferencing the iterator will
+return a reference to the value passed to the `co_yield` statement.
 
-Calling `operator++()` on the iterator will resume execution of the coroutine and continue until either the next `co_yield` point is reached or the coroutine runs to completion().
+Calling `operator++()` on the iterator will resume execution of the coroutine and continue until
+either the next `co_yield` point is reached or the coroutine runs to completion().
 
-Any unhandled exceptions thrown by the coroutine will propagate out of the `begin()` or `operator++()` calls to the caller.
+Any unhandled exceptions thrown by the coroutine will propagate out of the `begin()` or
+`operator++()` calls to the caller.
 
 API Summary:
 ```c++
@@ -496,7 +503,7 @@ namespace cppcoro
       // will subsequently become equal to the end() iterator.
       // If the coroutine completes with an unhandled exception then
       // that exception will be rethrown from the co_await expression.
-      <unspecified> operator++() noexcept;
+      Awaitable<iterator&> operator++() noexcept;
 
       // Dereference the iterator.
       pointer operator->() const noexcept;
@@ -524,7 +531,7 @@ namespace cppcoro
     //
     // This method is not valid to be called once the coroutine has
     // run to completion.
-    <unspecified> begin() noexcept;
+    Awaitable<iterator> begin() noexcept;
     iterator end() noexcept;
 
   };
@@ -570,7 +577,7 @@ namespace cppcoro
     bool is_set() const noexcept;
     void set();
     void reset() noexcept;
-    <unspecified> operator co_await() const noexcept;
+    Awaiter<void> operator co_await() const noexcept;
   };
 }
 ```
@@ -636,7 +643,7 @@ namespace cppcoro
     // continues without suspending.
     // The event is automatically reset back to the 'not set' state
     // before resuming the coroutine.
-    Awaitable<void> operator co_await() const noexcept;
+    Awaiter<void> operator co_await() const noexcept;
 
   };
 }
@@ -807,7 +814,7 @@ namespace cppcoro
     async_manual_reset_event& operator=(async_manual_reset_event&&) = delete;
 
     // Wait until the event becomes set.
-    <unspecified> operator co_await() const noexcept;
+    async_manual_reset_event_operation operator co_await() const noexcept;
 
     bool is_set() const noexcept;
 
@@ -1074,6 +1081,109 @@ cppcoro::task<> cancellable_timer_wait(cppcoro::cancellation_token token)
   });
 
   co_await timer;
+}
+```
+
+## `static_thread_pool`
+
+The `static_thread_pool` class provides an abstraction that lets you schedule work
+on a fixed-size pool of threads.
+
+This class implements the **Scheduler** concept (see below).
+
+You can enqueue work to the thread-pool by executing `co_await threadPool.schedule()`.
+This operation will suspend the current coroutine, enqueue it for execution on the
+thread-pool and the thread pool will then resume the coroutine when a thread in the
+thread-pool is next free to run the coroutine. **This operation is guaranteed not
+to throw and, in the common case, will not allocate any memory**.
+
+This class makes use of a work-stealing algorithm to load-balance work across multiple
+threads. Work enqueued to the thread-pool from a thread-pool thread will be scheduled
+for execution on the same thread in a LIFO queue. Work enqueued to the thread-pool from
+a remote thread will be enqueued to a global FIFO queue. When a worker thread runs out
+of work from its local queue it first tries to dequeue work from the global queue. If
+that queue is empty then it next tries to steal work from the back of the queues of
+the other worker threads.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class static_thread_pool
+  {
+  public:
+    // Initialise the thread-pool with a number of threads equal to
+    // std::thread::hardware_concurrency().
+    static_thread_pool();
+
+    // Initialise the thread pool with the specified number of threads.
+    explicit static_thread_pool(std::uint32_t threadCount);
+
+    std::uint32_t thread_count() const noexcept;
+
+    class schedule_operation
+    {
+    public:
+      schedule_operation(static_thread_pool* tp) noexcept;
+
+      bool await_ready() noexcept;
+      bool await_suspend(std::experimental::coroutine_handle<> h) noexcept;
+      bool await_resume() noexcept;
+
+    private:
+      // unspecified
+    };
+
+    // Return an operation that can be awaited by a coroutine.
+    //
+    // 
+    [[nodiscard]]
+    schedule_operation schedule() noexcept;
+
+  private:
+
+    // Unspecified
+
+  };
+}
+```
+
+Example usage: Simple
+```c++
+cppcoro::task<std::string> do_something_on_threadpool(cppcoro::static_thread_pool& tp)
+{
+  // First schedule the coroutine onto the threadpool.
+  co_await tp.schedule();
+
+  // When it resumes, this coroutine is now running on the threadpool.
+  do_something();
+}
+```
+
+Example usage: Doing things in parallel - using `schedule_on()` operator with `static_thread_pool`.
+```c++
+cppcoro::task<double> dot_product(static_thread_pool& tp, double a[], double b[], size_t count)
+{
+  if (count > 1000)
+  {
+    // Subdivide the work recursively into two equal tasks
+    // The first half is scheduled to the thread pool so it can run concurrently
+    // with the second half which continues on this thread.
+    size_t halfCount = count / 2;
+    auto [first, second] = co_await when_all(
+      schedule_on(tp, dot_product(tp, a, b, halfCount),
+      dot_product(tp, a + halfCount, b + halfCount, count - halfCount));
+    co_return first + second;
+  }
+  else
+  {
+    double sum = 0.0;
+    for (size_t i = 0; i < count; ++i)
+    {
+      sum += a[i] * b[i];
+    }
+    co_return sum;
+  }
 }
 ```
 
@@ -1444,13 +1554,14 @@ All `open()` functions throw `std::system_error` on failure.
 
 ## `sync_wait()`
 
-The `sync_wait()`function can be used to synchronously wait until the specified `task`
-or `shared_task` completes.
+The `sync_wait()`function can be used to synchronously wait until the specified `awaitable`
+completes.
 
-If the task has not yet started execution then it will be started on the current thread.
+The specified awaitable will be `co_await`ed on current thread inside a newly created coroutine.
 
-The `sync_wait()` call will block until the task completes and will return the task's result
-or rethrow the task's exception if the task completed with an unhandled exception.
+The `sync_wait()` call will block until the operation completes and will return the result of
+the `co_await` expression or rethrow the exception if the `co_await` expression completed with
+an unhandled exception.
 
 The `sync_wait()` function is mostly useful for starting a top-level task from within `main()`
 and waiting until the task finishes, in practise it is the only way to start the first/top-level
@@ -1461,8 +1572,9 @@ API Summary:
 // <cppcoro/sync_wait.hpp>
 namespace cppcoro
 {
-  template<typename TASKS>
-  decltype(auto) sync_wait(TASK&& task);
+  template<typename AWAITABLE>
+  auto sync_wait(AWAITABLE&& awaitable)
+    -> typename awaitable_traits<AWAITABLE&&>::await_result_t;
 }
 ```
 
@@ -1478,8 +1590,8 @@ void example_task()
   auto task = makeTask();
 
   // start the lazy task and wait until it completes
-  sync_wait(task) == "foo";
-  sync_wait(makeTask()) == "foo";
+  sync_wait(task); // -> "foo"
+  sync_wait(makeTask()); // -> "foo"
 }
 
 void example_shared_task()
@@ -1498,48 +1610,68 @@ void example_shared_task()
 
 ## `when_all_ready()`
 
-The `when_all_ready()` function can be used to create a new `task` that will
-complete when all of the specified input tasks have completed.
+The `when_all_ready()` function can be used to create a new awaitable that completes when
+all of the input awaitables complete.
 
-Input tasks can either be `task<T>` or `shared_task<T>`.
+Input tasks can be any type of awaitable.
 
-When the returned `task` is `co_await`ed it will start executing each of the input
-tasks in turn on the awaiting thread in the order they are passed to the `when_all_ready()`
+When the returned awaitable is `co_await`ed it will `co_await` each of the input awaitables
+in turn on the awaiting thread in the order they are passed to the `when_all_ready()`
 function. If these tasks to not complete synchronously then they will execute concurrently.
 
-Once all of the input tasks have run to completion the returned `task` will complete
-and resume the awaiting coroutine. The awaiting coroutine will be resumed on the thread
-of the input task that is last to complete.
+Once all of the `co_await` expressions on input awaitables have run to completion the
+returned awaitable will complete and resume the awaiting coroutine. The awaiting coroutine
+will be resumed on the thread of the input awaitable that is last to complete.
 
-The returned `task` is guaranteed not to throw an exception when `co_await`ed,
-even if some of the input tasks fail with an unhandled exception.
+The returned awaitable is guaranteed not to throw an exception when `co_await`ed,
+even if some of the input awaitables fail with an unhandled exception.
 
 Note, however, that the `when_all_ready()` call itself may throw `std::bad_alloc` if it
-was unable to allocate memory for the returned `task`'s coroutine frame.
+was unable to allocate memory for the coroutine frames required to await each of the
+input awaitables. It may also throw an exception if any of the input awaitable objects
+throw from their copy/move constructors.
 
-The input tasks are returned back to the awaiting coroutine upon completion.
-This allows the caller to execute the coroutines concurrently and synchronise their
-completion while still retaining the ability to subsequently inspect the results of
-each of the input tasks for success/failure.
+The result of `co_await`ing the returned awaitable is a `std::tuple` or `std::vector`
+of `when_all_task<RESULT>` objects. These objects allow you to obtain the result (or exception)
+of each input awaitable separately by calling the `when_all_task<RESULT>::result()`
+method of the corresponding output task.
+This allows the caller to concurrently await multiple awaitables and synchronise on
+their completion while still retaining the ability to subsequently inspect the results of
+each of the `co_await` operations for success/failure.
 
-This differs from `when_all()` in a similar way that `co_await`ing `task<T>::when_ready()`
-differs from `co_await'ing the `task<T>` directly.
+This differs from `when_all()` where the failure of any individual `co_await` operation
+causes the overall operation to fail with an exception. This means you cannot determine
+which of the component `co_await` operations failed and also prevents you from obtaining
+the results of the other `co_await` operations.
 
 API summary:
 ```c++
 // <cppcoro/when_all_ready.hpp>
 namespace cppcoro
 {
-  template<typename... TASKS>
-  task<std::tuple<TASKS...>> when_all_ready(TASKS... tasks);
+  // Concurrently await multiple awaitables.
+  //
+  // Returns an awaitable object that, when co_await'ed, will co_await each of the input
+  // awaitable objects and will resume the awaiting coroutine only when all of the
+  // component co_await operations complete.
+  //
+  // Result of co_await'ing the returned awaitable is a std::tuple of detail::when_all_task<T>,
+  // one for each input awaitable and where T is the result-type of the co_await expression
+  // on the corresponding awaitable.
+  //
+  // AWAITABLES must be awaitable types and must be movable (if passed as rvalue) or copyable
+  // (if passed as lvalue). The co_await expression will be executed on an rvalue of the
+  // copied awaitable.
+  template<typename... AWAITABLES>
+  auto when_all_ready(AWAITABLES&&... awaitables)
+    -> Awaitable<std::tuple<detail::when_all_task<typename awaitable_traits<AWAITABLES>::await_result_t>...>>;
 
-  template<typename T>
-  task<std::vector<task<T>> when_all_ready(
-    std::vector<task<T>> tasks);
-
-  template<typename T>
-  task<std::vector<shared_task<T>> when_all_ready(
-    std::vector<shared_task<T>> tasks);
+  // Concurrently await each awaitable in a vector of input awaitables.
+  template<
+    typename AWAITABLE,
+    typename RESULT = typename awaitable_traits<AWAITABLE>::await_result_t>
+  auto when_all_ready(std::vector<AWAITABLE> awaitables)
+    -> Awaitable<std::vector<detail::when_all_task<RESULT>>>;
 }
 ```
 
@@ -1556,10 +1688,10 @@ task<> example1()
     get_record(456),
     get_record(789));
 
-  // Unpack the result of each task (this will complete immediately)
-  std::string& record1 = co_await task1;
-  std::string& record2 = co_await task2;
-  std::string& record3 = co_await task3;
+  // Unpack the result of each task
+  std::string& record1 = task1.result();
+  std::string& record2 = task2.result();
+  std::string& record3 = task3.result();
 
   // Use records....
 }
@@ -1574,15 +1706,15 @@ task<> example2()
   }
 
   // Execute all tasks concurrently.
-  // Returns the input vector of tasks.
-  tasks = co_await when_all_ready(std::move(tasks));
+  std::vector<detail::when_all_task<std::string>> resultTasks =
+    co_await when_all_ready(std::move(tasks));
 
   // Unpack and handle each result individually once they're all complete.
   for (int i = 0; i < 1000; ++i)
   {
     try
     {
-      std::string& record = co_await tasks[i];
+      std::string& record = tasks[i].result();
       std::cout << i << " = " << record << std::endl;
     }
     catch (const std::exception& ex)
@@ -1595,24 +1727,26 @@ task<> example2()
 
 ## `when_all()`
 
-The `when_all()` function can be used to create a new `task` that will complete
-when all of the input tasks have completed, and will return an aggregate of all of the
-individual results.
+The `when_all()` function can be used to create a new Awaitable that when `co_await`ed
+will `co_await` each of the input awaitables concurrently and return an aggregate of
+their individual results.
 
-When the returned `task` is awaited, it will start execution of all of the input
-tasks on the current thread. Once the first task suspends, the second task will be started,
-and so on. The tasks execute concurrently until they have all run to completion.
+When the returned awaitable is awaited, it will `co_await` each of the input awaitables
+on the current thread. Once the first awaitable suspends, the second task will be started,
+and so on. The operations execute concurrently until they have all run to completion.
 
-Once all input tasks have run to completion, an aggregate of the results is constructed
-from each individual task result. If an exception is thrown by any of the input tasks
-or if the construction of the aggregate result throws an exception then the exception
-will propagate out of the `co_await` of the returned `task`.
+Once all component `co_await` operations have run to completion, an aggregate of the
+results is constructed from each individual result. If an exception is thrown by any
+of the input tasks or if the construction of the aggregate result throws an exception
+then the exception will propagate out of the `co_await` of the returned awaitable.
 
-If multiple tasks fail with an exception then one of the exceptions will propagate out
-of the `when_all()` task and the other exceptions will be silently ignored. It is not
-specified which task's exception will be chosen. If it is important to know which task(s)
-failed then you should use `when_all_ready()` instead and `co_await` the result of each
-task individually.
+If multiple `co_await` operations fail with an exception then one of the exceptions
+will propagate out of the `co_await when_all()` expression the other exceptions will be silently
+ignored. It is not specified which operation's exception will be chosen.
+
+If it is important to know which component `co_await` operation failed or to retain
+the ability to obtain results of other operations even if some of them fail then you
+you should use `when_all_ready()` instead.
 
 API Summary:
 ```c++
@@ -1620,24 +1754,32 @@ API Summary:
 namespace cppcoro
 {
   // Variadic version.
-  template<typename... TASKS>
-  task<std::tuple<typename TASKS::value_type...>> when_all(TASKS... tasks);
+  //
+  // Note that if the result of `co_await awaitable` yields a void-type
+  // for some awaitables then the corresponding component for that awaitable
+  // in the tuple will be an empty struct of type detail::void_value.
+  template<typename... AWAITABLES>
+  auto when_all(AWAITABLES&&... awaitables)
+    -> Awaitable<std::tuple<typename awaitable_traits<AWAITABLES>::await_result_t...>>;
 
-  // Overloads for vector of value-returning tasks
-  template<typename T>
-  task<std::vector<T>> when_all(std::vector<task<T>> tasks);
-  template<typename T>
-  task<std::vector<T>> when_all(std::vector<shared_task<T>> tasks);
+  // Overload for vector<Awaitable<void>>.
+  template<
+    typename AWAITABLE,
+    typename RESULT = typename awaitable_traits<AWAITABLE>::await_result_t,
+    std::enable_if_t<std::is_void_v<RESULT>, int> = 0>
+  auto when_all(std::vector<AWAITABLE> awaitables)
+    -> Awaitable<void>;
 
-  // Overloads for vector of reference-returning tasks
-  template<typename T>
-  task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<task<T&>> tasks);
-  template<typename T>
-  task<std::vector<std::reference_wrapper<T>>> when_all(std::vector<shared_task<T&>> tasks);
-
-  // Overloads for vector of void-returning tasks
-  task<> when_all(std::vector<task<>> tasks);
-  task<> when_all(std::vector<shared_task<>> tasks);
+  // Overload for vector<Awaitable<NonVoid>> that yield a value when awaited.
+  template<
+    typename AWAITABLE,
+    typename RESULT = typename awaitable_traits<AWAITABLE>::await_result_t,
+    std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
+  auto when_all(std::vector<AWAITABLE> awaitables)
+    -> Awaitable<std::vector<std::conditional_t<
+         std::is_lvalue_reference_v<RESULT>,
+         std::reference_wrapper<std::remove_reference_t<RESULT>>,
+         std::remove_reference_t<RESULT>>>>;
 }
 ```
 
@@ -1684,10 +1826,11 @@ The `fmap()` function can be used to apply a callable function to the value(s) c
 a container-type, returning a new container-type of the results of applying the function the
 contained value(s).
 
-The `fmap()` function can apply a function to values of type `task<T>`, `shared_task<T>`, `generator<T>`,
-`recursive_generator<T>` and `async_generator<T>`.
+The `fmap()` function can apply a function to values of type `generator<T>`, `recursive_generator<T>`
+and `async_generator<T>` as well as any value that supports the `Awaitable` concept (eg. `task<T>`).
 
-Each of these types provides an overload for `fmap()` that takes two arguments; a function to apply and the container value.
+Each of these types provides an overload for `fmap()` that takes two arguments; a function to apply
+and the container value.
 See documentation for each type for the supported `fmap()` overloads.
 
 For example, the `fmap()` function can be used to apply a function to the eventual result of
@@ -1739,6 +1882,21 @@ namespace cppcoro
 
   template<typename T, typename FUNC>
   decltype(auto) operator|(T&& value, const fmap_transform<FUNC>& transform);
+
+  // Generic overload for all awaitable types.
+  //
+  // Returns an awaitable that when co_awaited, co_awaits the specified awaitable
+  // and applies the specified func to the result of the 'co_await awaitable'
+  // expression as if by 'std::invoke(func, co_await awaitable)'.
+  //
+  // If the type of 'co_await awaitable' expression is 'void' then co_awaiting the
+  // returned awaitable is equivalent to 'co_await awaitable, func()'.
+  template<
+    typename FUNC,
+    typename AWAITABLE,
+    std::enable_if_t<is_awaitable_v<AWAITABLE>, int> = 0>
+  auto fmap(FUNC&& func, AWAITABLE&& awaitable)
+    -> Awaitable<std::invoke_result_t<FUNC, typename awaitable_traits<AWAITABLE>::await_result_t>>;
 }
 ```
 
@@ -1747,16 +1905,18 @@ lookup (ADL) so it should generally be called without the `cppcoro::` prefix.
 
 ## `resume_on()`
 
-The `resume_on()` function can be used to control the execution context that a `task`,
-`shared_task` or `async_generator` should resume its awaiting coroutine on.
+The `resume_on()` function can be used to control the execution context that an awaitable
+will resume the awaiting coroutine on when awaited. When applied to an `async_generator`
+it controls which execution context the `co_await g.begin()` and `co_await ++it` operations
+resume the awaiting coroutines on.
 
-Normally, the awaiter of a `task` or `async_generator` will resume execution on whatever
-thread the `task` completed on. In some cases this may not be the thread that you want
-to continue executing on. In these cases you can use the `resume_on()` function to create
-a new task or generator that will resume execution on a thread associated with a specified
-scheduler.
+Normally, the awaiting coroutine of an awaitable (eg. a `task`) or `async_generator` will
+resume execution on whatever thread the operation completed on. In some cases this may not
+be the thread that you want to continue executing on. In these cases you can use the
+`resume_on()` function to create a new awaitable or generator that will resume execution
+on a thread associated with a specified scheduler.
 
-The `resume_on()` function can be used either as a normal function returning a new task/generator.
+The `resume_on()` function can be used either as a normal function returning a new awaitable/generator.
 Or it can be used in a pipeline-syntax.
 
 Example:
@@ -1795,11 +1955,9 @@ API Summary:
 // <cppcoro/resume_on.hpp>
 namespace cppcoro
 {
-  template<typename SCHEDULER, typename T>
-  task<T> resume_on(SCHEDULER& scheduler, task<T> t);
-
-  template<typename SCHEDULER, typename T>
-  task<T> resume_on(SCHEDULER& scheduler, shared_task<T> t);
+  template<typename SCHEDULER, typename AWAITABLE>
+  auto resume_on(SCHEDULER& scheduler, AWAITABLE awaitable)
+    -> Awaitable<typename awaitable_traits<AWAITABLE>::await_traits_t>;
 
   template<typename SCHEDULER, typename T>
   async_generator<T> resume_on(SCHEDULER& scheduler, async_generator<T> source);
@@ -1828,13 +1986,14 @@ namespace cppcoro
 ## `schedule_on()`
 
 The `schedule_on()` function can be used to change the execution context that a given
-`task` or `async_generator` starts executing on.
+awaitable or `async_generator` starts executing on.
 
 When applied to an `async_generator` it also affects which execution context it resumes
 on after `co_yield` statement.
 
-Note that the `schedule_on` transform does not specify the thread that the `task` or `async_generator`
-will complete or yield results on, that is up to the implementing coroutine.
+Note that the `schedule_on` transform does not specify the thread that the awaitable or
+`async_generator` will complete or yield results on, that is up to the implementation of
+the awaitable or generator.
 
 See the `resume_on()` operator for a transform that controls the thread the operation completes on.
 
@@ -1854,7 +2013,7 @@ task<> example()
 ```
 
 API Summary:
-```
+```c++
 // <cppcoro/schedule_on.hpp>
 namespace cppcoro
 {
@@ -1862,8 +2021,9 @@ namespace cppcoro
   // ensures that 't' is co_await'ed on a thread associated with
   // the specified scheduler. Resulting task will complete on
   // whatever thread 't' would normally complete on.
-  template<typename SCHEDULER, typename T>
-  task<T> schedule_on(SCHEDULER& scheduler, task<T> t);
+  template<typename SCHEDULER, typename AWAITABLE>
+  auto schedule_on(SCHEDULER& scheduler, AWAITABLE awaitable)
+    -> Awaitable<typename awaitable_traits<AWAITABLE>::await_result_t>;
 
   // Return a generator that yields the same sequence of results as
   // 'source' but that ensures that execution of the coroutine starts
@@ -1887,7 +2047,80 @@ namespace cppcoro
 }
 ```
 
+# Metafunctions
+
+## `awaitable_traits<T>`
+
+This template metafunction can be used to determine what the resulting type of a `co_await` expression
+will be if applied to an expression of type `T`.
+
+Note that this assumes the value of type `T` is being awaited in a context where it is unaffected by
+any `await_transform` applied by the coroutine's promise object. The results may differ if a value
+of type `T` is awaited in such a context.
+
+The `awaitable_traits<T>` template metafunction does not define the `awaiter_t` or `await_result_t`
+nested typedefs if type, `T`, is not awaitable. This allows its use in SFINAE contexts that disables
+overloads when `T` is not awaitable.
+
+API Summary:
+```c++
+// <cppcoro/awaitable_traits.hpp>
+namespace cppcoro
+{
+  template<typename T>
+  struct awaitable_traits
+  {
+    // The type that results from applying `operator co_await()` to a value
+    // of type T, if T supports an `operator co_await()`, otherwise is type `T&&`.
+    typename awaiter_t = <unspecified>;
+
+    // The type of the result of co_await'ing a value of type T.
+    typename await_result_t = <unspecified>;
+  };
+}
+```
+
+## `is_awaitable<T>`
+
+The `is_awaitable<T>` template metafunction allows you to query whether or not a given
+type can be `co_await`ed or not from within a coroutine.
+
+API Summary:
+```c++
+// <cppcoro/is_awaitable.hpp>
+namespace cppcoro
+{
+  template<typename T>
+  struct is_awaitable : std::bool_constant<...>
+  {};
+
+  template<typename T>
+  constexpr bool is_awaitable_v = is_awaitable<T>::value;
+}
+```
+
 # Concepts
+
+## `Awaitable<T>` concept
+
+An `Awaitable<T>` is a concept that indicates that a type can be `co_await`ed in a coroutine context
+that has no `await_transform` overloads and that the result of the `co_await` expression has type, `T`.
+
+For example, the type `task<T>` implements the concept `Awaitable<T&&>` whereas the type `task<T>&`
+implements the concept `Awaitable<T&>`.
+
+## `Awaiter<T>` concept
+
+An `Awaiter<T>` is a concept that indicates a type contains the `await_ready`, `await_suspend` and
+`await_resume` methods required to implement the protocol for suspending/resuming an awaiting
+coroutine.
+
+A type that satisfies `Awaiter<T>` must have, for an instance of the type, `awaiter`:
+- `awaiter.await_ready()` -> `bool`
+- `awaiter.await_suspend(std::experimental::coroutine_handle<void>{})` -> `void` or `bool` or `std::experimental::coroutine_handle<P>` for some `P`.
+- `awaiter.await_resume()` -> `T`
+
+Any type that implements the `Awaiter<T>` concept also implements the `Awaitable<T>` concept.
 
 ## `Scheduler` concept
 
@@ -1896,7 +2129,7 @@ A `Scheduler` is a concept that allows scheduling execution of coroutines within
 ```c++
 concept Scheduler
 {
-  <awaitable-type> schedule();
+  Awaitable<void> schedule();
 }
 ```
 
@@ -1929,10 +2162,10 @@ the scheduler's execution context after a specified duration of time has elapsed
 concept DelayedScheduler : Scheduler
 {
   template<typename REP, typename RATIO>
-  <awaitable-type> schedule_after(std::chrono::duration<REP, RATIO> delay);
+  Awaitable<void> schedule_after(std::chrono::duration<REP, RATIO> delay);
 
   template<typename REP, typename RATIO>
-  <awaitable-type> schedule_after(
+  Awaitable<void> schedule_after(
     std::chrono::duration<REP, RATIO> delay,
     cppcoro::cancellation_token cancellationToken);
 }

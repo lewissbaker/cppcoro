@@ -6,10 +6,11 @@
 #define CPPCORO_SHARED_LAZY_TASK_HPP_INCLUDED
 
 #include <cppcoro/config.hpp>
+#include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/broken_promise.hpp>
 #include <cppcoro/task.hpp>
 
-#include <cppcoro/detail/continuation.hpp>
+#include <cppcoro/detail/remove_rvalue_reference.hpp>
 
 #include <atomic>
 #include <exception>
@@ -27,77 +28,63 @@ namespace cppcoro
 	{
 		struct shared_task_waiter
 		{
-			continuation m_continuation;
+			std::experimental::coroutine_handle<> m_continuation;
 			shared_task_waiter* m_next;
 		};
 
 		class shared_task_promise_base
 		{
+			friend struct final_awaiter;
+
+			struct final_awaiter
+			{
+				bool await_ready() const noexcept { return false; }
+
+				template<typename PROMISE>
+				void await_suspend(std::experimental::coroutine_handle<PROMISE> h) noexcept
+				{
+					shared_task_promise_base& promise = h.promise();
+
+					// Exchange operation needs to be 'release' so that subsequent awaiters have
+					// visibility of the result. Also needs to be 'acquire' so we have visibility
+					// of writes to the waiters list.
+					void* const valueReadyValue = &promise;
+					void* waiters = promise.m_waiters.exchange(valueReadyValue, std::memory_order_acq_rel);
+					if (waiters != nullptr)
+					{
+						shared_task_waiter* waiter = static_cast<shared_task_waiter*>(waiters);
+						while (waiter->m_next != nullptr)
+						{
+							// Read the m_next pointer before resuming the coroutine
+							// since resuming the coroutine may destroy the shared_task_waiter value.
+							auto* next = waiter->m_next;
+							waiter->m_continuation.resume();
+							waiter = next;
+						}
+
+						// Resume last waiter in tail position to allow it to potentially
+						// be compiled as a tail-call.
+						waiter->m_continuation.resume();
+					}
+				}
+
+				void await_resume() noexcept {}
+			};
+
 		public:
 
 			shared_task_promise_base() noexcept
 				: m_waiters(&this->m_waiters)
-				, m_refCount(2)
+				, m_refCount(1)
 				, m_exception(nullptr)
 			{}
 
-			auto initial_suspend() noexcept
-			{
-				return std::experimental::suspend_always{};
-			}
-
-			auto final_suspend() noexcept
-			{
-				struct awaitable
-				{
-					shared_task_promise_base& m_promise;
-
-					awaitable(shared_task_promise_base& promise) noexcept
-						: m_promise(promise)
-					{}
-
-					bool await_ready() const noexcept
-					{
-						return m_promise.m_refCount.load(std::memory_order_acquire) == 1;
-					}
-
-					bool await_suspend(std::experimental::coroutine_handle<>) noexcept
-					{
-						return m_promise.m_refCount.fetch_sub(1, std::memory_order_acq_rel) > 1;
-					}
-
-					void await_resume() noexcept
-					{}
-				};
-
-				// Exchange operation needs to be 'release' so that subsequent awaiters have
-				// visibility of the result. Also needs to be 'acquire' so we have visibility
-				// of writes to the waiters list.
-				void* const valueReadyValue = this;
-				void* waiters = m_waiters.exchange(valueReadyValue, std::memory_order_acq_rel);
-				if (waiters != nullptr)
-				{
-					shared_task_waiter* waiter = static_cast<shared_task_waiter*>(waiters);
-					do
-					{
-						// Read the m_next pointer before resuming the coroutine
-						// since resuming the coroutine may destroy the shared_task_waiter value.
-						auto* next = waiter->m_next;
-						waiter->m_continuation.resume();
-						waiter = next;
-					} while (waiter != nullptr);
-				}
-
-				return awaitable{ *this };
-			}
+			std::experimental::suspend_always initial_suspend() noexcept { return {}; }
+			final_awaiter final_suspend() noexcept { return {}; }
 
 			void unhandled_exception() noexcept
 			{
-				// No point capturing exception if no more references to the task.
-				if (m_refCount.load(std::memory_order_relaxed) > 1)
-				{
-					m_exception = std::current_exception();
-				}
+				m_exception = std::current_exception();
 			}
 
 			bool is_ready() const noexcept
@@ -119,7 +106,7 @@ namespace cppcoro
 			/// call destroy() on the coroutine handle.
 			bool try_detach() noexcept
 			{
-				return m_refCount.fetch_sub(1, std::memory_order_acq_rel) > 1;
+				return m_refCount.fetch_sub(1, std::memory_order_acq_rel) != 1;
 			}
 
 			/// Try to enqueue a waiter to the list of waiters.
@@ -156,7 +143,10 @@ namespace cppcoro
 				// Start the coroutine if not already started.
 				void* oldWaiters = m_waiters.load(std::memory_order_acquire);
 				if (oldWaiters == notStartedValue &&
-					m_waiters.compare_exchange_strong(oldWaiters, startedNoWaitersValue, std::memory_order_relaxed))
+				    m_waiters.compare_exchange_strong(
+				      oldWaiters,
+				      startedNoWaitersValue,
+				      std::memory_order_relaxed))
 				{
 					// Start the task executing.
 					coroutine.resume();
@@ -328,7 +318,7 @@ namespace cppcoro
 
 			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
 			{
-				m_waiter.m_continuation = detail::continuation{ awaiter };
+				m_waiter.m_continuation = awaiter;
 				return m_coroutine.promise().try_await(&m_waiter, m_coroutine);
 			}
 		};
@@ -446,37 +436,6 @@ namespace cppcoro
 			return awaitable{ m_coroutine };
 		}
 
-		auto get_starter() const noexcept
-		{
-			struct starter
-			{
-			public:
-
-				explicit starter(std::experimental::coroutine_handle<promise_type> coroutine)
-					: m_coroutine(coroutine)
-				{}
-
-				void start(detail::continuation c) noexcept
-				{
-					m_waiter.m_continuation = c;
-
-					if (!m_coroutine ||
-						m_coroutine.promise().is_ready() ||
-						!m_coroutine.promise().try_await(&m_waiter, m_coroutine))
-					{
-						// Task completed synchronously, resume immediately.
-						c.resume();
-					}
-				}
-
-			private:
-				std::experimental::coroutine_handle<promise_type> m_coroutine;
-				detail::shared_task_waiter m_waiter;
-			};
-
-			return starter{ m_coroutine };
-		}
-
 	private:
 
 		template<typename U>
@@ -541,36 +500,11 @@ namespace cppcoro
 		}
 	}
 
-	template<typename T>
-	shared_task<T> make_shared_task(task<T> t)
+	template<typename AWAITABLE>
+	auto make_shared_task(AWAITABLE awaitable)
+		-> shared_task<detail::remove_rvalue_reference_t<typename awaitable_traits<AWAITABLE>::await_result_t>>
 	{
-		co_return co_await std::move(t);
-	}
-
-#if defined(_MSC_VER) && _MSC_FULL_VER <= 191025019 || CPPCORO_COMPILER_CLANG
-	// HACK: Workaround for broken MSVC that doesn't execute <expr> in 'co_return <expr>;'.
-	inline shared_task<void> make_shared_task(task<void> t)
-	{
-		co_await t;
-	}
-#endif
-
-	// Note: We yield a task<> when applying fmap() operator to a shared_task<> since
-	// it's not necessarily the case that because the source task was shared that the
-	// result will be used in a shared context. So we choose to return a task<> which
-	// generally has less overhead than a shared_task<>.
-
-	template<typename FUNC, typename T>
-	task<std::result_of_t<FUNC&&(T&)>> fmap(FUNC func, shared_task<T> task)
-	{
-		co_return std::invoke(std::move(func), co_await std::move(task));
-	}
-
-	template<typename FUNC>
-	task<std::result_of_t<FUNC&&()>> fmap(FUNC func, shared_task<void> task)
-	{
-		co_await task;
-		co_return std::invoke(std::move(func));
+		co_return co_await static_cast<AWAITABLE&&>(awaitable);
 	}
 }
 

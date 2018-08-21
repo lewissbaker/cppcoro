@@ -1,9 +1,8 @@
-
 version: 1.0.{build}
 
 image:
 - Visual Studio 2017
-#- Visual Studio 2017 Preview
+- Visual Studio 2017 Preview
 
 platform:
 - x64
@@ -12,6 +11,13 @@ platform:
 configuration:
 - debug
 - optimised
+
+matrix:
+  # Allow failures under MSVC x86 optimised since there are some known compiler
+  # bugs causing failures here.
+  allow_failures:
+    - platform: x86
+      configuration: optimised
 
 clone_script:
 - ps: git clone -q $("--branch=" + $env:APPVEYOR_REPO_BRANCH) $("https://github.com/" + $env:APPVEYOR_REPO_NAME + ".git") $env:APPVEYOR_BUILD_FOLDER

@@ -8,6 +8,8 @@ import cake.path
 from cake.tools import compiler, script, env, project, variant
 
 includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
+  'awaitable_traits.hpp',
+  'is_awaitable.hpp',
   'async_auto_reset_event.hpp',
   'async_manual_reset_event.hpp',
   'async_generator.hpp',
@@ -45,6 +47,7 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'read_write_file.hpp',
   'file_read_operation.hpp',
   'file_write_operation.hpp',
+  'static_thread_pool.hpp',
   ])
 
 netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'net', [
@@ -58,8 +61,14 @@ netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'ne
 ])
 
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
-  'continuation.hpp',
-  'when_all_awaitable.hpp',
+  'void_value.hpp',
+  'when_all_ready_awaitable.hpp',
+  'when_all_counter.hpp',
+  'when_all_task.hpp',
+  'get_awaiter.hpp',
+  'is_awaiter.hpp',
+  'any.hpp',
+  'sync_wait_task.hpp',
   'unwrap_reference.hpp',
   'lightweight_manual_reset_event.hpp',
   ])
@@ -67,6 +76,9 @@ detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 
 privateHeaders = script.cwd([
   'cancellation_state.hpp',
   'socket_helpers.hpp',
+  'auto_reset_event.hpp',
+  'spin_wait.hpp',
+  'spin_mutex.hpp',
   ])
 
 sources = script.cwd([
@@ -84,6 +96,10 @@ sources = script.cwd([
   'ipv4_endpoint.cpp',
   'ipv6_address.cpp',
   'ipv6_endpoint.cpp',
+  'static_thread_pool.cpp',
+  'auto_reset_event.cpp',
+  'spin_wait.cpp',
+  'spin_mutex.cpp',
   ])
 
 extras = script.cwd([

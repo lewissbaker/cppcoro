@@ -19,6 +19,7 @@
 
 #include "io_service_fixture.hpp"
 
+#include <ostream>
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("file");

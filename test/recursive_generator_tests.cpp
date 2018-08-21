@@ -10,6 +10,7 @@
 #include <chrono>
 #include <algorithm>
 
+#include <ostream>
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("recursive_generator");

@@ -17,6 +17,7 @@
 #include <thread>
 #include <vector>
 
+#include <ostream>
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("io_service");

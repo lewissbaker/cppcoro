@@ -6,7 +6,9 @@
 #include <cppcoro/file_read_operation.hpp>
 
 #if CPPCORO_OS_WINNT
-# define WIN32_LEAN_AND_MEAN
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
 # include <Windows.h>
 
 bool cppcoro::file_read_operation_impl::try_start(
