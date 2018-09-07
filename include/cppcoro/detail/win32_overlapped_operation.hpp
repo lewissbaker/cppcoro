@@ -99,6 +99,7 @@ namespace cppcoro
 
 			bool await_ready() const noexcept { return false; }
 
+			CPPCORO_NOINLINE
 			bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine)
 			{
 				static_assert(std::is_base_of_v<win32_overlapped_operation, OPERATION>);
@@ -184,6 +185,7 @@ namespace cppcoro
 				return m_state.load(std::memory_order_relaxed) == state::completed;
 			}
 
+			CPPCORO_NOINLINE
 			bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine)
 			{
 				static_assert(std::is_base_of_v<win32_overlapped_operation_cancellable, OPERATION>);
