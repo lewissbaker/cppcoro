@@ -331,7 +331,7 @@ namespace cppcoro
 		{
 #if CPPCORO_COMPILER_MSVC
 			// HACK: Workaround another bug in MSVC where the expression 'co_yield co_await x' seems
-			// to completely ignore the co_yield an never calls promise.yield_value().
+			// to completely ignore the co_yield and never calls promise.yield_value().
 			// The coroutine seems to be resuming the 'co_await' after the 'co_yield'
 			// rather than before the 'co_yield'.
 			// This bug is present in VS 2017.7 and VS 2017.8.
