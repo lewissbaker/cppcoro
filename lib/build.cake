@@ -54,7 +54,7 @@ netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'ne
   'ip_address.hpp',
   'ip_endpoint.hpp',
   'ipv4_address.hpp',
-  'ipv4_endpoint.hpp.',
+  'ipv4_endpoint.hpp',
   'ipv6_address.hpp',
   'ipv6_endpoint.hpp',
   'socket.hpp',
