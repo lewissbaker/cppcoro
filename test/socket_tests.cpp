@@ -263,7 +263,7 @@ TEST_CASE("send/recv TCP/IPv4 many connections")
 			ex = std::current_exception();
 		}
 
-		co_await connectionScope;
+		co_await connectionScope.join();
 
 		if (ex)
 		{

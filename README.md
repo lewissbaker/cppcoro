@@ -1725,7 +1725,7 @@ cppcoro::task<void> echo_server(
   }
 
   // Wait until all handle_connection tasks have finished.
-  co_await scope;
+  co_await scope.join();
 
   if (ex) std::rethrow_exception(ex);
 }
