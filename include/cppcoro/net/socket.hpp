@@ -28,9 +28,6 @@ namespace cppcoro
 
 	namespace net
 	{
-		class socket_send_operation;
-		class socket_recv_operation;
-
 		class socket
 		{
 		public:
