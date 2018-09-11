@@ -213,7 +213,7 @@ TEST_CASE("send/recv TCP/IPv4 many connections")
 	auto listeningSocket = socket::create_tcpv4(ioSvc);
 
 	listeningSocket.bind(ipv4_endpoint{ ipv4_address::loopback(), 0 });
-	listeningSocket.listen(3);
+	listeningSocket.listen(20);
 
 	cancellation_source canceller;
 
