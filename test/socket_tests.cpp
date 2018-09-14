@@ -206,6 +206,10 @@ TEST_CASE("send/recv TCP/IPv4")
 		}()));
 }
 
+#if !CPPCORO_COMPILER_MSVC || !CPPCORO_CPU_X86
+// HACK: Don't compile this function under MSVC x86.
+// It results in an ICE under VS 2017.8 / 2017.9 Preview 1.
+
 TEST_CASE("send/recv TCP/IPv4 many connections")
 {
 	io_service ioSvc;
@@ -358,6 +362,7 @@ TEST_CASE("send/recv TCP/IPv4 many connections")
 		}()));
 }
 
+#endif
 
 TEST_CASE("udp send_to/recv_from")
 {
