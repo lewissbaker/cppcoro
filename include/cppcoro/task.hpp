@@ -33,7 +33,13 @@ namespace cppcoro
 			{
 				bool await_ready() const noexcept { return false; }
 
+				// HACK: Need to add CPPCORO_NOINLINE to await_suspend() method
+				// to avoid MSVC 2017.8 from spilling some local variables in
+				// await_suspend() onto the coroutine frame in some cases.
+				// Without this, some tests in async_auto_reset_event_tests.cpp
+				// were crashing under x86 optimised builds.
 				template<typename PROMISE>
+				CPPCORO_NOINLINE
 				void await_suspend(std::experimental::coroutine_handle<PROMISE> coroutine)
 				{
 					task_promise_base& promise = coroutine.promise();

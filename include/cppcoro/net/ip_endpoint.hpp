@@ -43,7 +43,7 @@ namespace cppcoro
 			bool operator==(const ip_endpoint& rhs) const noexcept;
 			bool operator!=(const ip_endpoint& rhs) const noexcept;
 
-			//  ipv4_address sorts less than ipv6_address
+			//  ipv4_endpoint sorts less than ipv6_endpoint
 			bool operator<(const ip_endpoint& rhs) const noexcept;
 			bool operator>(const ip_endpoint& rhs) const noexcept;
 			bool operator<=(const ip_endpoint& rhs) const noexcept;

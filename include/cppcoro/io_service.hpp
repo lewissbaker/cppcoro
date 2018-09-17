@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <atomic>
 #include <utility>
+#include <mutex>
 #include <experimental/coroutine>
 
 namespace cppcoro
@@ -121,7 +122,7 @@ namespace cppcoro
 		/// Call this after a call to stop() to allow calls to process_xxx() methods
 		/// to process events.
 		///
-		/// After calling stop() you must ensure that all threads have returned from
+		/// After calling stop() you should ensure that all threads have returned from
 		/// calls to process_xxx() methods before calling reset().
 		void reset();
 
@@ -133,6 +134,7 @@ namespace cppcoro
 
 #if CPPCORO_OS_WINNT
 		detail::win32::handle_t native_iocp_handle() noexcept;
+		void ensure_winsock_initialised();
 #endif
 
 	private:
@@ -167,6 +169,9 @@ namespace cppcoro
 
 #if CPPCORO_OS_WINNT
 		detail::win32::safe_handle m_iocpHandle;
+
+		std::atomic<bool> m_winsockInitialised;
+		std::mutex m_winsockInitialisationMutex;
 #endif
 
 		// Head of a linked-list of schedule operations that are

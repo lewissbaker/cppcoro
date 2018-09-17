@@ -58,6 +58,16 @@ namespace cppcoro
 
 			struct wsabuf
 			{
+				constexpr wsabuf() noexcept
+					: len(0)
+					, buf(nullptr)
+				{}
+
+				constexpr wsabuf(void* ptr, std::size_t size)
+					: len(size <= ulong_t(-1) ? ulong_t(size) : ulong_t(-1))
+					, buf(static_cast<char*>(ptr))
+				{}
+
 				ulong_t len;
 				char* buf;
 			};

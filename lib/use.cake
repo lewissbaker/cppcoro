@@ -15,4 +15,6 @@ compiler.addLibrary(buildScript.getResult('library'))
 if variant.platform == "windows":
   compiler.addLibrary("Synchronization")
   compiler.addLibrary("kernel32")
+  compiler.addLibrary("WS2_32")
+  compiler.addLibrary("Mswsock")
 

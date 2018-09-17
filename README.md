@@ -33,6 +33,10 @@ These include:
   * `io_work_scope`
   * `file`, `readable_file`, `writable_file`
   * `read_only_file`, `write_only_file`, `read_write_file`
+Networking
+  * `socket`
+  * `ip_address`, `ipv4_address`, `ipv6_address`
+  * `ip_endpoint`, `ipv4_endpoint`, `ipv6_endpoint`
 * Metafunctions
   * `is_awaitable<T>`
   * `awaitable_traits<T>`
@@ -1549,6 +1553,421 @@ namespace cppcoro
 ```
 
 All `open()` functions throw `std::system_error` on failure.
+
+# Networking
+
+NOTE: Networking abstractions are currently only supported on the Windows platform.
+Linux support will be coming soon.
+
+## `socket`
+
+The socket class can be used to send/receive data over the network asynchronously.
+
+Currently only supports TCP/IP, UDP/IP over IPv4 and IPv6.
+
+API Summary:
+```c++
+// <cppcoro/net/socket.hpp>
+namespace cppcoro::net
+{
+  class socket
+  {
+  public:
+
+    static socket create_tcpv4(ip_service& ioSvc);
+    static socket create_tcpv6(ip_service& ioSvc);
+    static socket create_updv4(ip_service& ioSvc);
+    static socket create_udpv6(ip_service& ioSvc);
+
+    socket(socket&& other) noexcept;
+
+    ~socket();
+
+    socket& operator=(socket&& other) noexcept;
+
+    // Return the native socket handle for the socket
+    <platform-specific> native_handle() noexcept;
+
+    const ip_endpoint& local_endpoint() const noexcept;
+    const ip_endpoint& remote_endpoint() const noexcept;
+
+    void bind(const ip_endpoint& localEndPoint);
+
+    void listen();
+
+    [[nodiscard]]
+    Awaitable<void> connect(const ip_endpoint& remoteEndPoint) noexcept;
+    [[nodiscard]]
+    Awaitable<void> connect(const ip_endpoint& remoteEndPoint,
+                            cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<void> accept(socket& acceptingSocket) noexcept;
+    [[nodiscard]]
+    Awaitable<void> accept(socket& acceptingSocket,
+                           cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<void> disconnect() noexcep0t;
+    [[nodiscard]]
+    Awaitable<void> disconnect(cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<std::size_t> send(const void* buffer, std::size_t size) noexcept;
+    [[nodiscard]]
+    Awaitable<std::size_t> send(const void* buffer,
+                                std::size_t size,
+                                cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<std::size_t> recv(void* buffer, std::size_t size) noexcept;
+    [[nodiscard]]
+    Awaitable<std::size_t> recv(void* buffer,
+                                std::size_t size,
+                                cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    socket_recv_from_operation recv_from(
+        void* buffer,
+        std::size_t size) noexcept;
+    [[nodiscard]]
+    socket_recv_from_operation_cancellable recv_from(
+        void* buffer,
+        std::size_t size,
+        cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    socket_send_to_operation send_to(
+        const ip_endpoint& destination,
+        const void* buffer,
+        std::size_t size) noexcept;
+    [[nodiscard]]
+    socket_send_to_operation_cancellable send_to(
+        const ip_endpoint& destination,
+        const void* buffer,
+        std::size_t size,
+        cancellation_token ct) noexcept;
+
+    void close_send();
+    void close_recv();
+
+  };
+}
+```
+
+Example: Echo Server
+```c++
+#include <cppcoro/net/socket.hpp>
+#include <cppcoro/io_service.hpp>
+#include <cppcoro/cancellation_source.hpp>
+#include <cppcoro/async_scope.hpp>
+#include <cppcoro/on_scope_exit.hpp>
+
+#include <memory>
+#include <iostream>
+
+cppcoro::task<void> handle_connection(socket s)
+{
+  try
+  {
+    const size_t bufferSize = 16384;
+    auto buffer = std::make_unique<unsigned char[]>(bufferSize);
+    size_t bytesRead;
+    do {
+      // Read some bytes
+      bytesRead = co_await s.recv(buffer.get(), bufferSize);
+
+      // Write some bytes
+      size_t bytesWritten = 0;
+      while (bytesWritten < bytesRead) {
+        bytesWritten += co_await s.send(
+          buffer.get() + bytesWritten,
+          bytesRead - bytesWritten);
+      }
+    } while (bytesRead != 0);
+
+    s.close_send();
+
+    co_await s.disconnect();
+  }
+  catch (...)
+  {
+    std::cout << "connection failed" << std::
+  }
+}
+
+cppcoro::task<void> echo_server(
+  cppcoro::net::ipv4_endpoint endpoint,
+  cppcoro::io_service& ioSvc,
+  cancellation_token ct)
+{
+  cppcoro::async_scope scope;
+
+  std::exception_ptr ex;
+  try
+  {
+    auto listeningSocket = cppcoro::net::socket::create_tcpv4(ioSvc);
+    listeningSocket.bind(endpoint);
+    listeningSocket.listen();
+
+    while (true) {
+      auto connection = cppcoro::net::socket::create_tcpv4(ioSvc);
+      co_await listeningSocket.accept(connection, ct);
+      scope.spawn(handle_connection(std::move(connection)));
+    }
+  }
+  catch (cppcoro::operation_cancelled)
+  {
+  }
+  catch (...)
+  {
+    ex = std::current_exception();
+  }
+
+  // Wait until all handle_connection tasks have finished.
+  co_await scope.join();
+
+  if (ex) std::rethrow_exception(ex);
+}
+
+int main(int argc, const char* argv[])
+{
+    cppcoro::io_service ioSvc;
+
+    if (argc != 2) return -1;
+
+    auto endpoint = cppcoro::ipv4_endpoint::from_string(argv[1]);
+    if (!endpoint) return -1;
+
+    (void)cppcoro::sync_wait(cppcoro::when_all(
+        [&]() -> task<>
+        {
+            // Shutdown the event loop once finished.
+            auto stopOnExit = cppcoro::on_scope_exit([&] { ioSvc.stop(); });
+
+            cppcoro::cancellation_source canceller;
+            co_await cppcoro::when_all(
+                [&]() -> task<>
+                {
+                    // Run for 30s then stop accepting new connections.
+                    co_await ioSvc.schedule_after(std::chrono::seconds(30));
+                    canceller.request_cancellation();
+                }(),
+                echo_server(*endpoint, ioSvc, canceller.token()));
+        }(),
+        [&]() -> task<>
+        {
+            ioSvc.process_events();
+        }()));
+
+    return 0;
+}
+```
+
+## `ip_address`, `ipv4_address`, `ipv6_address`
+
+Helper classes for representing an IP address.
+
+API Synopsis:
+```c++
+namespace cppcoro::net
+{
+  class ipv4_address
+  {
+    using bytes_t = std::uint8_t[4];
+  public:
+    constexpr ipv4_address();
+    explicit constexpr ipv4_address(std::uint32_t integer);
+    explicit constexpr ipv4_address(const std::uint8_t(&bytes)[4]);
+    explicit constexpr ipv4_address(std::uint8_t b0,
+                                    std::uint8_t b1,
+                                    std::uint8_t b2,
+                                    std::uint8_t b3);
+
+    constexpr const bytes_t& bytes() const;
+
+    cosntexpr std::uint32_t to_integer() const;
+
+    static constexpr ipv4_address loopback();
+
+    constexpr bool is_loopback() const;
+    constexpr bool is_private_network() const;
+
+    constexpr bool operator==(ipv4_address other) const;
+    constexpr bool operator!=(ipv4_address other) const;
+    constexpr bool operator<(ipv4_address other) const;
+    constexpr bool operator>(ipv4_address other) const;
+    constexpr bool operator<=(ipv4_address other) const;
+    constexpr bool operator>=(ipv4_address other) const;
+
+    std::string to_string();
+
+    static std::optional<ipv4_address> from_string(std::string_view string) noexcept;
+  };
+
+  class ipv6_address
+  {
+    using bytes_t = std::uint8_t[16];
+  public:
+    constexpr ipv6_address();
+
+    explicit constexpr ipv6_address(
+      std::uint64_t subnetPrefix,
+      std::uint64_t interfaceIdentifier);
+
+    constexpr ipv6_address(
+      std::uint16_t part0,
+      std::uint16_t part1,
+      std::uint16_t part2,
+      std::uint16_t part3,
+      std::uint16_t part4,
+      std::uint16_t part5,
+      std::uint16_t part6,
+      std::uint16_t part7);
+
+    explicit constexpr ipv6_address(
+        const std::uint16_t(&parts)[8]);
+
+    explicit constexpr ipv6_address(
+        const std::uint8_t(bytes)[16]);
+
+    constexpr const bytes_t& bytes() const;
+
+    constexpr std::uint64_t subnet_prefix() const;
+    constexpr std::uint64_t interface_identifier() const;
+
+    static constexpr ipv6_address unspecified();
+    static constexpr ipv6_address loopback();
+
+    static std::optional<ipv6_address> from_string(std::string_view string) noexcept;
+
+    std::string to_string() const;
+
+    constexpr bool operator==(const ipv6_address& other) const;
+    constexpr bool operator!=(const ipv6_address& other) const;
+    constexpr bool operator<(const ipv6_address& other) const;
+    constexpr bool operator>(const ipv6_address& other) const;
+    constexpr bool operator<=(const ipv6_address& other) const;
+    constexpr bool operator>=(const ipv6_address& other) const;
+
+  };
+
+  class ip_address
+  {
+  public:
+
+    // Constructs to IPv4 address 0.0.0.0
+    ip_address() noexcept;
+
+    ip_address(ipv4_address address) noexcept;
+    ip_address(ipv6_address address) noexcept;
+
+    bool is_ipv4() const noexcept;
+    bool is_ipv6() const noexcept;
+
+    const ipv4_address& to_ipv4() const;
+    const ipv6_address& to_ipv6() const;
+
+    const std::uint8_t* bytes() const noexcept;
+
+    std::string to_string() const;
+
+    static std::optional<ip_address> from_string(std::string_view string) noexcept;
+
+    bool operator==(const ip_address& rhs) const noexcept;
+    bool operator!=(const ip_address& rhs) const noexcept;
+
+    //  ipv4_address sorts less than ipv6_address
+    bool operator<(const ip_address& rhs) const noexcept;
+    bool operator>(const ip_address& rhs) const noexcept;
+    bool operator<=(const ip_address& rhs) const noexcept;
+    bool operator>=(const ip_address& rhs) const noexcept;
+
+  };
+}
+```
+
+## `ip_endpoint`, `ipv4_endpoint` `ipv6_endpoint`
+
+Helper classes for representing an IP address and port-number.
+
+API Synopsis:
+```c++
+namespace cppcoro::net
+{
+  class ipv4_endpoint
+  {
+  public:
+    ipv4_endpoint() noexcept;
+    explicit ipv4_endpoint(ipv4_address address, std::uint16_t port = 0) noexcept;
+
+    const ipv4_address& address() const noexcept;
+    std::uint16_t port() const noexcept;
+
+    std::string to_string() const;
+    static std::optional<ipv4_endpoint> from_string(std::string_view string) noexcept;
+  };
+
+  bool operator==(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator!=(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator<(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator>(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator<=(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator>=(const ipv4_endpoint& a, const ipv4_endpoint& b);
+
+  class ipv6_endpoint
+  {
+  public:
+    ipv6_endpoint() noexcept;
+    explicit ipv6_endpoint(ipv6_address address, std::uint16_t port = 0) noexcept;
+
+    const ipv6_address& address() const noexcept;
+    std::uint16_t port() const noexcept;
+
+    std::string to_string() const;
+    static std::optional<ipv6_endpoint> from_string(std::string_view string) noexcept;
+  };
+
+  bool operator==(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator!=(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator<(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator>(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator<=(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator>=(const ipv6_endpoint& a, const ipv6_endpoint& b);
+
+  class ip_endpoint
+  {
+  public:
+     // Constructs to IPv4 end-point 0.0.0.0:0
+     ip_endpoint() noexcept;
+
+     ip_endpoint(ipv4_endpoint endpoint) noexcept;
+     ip_endpoint(ipv6_endpoint endpoint) noexcept;
+
+     bool is_ipv4() const noexcept;
+     bool is_ipv6() const noexcept;
+
+     const ipv4_endpoint& to_ipv4() const;
+     const ipv6_endpoint& to_ipv6() const;
+
+     ip_address address() const noexcept;
+     std::uint16_t port() const noexcept;
+
+     std::string to_string() const;
+
+     static std::optional<ip_endpoint> from_string(std::string_view string) noexcept;
+
+     bool operator==(const ip_endpoint& rhs) const noexcept;
+     bool operator!=(const ip_endpoint& rhs) const noexcept;
+
+     //  ipv4_endpoint sorts less than ipv6_endpoint
+     bool operator<(const ip_endpoint& rhs) const noexcept;
+     bool operator>(const ip_endpoint& rhs) const noexcept;
+     bool operator<=(const ip_endpoint& rhs) const noexcept;
+     bool operator>=(const ip_endpoint& rhs) const noexcept;
+  };
+}
+```
 
 # Functions
 

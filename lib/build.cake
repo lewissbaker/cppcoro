@@ -15,6 +15,7 @@ includes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', [
   'async_generator.hpp',
   'async_mutex.hpp',
   'async_latch.hpp',
+  'async_scope.hpp',
   'broken_promise.hpp',
   'cancellation_registration.hpp',
   'cancellation_source.hpp',
@@ -54,9 +55,10 @@ netIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'ne
   'ip_address.hpp',
   'ip_endpoint.hpp',
   'ipv4_address.hpp',
-  'ipv4_endpoint.hpp.',
+  'ipv4_endpoint.hpp',
   'ipv6_address.hpp',
   'ipv6_endpoint.hpp',
+  'socket.hpp',
 ])
 
 detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
@@ -74,6 +76,7 @@ detailIncludes = cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 
 
 privateHeaders = script.cwd([
   'cancellation_state.hpp',
+  'socket_helpers.hpp',
   'auto_reset_event.hpp',
   'spin_wait.hpp',
   'spin_mutex.hpp',
@@ -108,8 +111,18 @@ extras = script.cwd([
 if variant.platform == "windows":
   detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
     'win32.hpp',
-	'win32_overlapped_operation.hpp',
+    'win32_overlapped_operation.hpp',
     ]))
+  netIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'net', [
+    'socket.hpp',
+    'socket_accept_operation.hpp',
+    'socket_connect_operation.hpp',
+    'socket_disconnect_operation.hpp',
+    'socket_recv_operation.hpp',
+    'socket_recv_from_operation.hpp',
+    'socket_send_operation.hpp',
+    'socket_send_to_operation.hpp',
+  ]))
   sources.extend(script.cwd([
     'win32.cpp',
     'io_service.cpp',
@@ -121,6 +134,15 @@ if variant.platform == "windows":
     'read_write_file.cpp',
     'file_read_operation.cpp',
     'file_write_operation.cpp',
+    'socket_helpers.cpp',
+    'socket.cpp',
+    'socket_accept_operation.cpp',
+    'socket_connect_operation.cpp',
+    'socket_disconnect_operation.cpp',
+    'socket_send_operation.cpp',
+    'socket_send_to_operation.cpp',
+    'socket_recv_operation.cpp',
+    'socket_recv_from_operation.cpp',
     ]))
 
 buildDir = env.expand('${CPPCORO_BUILD}')
