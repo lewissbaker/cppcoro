@@ -470,7 +470,7 @@ cppcoro::async_generator<int> ticker(int count, threadpool& tp)
 
 cppcoro::task<> consumer(threadpool& tp)
 {
-  auto sequence = ticker(tp);
+  auto sequence = ticker(10, tp);
   for co_await(std::uint32_t i : sequence)
   {
     std::cout << "Tick " << i << std::endl;
