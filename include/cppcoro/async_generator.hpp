@@ -1062,7 +1062,7 @@ namespace cppcoro
 #endif // !CPPCORO_COMPILER_SUPPORTS_SYMMETRIC_TRANSFER
 
 	template<typename FUNC, typename T>
-	async_generator<std::invoke_result_t<FUNC&, decltype(*std::declval<typename async_generator<T>::iterator&>()))>> fmap(
+	async_generator<std::invoke_result_t<FUNC&, decltype(*std::declval<typename async_generator<T>::iterator&>())>> fmap(
 		FUNC func,
 		async_generator<T> source)
 	{
