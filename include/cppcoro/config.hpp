@@ -30,6 +30,19 @@
 # define CPPCORO_COMPILER_GCC 0
 #endif
 
+/// \def CPPCORO_COMPILER_SUPPORTS_SYMMETRIC_TRANSFER
+/// Defined to 1 if the compiler supports returning a coroutine_handle from
+/// the await_suspend() method as a way of transferring execution
+/// to another coroutine with a guaranteed tail-call.
+#if CPPCORO_COMPILER_CLANG
+# if __clang_major__ >= 7
+#  define CPPCORO_COMPILER_SUPPORTS_SYMMETRIC_TRANSFER 1
+# endif
+#endif
+#ifndef CPPCORO_COMPILER_SUPPORTS_SYMMETRIC_TRANSFER
+# define CPPCORO_COMPILER_SUPPORTS_SYMMETRIC_TRANSFER 0
+#endif
+
 #if CPPCORO_COMPILER_MSVC
 # define CPPCORO_ASSUME(X) __assume(X)
 #else

@@ -229,9 +229,10 @@ TEST_CASE("exception thrown before first yield is rethrown from begin operation"
 		co_yield 1;
 	}(true);
 
-	auto beginAwaitable = gen.begin();
-	CHECK(beginAwaitable.await_ready());
-	CHECK_THROWS_AS(beginAwaitable.await_resume(), const TestException&);
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
+	{
+		CHECK_THROWS_AS(co_await gen.begin(), const TestException&);
+	}());
 }
 
 TEST_CASE("exception thrown after first yield is rethrown from increment operator")
@@ -246,14 +247,13 @@ TEST_CASE("exception thrown after first yield is rethrown from increment operato
 		}
 	}(true);
 
-	auto beginAwaitable = gen.begin();
-	CHECK(beginAwaitable.await_ready());
-	auto it = beginAwaitable.await_resume();
-	CHECK(*it == 1u);
-	auto incrementAwaitable = ++it;
-	CHECK(incrementAwaitable.await_ready());
-	CHECK_THROWS_AS(incrementAwaitable.await_resume(), const TestException&);
-	CHECK(it == gen.end());
+	cppcoro::sync_wait([&]() -> cppcoro::task<>
+	{
+		auto it = co_await gen.begin();
+		CHECK(*it == 1u);
+		CHECK_THROWS_AS(co_await ++it, const TestException&);
+		CHECK(it == gen.end());
+	}());
 }
 
 TEST_CASE("large number of synchronous completions doesn't result in stack-overflow")
