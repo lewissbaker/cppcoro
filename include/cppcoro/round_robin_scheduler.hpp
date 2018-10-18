@@ -65,7 +65,7 @@ namespace cppcoro
 		{
 			for (size_t i = 0; i < N - 1; ++i)
 			{
-				m_coroutines[i] = m_noop();
+				m_coroutines[i] = m_noop;
 			}
 		}
 
@@ -104,13 +104,11 @@ namespace cppcoro
 
 	private:
 
-		std::experimental::coroutine_handle exchange_next(
+		std::experimental::coroutine_handle<> exchange_next(
 			std::experimental::coroutine_handle<> coroutine) noexcept
 		{
-			auto coroutineToResume = std::exchange(
-				m_scheduler.m_coroutines[m_scheduler.m_index],
-				awaitingCoroutine);
-			m_scheduler.m_index = m_scheduler.m_index < (N - 2) ? m_scheduler.m_index + 1 : 0;
+			auto coroutineToResume = std::exchange(m_coroutines[m_index], coroutine);
+			m_index = m_index < (N - 2) ? m_index + 1 : 0;
 			return coroutineToResume;
 		}
 

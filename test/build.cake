@@ -50,6 +50,11 @@ if variant.platform == 'windows':
     'socket_tests.cpp',
     ])
 
+if variant.compiler == 'clang':
+  sources += script.cwd([
+    'round_robin_scheduler_tests.cpp',
+    ])
+
 extras = script.cwd([
   'build.cake',
 ])

@@ -143,4 +143,26 @@
 # define CPPCORO_CPU_64BIT 0
 #endif
 
+/// \def CPPCORO_CPU_HAVE_SSE
+/// Defined to 1 if the target CPU can be assumed to always have support
+/// for SSE instruction set.
+#if CPPCORO_COMPILER_MSVC && CPPCORO_CPU_X86 && _M_IX86_FP >= 1
+# define CPPCORO_CPU_HAVE_SSE 1
+#elif CPPCORO_CPU_X64
+# define CPPCORO_CPU_HAVE_SSE 1
+#else
+# define CPPCORO_CPU_HAVE_SSE 0
+#endif
+
+/// \def CPPCORO_CPU_HAVE_SSE2
+/// Defined to 1 if the target CPU can be assumed to always have support
+/// for SSE2 instruction set.
+#if CPPCORO_COMPILER_MSVC && CPPCORO_CPU_X86 && _M_IX86_FP >= 2
+# define CPPCORO_CPU_HAVE_SSE2 1
+#elif CPPCORO_CPU_X64
+# define CPPCORO_CPU_HAVE_SSE2 1
+#else
+# define CPPCORO_CPU_HAVE_SSE2 0
+#endif
+
 #endif
