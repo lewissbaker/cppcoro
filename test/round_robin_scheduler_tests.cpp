@@ -123,10 +123,8 @@ namespace
 						lookupResult = mid;
 						break;
 					}
-					else {
-						low = lookupValue > midValue ? mid + 1 : low;
-						high = lookupValue < midValue ? mid : high;
-					}
+					low = lookupValue > midValue ? mid + 1 : low;
+					high = lookupValue < midValue ? mid : high;
 				}
 			}
 			co_return;
@@ -137,19 +135,15 @@ namespace
 	{
 		size_t low = 0;
 		size_t high = indexSize;
-		size_t lookupResult = no_result;
 		while (low < high)
 		{
 			size_t mid = low + (high - low) / 2;
 			int midValue = index[mid];
 			if (midValue == lookupValue) return mid;
-			if (lookupValue > midValue) { low = mid + 1; }
-			else if (lookupValue < midValue) { high = mid; }
-			else
-			{
-				return mid;
-			}
+			low = lookupValue > midValue ? mid + 1 : low;
+			high = lookupValue < midValue ? mid : high;
 		}
+		return no_result;
 	}
 
 	std::vector<int> make_random_sorted_array_no_duplicates(size_t size)
