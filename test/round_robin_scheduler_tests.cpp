@@ -64,7 +64,7 @@ namespace
 	inline void concurrently_impl(Scheduler& scheduler, Func& taskFactory)
 	{
 		auto t = std::invoke(taskFactory, scheduler);
-		if constexpr (N > 0)
+		if constexpr (N > 1)
 		{
 			concurrently_impl<N - 1>(scheduler, taskFactory);
 		}
@@ -188,8 +188,8 @@ TEST_CASE("round_robin_scheduler performance")
 	auto index = make_random_sorted_array_no_duplicates(100'000'000);
 	auto lookups = make_random_unsorted_array(1'000'000, -1000, index.back() + 1000);
 
-	std::vector<size_t> results1{ lookups.size() };
-	std::vector<size_t> results2{ lookups.size() };
+	std::vector<size_t> results1(lookups.size());
+	std::vector<size_t> results2(lookups.size());
 
 	auto start = std::chrono::high_resolution_clock::now();
 
