@@ -10,6 +10,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <forward_list>
 
 #include "doctest/doctest.h"
 
@@ -216,6 +217,128 @@ TEST_CASE("fmap operator")
 	CHECK(*++it == 9);
 	CHECK(*++it == 12);
 	CHECK(++it == gen.end());
+}
+
+namespace
+{
+	template<std::size_t window, typename Range>
+	cppcoro::generator<const double> low_pass(Range rng)
+	{
+		auto it = std::begin(rng);
+		const auto itEnd = std::end(rng);
+
+		const double invCount = 1.0 / window;
+		double sum = 0;
+
+		using iter_cat =
+			typename std::iterator_traits<decltype(it)>::iterator_category;
+
+		if constexpr (std::is_base_of_v<std::random_access_iterator_tag, iter_cat>)
+		{
+			for (std::size_t count = 0; it != itEnd && count < window; ++it)
+			{
+				sum += *it;
+				++count;
+				co_yield sum / count;
+			}
+
+			for (; it != itEnd; ++it)
+			{
+				sum -= *(it - window);
+				sum += *it;
+				co_yield sum * invCount;
+			}
+		}
+		else if constexpr (std::is_base_of_v<std::forward_iterator_tag, iter_cat>)
+		{
+			auto windowStart = it;
+			for (std::size_t count = 0; it != itEnd && count < window; ++it)
+			{
+				sum += *it;
+				++count;
+				co_yield sum / count;
+			}
+
+			for (; it != itEnd; ++it, ++windowStart)
+			{
+				sum -= *windowStart;
+				sum += *it;
+				co_yield sum * invCount;
+			}
+		}
+		else
+		{
+			// Just assume an input iterator
+			double buffer[window];
+
+			for (std::size_t count = 0; it != itEnd && count < window; ++it)
+			{
+				buffer[count] = *it;
+				sum += buffer[count];
+				++count;
+				co_yield sum / count;
+			}
+
+			for (std::size_t pos = 0; it != itEnd; ++it, pos = (pos + 1 == window) ? 0 : (pos + 1))
+			{
+				sum -= std::exchange(buffer[pos], *it);
+				sum += buffer[pos];
+				co_yield sum * invCount;
+			}
+		}
+	}
+}
+
+// HACK: Disable this test as it's causing heap corruption errors under MSVC 2017 Update 5 x86 debug builds.
+// Still needs investigation of root cause.
+TEST_CASE("low_pass" * doctest::skip{ true })
+{
+	// With random-access iterator
+	{
+		auto gen = low_pass<4>(std::vector<int>{ 10, 13, 10, 15, 18, 9, 11, 15 });
+		auto it = gen.begin();
+		CHECK(*it == 10.0);
+		CHECK(*++it == 11.5);
+		CHECK(*++it == 11.0);
+		CHECK(*++it == 12.0);
+		CHECK(*++it == 14.0);
+		CHECK(*++it == 13.0);
+		CHECK(*++it == 13.25);
+		CHECK(*++it == 13.25);
+		CHECK(++it == gen.end());
+	}
+
+	// With forward-iterator
+	{
+		auto gen = low_pass<4>(std::forward_list<int>{ 10, 13, 10, 15, 18, 9, 11, 15 });
+		auto it = gen.begin();
+		CHECK(*it == 10.0);
+		CHECK(*++it == 11.5);
+		CHECK(*++it == 11.0);
+		CHECK(*++it == 12.0);
+		CHECK(*++it == 14.0);
+		CHECK(*++it == 13.0);
+		CHECK(*++it == 13.25);
+		CHECK(*++it == 13.25);
+		CHECK(++it == gen.end());
+	}
+
+	// With input-iterator
+	{
+		auto gen = low_pass<3>(range(10, 20));
+		auto it = gen.begin();
+		CHECK(*it == 10.0);
+		CHECK(*++it == 10.5);
+		CHECK(*++it == 11.0);
+		CHECK(*++it == 12.0);
+		CHECK(*++it == 13.0);
+		CHECK(*++it == 14.0);
+		CHECK(*++it == 15.0);
+		CHECK(*++it == 16.0);
+		CHECK(*++it == 17.0);
+		CHECK(*++it == 18.0);
+		CHECK(++it == gen.end());
+	}
 }
 
 TEST_SUITE_END();

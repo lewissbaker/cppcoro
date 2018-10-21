@@ -28,15 +28,21 @@ These include:
   * `cancellation_source`
   * `cancellation_registration`
 * Schedulers and I/O
+  * `static_thread_pool`
   * `io_service`
   * `io_work_scope`
   * `file`, `readable_file`, `writable_file`
   * `read_only_file`, `write_only_file`, `read_write_file`
+Networking
+  * `socket`
+  * `ip_address`, `ipv4_address`, `ipv6_address`
+  * `ip_endpoint`, `ipv4_endpoint`, `ipv6_endpoint`
 * Metafunctions
   * `is_awaitable<T>`
   * `awaitable_traits<T>`
 * Concepts
   * `Awaitable<T>`
+  * `Awaiter<T>`
   * `Scheduler`
   * `DelayedScheduler`
 
@@ -48,8 +54,8 @@ It has been open-sourced in the hope that others will find it useful and that th
 can provide feedback on it and ways to improve it.
 
 It requires a compiler that supports the coroutines TS:
-- Windows + Visual Studio 2017 ![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/lewissbaker/cppcoro?branch=master&svg=true&passingText=master%20-%20OK&failingText=master%20-%20Failing&pendingText=master%20-%20Pending)
-- Linux + Clang 5.0/6.0 + libc++
+- Windows + Visual Studio 2017 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/lewissbaker/cppcoro?branch=master&svg=true&passingText=master%20-%20OK&failingText=master%20-%20Failing&pendingText=master%20-%20Pending)](https://ci.appveyor.com/project/lewissbaker/cppcoro/branch/master)
+- Linux + Clang 5.0/6.0 + libc++ [![Build Status](https://travis-ci.org/lewissbaker/cppcoro.svg?branch=master)](https://travis-ci.org/lewissbaker/cppcoro)
 
 The Linux version is functional except for the `io_context` and file I/O related classes which have not yet been implemented for Linux (see issue [#15](https://github.com/lewissbaker/cppcoro/issues/15) for more info).
 
@@ -130,8 +136,8 @@ namespace cppcoro
     // If the task is not yet ready then the awaiting coroutine will be
     // suspended until the task completes. If the the task is_ready() then
     // this operation will return the result synchronously without suspending.
-    <unspecified> operator co_await() const & noexcept;
-    <unspecified> operator co_await() const && noexcept;
+    Awaiter<T&> operator co_await() const & noexcept;
+    Awaiter<T&&> operator co_await() const && noexcept;
 
     // Returns an awaitable that can be co_await'ed to suspend the current
     // coroutine until the task completes.
@@ -142,7 +148,7 @@ namespace cppcoro
     //
     // This can be useful if you want to synchronise with the task without
     // the possibility of it throwing an exception.
-    <unspecified> when_ready() const noexcept;
+    Awaitable<void> when_ready() const noexcept;
   };
 
   template<typename T>
@@ -201,7 +207,7 @@ the result of the task to be created. It also allows multiple coroutines to
 concurrently await the result.
 
 The task will start executing on the thread that first `co_await`s the task.
-Subsequent awaiters will either be suspended and queued for resumption
+Subsequent awaiters will either be suspended and be queued for resumption
 when the task completes or will continue synchronously if the task has
 already run to completion.
 
@@ -242,7 +248,7 @@ namespace cppcoro
     // is void in which case the expression has type 'void').
     // If the task completed with an unhandled exception then the
     // exception will be rethrown by the co_await expression.
-    <unspecified> operator co_await() const noexcept;
+    Awaiter<T&> operator co_await() const noexcept;
 
     // Returns an operation that when awaited will suspend the
     // calling coroutine until the task completes and the result
@@ -251,7 +257,7 @@ namespace cppcoro
     // The result is not returned from the co_await expression.
     // This can be used to synchronise with the task without the
     // possibility of the co_await expression throwing an exception.
-    <unspecified> when_ready() const noexcept;
+    Awaiter<void> when_ready() const noexcept;
 
   };
 
@@ -272,8 +278,10 @@ namespace cppcoro
 }
 ```
 
-All const-methods on `shared_task<T>` are safe to call concurrently with other const-methods on the same instance from multiple threads.
-It is not safe to call non-const methods of `shared_task<T>` concurrently with any other method on the same instance of a `shared_task<T>`.
+All const-methods on `shared_task<T>` are safe to call concurrently with other 
+const-methods on the same instance from multiple threads. It is not safe to call
+non-const methods of `shared_task<T>` concurrently with any other method on the
+same instance of a `shared_task<T>`.
 
 ### Comparison to `task<T>`
 
@@ -462,7 +470,7 @@ cppcoro::async_generator<int> ticker(int count, threadpool& tp)
 
 cppcoro::task<> consumer(threadpool& tp)
 {
-  auto sequence = ticker(tp);
+  auto sequence = ticker(10, tp);
   for co_await(std::uint32_t i : sequence)
   {
     std::cout << "Tick " << i << std::endl;
@@ -499,7 +507,7 @@ namespace cppcoro
       // will subsequently become equal to the end() iterator.
       // If the coroutine completes with an unhandled exception then
       // that exception will be rethrown from the co_await expression.
-      <unspecified> operator++() noexcept;
+      Awaitable<iterator&> operator++() noexcept;
 
       // Dereference the iterator.
       pointer operator->() const noexcept;
@@ -527,7 +535,7 @@ namespace cppcoro
     //
     // This method is not valid to be called once the coroutine has
     // run to completion.
-    <unspecified> begin() noexcept;
+    Awaitable<iterator> begin() noexcept;
     iterator end() noexcept;
 
   };
@@ -573,7 +581,7 @@ namespace cppcoro
     bool is_set() const noexcept;
     void set();
     void reset() noexcept;
-    <unspecified> operator co_await() const noexcept;
+    Awaiter<void> operator co_await() const noexcept;
   };
 }
 ```
@@ -639,7 +647,7 @@ namespace cppcoro
     // continues without suspending.
     // The event is automatically reset back to the 'not set' state
     // before resuming the coroutine.
-    Awaitable<void> operator co_await() const noexcept;
+    Awaiter<void> operator co_await() const noexcept;
 
   };
 }
@@ -810,7 +818,7 @@ namespace cppcoro
     async_manual_reset_event& operator=(async_manual_reset_event&&) = delete;
 
     // Wait until the event becomes set.
-    <unspecified> operator co_await() const noexcept;
+    async_manual_reset_event_operation operator co_await() const noexcept;
 
     bool is_set() const noexcept;
 
@@ -1077,6 +1085,109 @@ cppcoro::task<> cancellable_timer_wait(cppcoro::cancellation_token token)
   });
 
   co_await timer;
+}
+```
+
+## `static_thread_pool`
+
+The `static_thread_pool` class provides an abstraction that lets you schedule work
+on a fixed-size pool of threads.
+
+This class implements the **Scheduler** concept (see below).
+
+You can enqueue work to the thread-pool by executing `co_await threadPool.schedule()`.
+This operation will suspend the current coroutine, enqueue it for execution on the
+thread-pool and the thread pool will then resume the coroutine when a thread in the
+thread-pool is next free to run the coroutine. **This operation is guaranteed not
+to throw and, in the common case, will not allocate any memory**.
+
+This class makes use of a work-stealing algorithm to load-balance work across multiple
+threads. Work enqueued to the thread-pool from a thread-pool thread will be scheduled
+for execution on the same thread in a LIFO queue. Work enqueued to the thread-pool from
+a remote thread will be enqueued to a global FIFO queue. When a worker thread runs out
+of work from its local queue it first tries to dequeue work from the global queue. If
+that queue is empty then it next tries to steal work from the back of the queues of
+the other worker threads.
+
+API Summary:
+```c++
+namespace cppcoro
+{
+  class static_thread_pool
+  {
+  public:
+    // Initialise the thread-pool with a number of threads equal to
+    // std::thread::hardware_concurrency().
+    static_thread_pool();
+
+    // Initialise the thread pool with the specified number of threads.
+    explicit static_thread_pool(std::uint32_t threadCount);
+
+    std::uint32_t thread_count() const noexcept;
+
+    class schedule_operation
+    {
+    public:
+      schedule_operation(static_thread_pool* tp) noexcept;
+
+      bool await_ready() noexcept;
+      bool await_suspend(std::experimental::coroutine_handle<> h) noexcept;
+      bool await_resume() noexcept;
+
+    private:
+      // unspecified
+    };
+
+    // Return an operation that can be awaited by a coroutine.
+    //
+    // 
+    [[nodiscard]]
+    schedule_operation schedule() noexcept;
+
+  private:
+
+    // Unspecified
+
+  };
+}
+```
+
+Example usage: Simple
+```c++
+cppcoro::task<std::string> do_something_on_threadpool(cppcoro::static_thread_pool& tp)
+{
+  // First schedule the coroutine onto the threadpool.
+  co_await tp.schedule();
+
+  // When it resumes, this coroutine is now running on the threadpool.
+  do_something();
+}
+```
+
+Example usage: Doing things in parallel - using `schedule_on()` operator with `static_thread_pool`.
+```c++
+cppcoro::task<double> dot_product(static_thread_pool& tp, double a[], double b[], size_t count)
+{
+  if (count > 1000)
+  {
+    // Subdivide the work recursively into two equal tasks
+    // The first half is scheduled to the thread pool so it can run concurrently
+    // with the second half which continues on this thread.
+    size_t halfCount = count / 2;
+    auto [first, second] = co_await when_all(
+      schedule_on(tp, dot_product(tp, a, b, halfCount),
+      dot_product(tp, a + halfCount, b + halfCount, count - halfCount));
+    co_return first + second;
+  }
+  else
+  {
+    double sum = 0.0;
+    for (size_t i = 0; i < count; ++i)
+    {
+      sum += a[i] * b[i];
+    }
+    co_return sum;
+  }
 }
 ```
 
@@ -1443,6 +1554,421 @@ namespace cppcoro
 
 All `open()` functions throw `std::system_error` on failure.
 
+# Networking
+
+NOTE: Networking abstractions are currently only supported on the Windows platform.
+Linux support will be coming soon.
+
+## `socket`
+
+The socket class can be used to send/receive data over the network asynchronously.
+
+Currently only supports TCP/IP, UDP/IP over IPv4 and IPv6.
+
+API Summary:
+```c++
+// <cppcoro/net/socket.hpp>
+namespace cppcoro::net
+{
+  class socket
+  {
+  public:
+
+    static socket create_tcpv4(ip_service& ioSvc);
+    static socket create_tcpv6(ip_service& ioSvc);
+    static socket create_updv4(ip_service& ioSvc);
+    static socket create_udpv6(ip_service& ioSvc);
+
+    socket(socket&& other) noexcept;
+
+    ~socket();
+
+    socket& operator=(socket&& other) noexcept;
+
+    // Return the native socket handle for the socket
+    <platform-specific> native_handle() noexcept;
+
+    const ip_endpoint& local_endpoint() const noexcept;
+    const ip_endpoint& remote_endpoint() const noexcept;
+
+    void bind(const ip_endpoint& localEndPoint);
+
+    void listen();
+
+    [[nodiscard]]
+    Awaitable<void> connect(const ip_endpoint& remoteEndPoint) noexcept;
+    [[nodiscard]]
+    Awaitable<void> connect(const ip_endpoint& remoteEndPoint,
+                            cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<void> accept(socket& acceptingSocket) noexcept;
+    [[nodiscard]]
+    Awaitable<void> accept(socket& acceptingSocket,
+                           cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<void> disconnect() noexcep0t;
+    [[nodiscard]]
+    Awaitable<void> disconnect(cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<std::size_t> send(const void* buffer, std::size_t size) noexcept;
+    [[nodiscard]]
+    Awaitable<std::size_t> send(const void* buffer,
+                                std::size_t size,
+                                cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    Awaitable<std::size_t> recv(void* buffer, std::size_t size) noexcept;
+    [[nodiscard]]
+    Awaitable<std::size_t> recv(void* buffer,
+                                std::size_t size,
+                                cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    socket_recv_from_operation recv_from(
+        void* buffer,
+        std::size_t size) noexcept;
+    [[nodiscard]]
+    socket_recv_from_operation_cancellable recv_from(
+        void* buffer,
+        std::size_t size,
+        cancellation_token ct) noexcept;
+
+    [[nodiscard]]
+    socket_send_to_operation send_to(
+        const ip_endpoint& destination,
+        const void* buffer,
+        std::size_t size) noexcept;
+    [[nodiscard]]
+    socket_send_to_operation_cancellable send_to(
+        const ip_endpoint& destination,
+        const void* buffer,
+        std::size_t size,
+        cancellation_token ct) noexcept;
+
+    void close_send();
+    void close_recv();
+
+  };
+}
+```
+
+Example: Echo Server
+```c++
+#include <cppcoro/net/socket.hpp>
+#include <cppcoro/io_service.hpp>
+#include <cppcoro/cancellation_source.hpp>
+#include <cppcoro/async_scope.hpp>
+#include <cppcoro/on_scope_exit.hpp>
+
+#include <memory>
+#include <iostream>
+
+cppcoro::task<void> handle_connection(socket s)
+{
+  try
+  {
+    const size_t bufferSize = 16384;
+    auto buffer = std::make_unique<unsigned char[]>(bufferSize);
+    size_t bytesRead;
+    do {
+      // Read some bytes
+      bytesRead = co_await s.recv(buffer.get(), bufferSize);
+
+      // Write some bytes
+      size_t bytesWritten = 0;
+      while (bytesWritten < bytesRead) {
+        bytesWritten += co_await s.send(
+          buffer.get() + bytesWritten,
+          bytesRead - bytesWritten);
+      }
+    } while (bytesRead != 0);
+
+    s.close_send();
+
+    co_await s.disconnect();
+  }
+  catch (...)
+  {
+    std::cout << "connection failed" << std::
+  }
+}
+
+cppcoro::task<void> echo_server(
+  cppcoro::net::ipv4_endpoint endpoint,
+  cppcoro::io_service& ioSvc,
+  cancellation_token ct)
+{
+  cppcoro::async_scope scope;
+
+  std::exception_ptr ex;
+  try
+  {
+    auto listeningSocket = cppcoro::net::socket::create_tcpv4(ioSvc);
+    listeningSocket.bind(endpoint);
+    listeningSocket.listen();
+
+    while (true) {
+      auto connection = cppcoro::net::socket::create_tcpv4(ioSvc);
+      co_await listeningSocket.accept(connection, ct);
+      scope.spawn(handle_connection(std::move(connection)));
+    }
+  }
+  catch (cppcoro::operation_cancelled)
+  {
+  }
+  catch (...)
+  {
+    ex = std::current_exception();
+  }
+
+  // Wait until all handle_connection tasks have finished.
+  co_await scope.join();
+
+  if (ex) std::rethrow_exception(ex);
+}
+
+int main(int argc, const char* argv[])
+{
+    cppcoro::io_service ioSvc;
+
+    if (argc != 2) return -1;
+
+    auto endpoint = cppcoro::ipv4_endpoint::from_string(argv[1]);
+    if (!endpoint) return -1;
+
+    (void)cppcoro::sync_wait(cppcoro::when_all(
+        [&]() -> task<>
+        {
+            // Shutdown the event loop once finished.
+            auto stopOnExit = cppcoro::on_scope_exit([&] { ioSvc.stop(); });
+
+            cppcoro::cancellation_source canceller;
+            co_await cppcoro::when_all(
+                [&]() -> task<>
+                {
+                    // Run for 30s then stop accepting new connections.
+                    co_await ioSvc.schedule_after(std::chrono::seconds(30));
+                    canceller.request_cancellation();
+                }(),
+                echo_server(*endpoint, ioSvc, canceller.token()));
+        }(),
+        [&]() -> task<>
+        {
+            ioSvc.process_events();
+        }()));
+
+    return 0;
+}
+```
+
+## `ip_address`, `ipv4_address`, `ipv6_address`
+
+Helper classes for representing an IP address.
+
+API Synopsis:
+```c++
+namespace cppcoro::net
+{
+  class ipv4_address
+  {
+    using bytes_t = std::uint8_t[4];
+  public:
+    constexpr ipv4_address();
+    explicit constexpr ipv4_address(std::uint32_t integer);
+    explicit constexpr ipv4_address(const std::uint8_t(&bytes)[4]);
+    explicit constexpr ipv4_address(std::uint8_t b0,
+                                    std::uint8_t b1,
+                                    std::uint8_t b2,
+                                    std::uint8_t b3);
+
+    constexpr const bytes_t& bytes() const;
+
+    cosntexpr std::uint32_t to_integer() const;
+
+    static constexpr ipv4_address loopback();
+
+    constexpr bool is_loopback() const;
+    constexpr bool is_private_network() const;
+
+    constexpr bool operator==(ipv4_address other) const;
+    constexpr bool operator!=(ipv4_address other) const;
+    constexpr bool operator<(ipv4_address other) const;
+    constexpr bool operator>(ipv4_address other) const;
+    constexpr bool operator<=(ipv4_address other) const;
+    constexpr bool operator>=(ipv4_address other) const;
+
+    std::string to_string();
+
+    static std::optional<ipv4_address> from_string(std::string_view string) noexcept;
+  };
+
+  class ipv6_address
+  {
+    using bytes_t = std::uint8_t[16];
+  public:
+    constexpr ipv6_address();
+
+    explicit constexpr ipv6_address(
+      std::uint64_t subnetPrefix,
+      std::uint64_t interfaceIdentifier);
+
+    constexpr ipv6_address(
+      std::uint16_t part0,
+      std::uint16_t part1,
+      std::uint16_t part2,
+      std::uint16_t part3,
+      std::uint16_t part4,
+      std::uint16_t part5,
+      std::uint16_t part6,
+      std::uint16_t part7);
+
+    explicit constexpr ipv6_address(
+        const std::uint16_t(&parts)[8]);
+
+    explicit constexpr ipv6_address(
+        const std::uint8_t(bytes)[16]);
+
+    constexpr const bytes_t& bytes() const;
+
+    constexpr std::uint64_t subnet_prefix() const;
+    constexpr std::uint64_t interface_identifier() const;
+
+    static constexpr ipv6_address unspecified();
+    static constexpr ipv6_address loopback();
+
+    static std::optional<ipv6_address> from_string(std::string_view string) noexcept;
+
+    std::string to_string() const;
+
+    constexpr bool operator==(const ipv6_address& other) const;
+    constexpr bool operator!=(const ipv6_address& other) const;
+    constexpr bool operator<(const ipv6_address& other) const;
+    constexpr bool operator>(const ipv6_address& other) const;
+    constexpr bool operator<=(const ipv6_address& other) const;
+    constexpr bool operator>=(const ipv6_address& other) const;
+
+  };
+
+  class ip_address
+  {
+  public:
+
+    // Constructs to IPv4 address 0.0.0.0
+    ip_address() noexcept;
+
+    ip_address(ipv4_address address) noexcept;
+    ip_address(ipv6_address address) noexcept;
+
+    bool is_ipv4() const noexcept;
+    bool is_ipv6() const noexcept;
+
+    const ipv4_address& to_ipv4() const;
+    const ipv6_address& to_ipv6() const;
+
+    const std::uint8_t* bytes() const noexcept;
+
+    std::string to_string() const;
+
+    static std::optional<ip_address> from_string(std::string_view string) noexcept;
+
+    bool operator==(const ip_address& rhs) const noexcept;
+    bool operator!=(const ip_address& rhs) const noexcept;
+
+    //  ipv4_address sorts less than ipv6_address
+    bool operator<(const ip_address& rhs) const noexcept;
+    bool operator>(const ip_address& rhs) const noexcept;
+    bool operator<=(const ip_address& rhs) const noexcept;
+    bool operator>=(const ip_address& rhs) const noexcept;
+
+  };
+}
+```
+
+## `ip_endpoint`, `ipv4_endpoint` `ipv6_endpoint`
+
+Helper classes for representing an IP address and port-number.
+
+API Synopsis:
+```c++
+namespace cppcoro::net
+{
+  class ipv4_endpoint
+  {
+  public:
+    ipv4_endpoint() noexcept;
+    explicit ipv4_endpoint(ipv4_address address, std::uint16_t port = 0) noexcept;
+
+    const ipv4_address& address() const noexcept;
+    std::uint16_t port() const noexcept;
+
+    std::string to_string() const;
+    static std::optional<ipv4_endpoint> from_string(std::string_view string) noexcept;
+  };
+
+  bool operator==(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator!=(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator<(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator>(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator<=(const ipv4_endpoint& a, const ipv4_endpoint& b);
+  bool operator>=(const ipv4_endpoint& a, const ipv4_endpoint& b);
+
+  class ipv6_endpoint
+  {
+  public:
+    ipv6_endpoint() noexcept;
+    explicit ipv6_endpoint(ipv6_address address, std::uint16_t port = 0) noexcept;
+
+    const ipv6_address& address() const noexcept;
+    std::uint16_t port() const noexcept;
+
+    std::string to_string() const;
+    static std::optional<ipv6_endpoint> from_string(std::string_view string) noexcept;
+  };
+
+  bool operator==(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator!=(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator<(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator>(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator<=(const ipv6_endpoint& a, const ipv6_endpoint& b);
+  bool operator>=(const ipv6_endpoint& a, const ipv6_endpoint& b);
+
+  class ip_endpoint
+  {
+  public:
+     // Constructs to IPv4 end-point 0.0.0.0:0
+     ip_endpoint() noexcept;
+
+     ip_endpoint(ipv4_endpoint endpoint) noexcept;
+     ip_endpoint(ipv6_endpoint endpoint) noexcept;
+
+     bool is_ipv4() const noexcept;
+     bool is_ipv6() const noexcept;
+
+     const ipv4_endpoint& to_ipv4() const;
+     const ipv6_endpoint& to_ipv6() const;
+
+     ip_address address() const noexcept;
+     std::uint16_t port() const noexcept;
+
+     std::string to_string() const;
+
+     static std::optional<ip_endpoint> from_string(std::string_view string) noexcept;
+
+     bool operator==(const ip_endpoint& rhs) const noexcept;
+     bool operator!=(const ip_endpoint& rhs) const noexcept;
+
+     //  ipv4_endpoint sorts less than ipv6_endpoint
+     bool operator<(const ip_endpoint& rhs) const noexcept;
+     bool operator>(const ip_endpoint& rhs) const noexcept;
+     bool operator<=(const ip_endpoint& rhs) const noexcept;
+     bool operator>=(const ip_endpoint& rhs) const noexcept;
+  };
+}
+```
+
 # Functions
 
 ## `sync_wait()`
@@ -1483,8 +2009,8 @@ void example_task()
   auto task = makeTask();
 
   // start the lazy task and wait until it completes
-  sync_wait(task) == "foo";
-  sync_wait(makeTask()) == "foo";
+  sync_wait(task); // -> "foo"
+  sync_wait(makeTask()); // -> "foo"
 }
 
 void example_shared_task()
@@ -1552,7 +2078,7 @@ namespace cppcoro
   // one for each input awaitable and where T is the result-type of the co_await expression
   // on the corresponding awaitable.
   //
-  // AWAITABLES must be awaitable types and must be movable (if passes as rvalue) or copyable
+  // AWAITABLES must be awaitable types and must be movable (if passed as rvalue) or copyable
   // (if passed as lvalue). The co_await expression will be executed on an rvalue of the
   // copied awaitable.
   template<typename... AWAITABLES>
@@ -1906,7 +2432,7 @@ task<> example()
 ```
 
 API Summary:
-```
+```c++
 // <cppcoro/schedule_on.hpp>
 namespace cppcoro
 {
@@ -1949,7 +2475,7 @@ will be if applied to an expression of type `T`.
 
 Note that this assumes the value of type `T` is being awaited in a context where it is unaffected by
 any `await_transform` applied by the coroutine's promise object. The results may differ if a value
-of type T is awaited in such a context.
+of type `T` is awaited in such a context.
 
 The `awaitable_traits<T>` template metafunction does not define the `awaiter_t` or `await_result_t`
 nested typedefs if type, `T`, is not awaitable. This allows its use in SFINAE contexts that disables
@@ -1964,7 +2490,7 @@ namespace cppcoro
   struct awaitable_traits
   {
     // The type that results from applying `operator co_await()` to a value
-    // of type T, if T supports an `operator co_await()`, otherwise is type T.
+    // of type T, if T supports an `operator co_await()`, otherwise is type `T&&`.
     typename awaiter_t = <unspecified>;
 
     // The type of the result of co_await'ing a value of type T.
@@ -2002,6 +2528,19 @@ that has no `await_transform` overloads and that the result of the `co_await` ex
 For example, the type `task<T>` implements the concept `Awaitable<T&&>` whereas the type `task<T>&`
 implements the concept `Awaitable<T&>`.
 
+## `Awaiter<T>` concept
+
+An `Awaiter<T>` is a concept that indicates a type contains the `await_ready`, `await_suspend` and
+`await_resume` methods required to implement the protocol for suspending/resuming an awaiting
+coroutine.
+
+A type that satisfies `Awaiter<T>` must have, for an instance of the type, `awaiter`:
+- `awaiter.await_ready()` -> `bool`
+- `awaiter.await_suspend(std::experimental::coroutine_handle<void>{})` -> `void` or `bool` or `std::experimental::coroutine_handle<P>` for some `P`.
+- `awaiter.await_resume()` -> `T`
+
+Any type that implements the `Awaiter<T>` concept also implements the `Awaitable<T>` concept.
+
 ## `Scheduler` concept
 
 A `Scheduler` is a concept that allows scheduling execution of coroutines within some execution context.
@@ -2009,7 +2548,7 @@ A `Scheduler` is a concept that allows scheduling execution of coroutines within
 ```c++
 concept Scheduler
 {
-  <awaitable-type> schedule();
+  Awaitable<void> schedule();
 }
 ```
 
@@ -2369,4 +2908,4 @@ Contributions are welcome and pull-requests will be happily reviewed.
 I only ask that you agree to license any contributions that you make under the MIT license.
 
 If you have general questions about C++ coroutines, you can generally find someone to help
-in the `#coroutines` channel on [https://cpplang.slack.com/][Cpplang Slack] group.
+in the `#coroutines` channel on [Cpplang Slack](https://cpplang.slack.com/) group.

@@ -76,6 +76,40 @@ namespace cppcoro
 				assert(false);
 			}
 
+#if CPPCORO_COMPILER_MSVC
+			// HACK: This is needed to work around a bug in MSVC 2017.7/2017.8.
+			// See comment in make_when_all_task below.
+			template<typename Awaitable>
+			Awaitable&& await_transform(Awaitable&& awaitable)
+			{
+				return static_cast<Awaitable&&>(awaitable);
+			}
+
+			struct get_promise_t {};
+			static constexpr get_promise_t get_promise = {};
+
+			auto await_transform(get_promise_t)
+			{
+				class awaiter
+				{
+				public:
+					awaiter(when_all_task_promise* promise) noexcept : m_promise(promise) {}
+					bool await_ready() noexcept {
+						return true;
+					}
+					void await_suspend(std::experimental::coroutine_handle<>) noexcept {}
+					when_all_task_promise& await_resume() noexcept
+					{
+						return *m_promise;
+					}
+				private:
+					when_all_task_promise* m_promise;
+				};
+				return awaiter{ this };
+			}
+#endif
+
+
 			auto yield_value(RESULT&& result) noexcept
 			{
 				m_result = std::addressof(result);
@@ -267,7 +301,17 @@ namespace cppcoro
 			std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
 		when_all_task<RESULT> make_when_all_task(AWAITABLE awaitable)
 		{
+#if CPPCORO_COMPILER_MSVC
+			// HACK: Workaround another bug in MSVC where the expression 'co_yield co_await x' seems
+			// to completely ignore the co_yield an never calls promise.yield_value().
+			// The coroutine seems to be resuming the 'co_await' after the 'co_yield'
+			// rather than before the 'co_yield'.
+			// This bug is present in VS 2017.7 and VS 2017.8.
+			auto& promise = co_await when_all_task_promise<RESULT>::get_promise;
+			co_await promise.yield_value(co_await std::forward<AWAITABLE>(awaitable));
+#else
 			co_yield co_await static_cast<AWAITABLE&&>(awaitable);
+#endif
 		}
 
 		template<
@@ -285,7 +329,17 @@ namespace cppcoro
 			std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
 		when_all_task<RESULT> make_when_all_task(std::reference_wrapper<AWAITABLE> awaitable)
 		{
+#if CPPCORO_COMPILER_MSVC
+			// HACK: Workaround another bug in MSVC where the expression 'co_yield co_await x' seems
+			// to completely ignore the co_yield and never calls promise.yield_value().
+			// The coroutine seems to be resuming the 'co_await' after the 'co_yield'
+			// rather than before the 'co_yield'.
+			// This bug is present in VS 2017.7 and VS 2017.8.
+			auto& promise = co_await when_all_task_promise<RESULT>::get_promise;
+			co_await promise.yield_value(co_await awaitable.get());
+#else
 			co_yield co_await awaitable.get();
+#endif
 		}
 
 		template<

@@ -5,7 +5,9 @@
 
 #include <cppcoro/detail/win32.hpp>
 
-#define WIN32_LEAN_AND_MEAN
+#ifndef WIN32_LEAN_AND_MEAN
+# define WIN32_LEAN_AND_MEAN
+#endif
 #include <Windows.h>
 
 void cppcoro::detail::win32::safe_handle::close() noexcept

@@ -4,6 +4,7 @@
 ###############################################################################
 
 import subprocess
+import os
 
 import cake.filesys
 import cake.path
@@ -22,6 +23,7 @@ class UnitTestTool(Tool):
     Tool.__init__(self, configuration)
     self.dependencies = []
     self.extraArgs = []
+    self.env = dict(os.environ)
 
   def run(self, program, results=None, cwd=None, extraArgs=[], dependencies=[]):
 
@@ -89,6 +91,8 @@ class UnitTestTool(Tool):
 
     self.engine.logger.outputInfo("Testing %s\n" % programPath)
 
+    self.engine.logger.outputDebug("run", " ".join(programArgs))
+
     if results:
       resultsAbsPath = self.configuration.abspath(results)
       cake.filesys.makeDirs(cake.path.dirName(resultsAbsPath))
@@ -104,6 +108,7 @@ class UnitTestTool(Tool):
         stdout=stdout,
         stderr=subprocess.STDOUT,
         cwd=cwd,
+        env=self.env
         )
     except EnvironmentError, e:
       msg = "cake: failed to launch %s: %s\n" % (programPath, str(e))

@@ -1,0 +1,72 @@
+# Copyright Lewis Baker 2017
+#
+# Distributed under MIT license.
+# See LICENSE.txt file for details.
+
+language: cpp
+
+os: linux
+
+dist: trusty
+
+git:
+  submodules: true
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-trusty
+    packages:
+    - python2.7
+    - clang-8
+    - lld-8
+    - ninja-build
+
+cache:
+  directories:
+  - ${TOOLS_DIR}/cmake-${CMAKE_VERSION}
+    
+compiler:
+- clang
+    
+env:
+  global:
+  - TOOLS_DIR=${TRAVIS_BUILD_DIR}/tools
+  - LLVM_INSTALL_PREFIX=${TOOLS_DIR}/llvm
+  - CMAKE_VERSION="3.9.1"
+matrix:
+  include:
+  - env: RELEASE=debug ARCH=x64 CLANG_VERSION=8
+  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=8
+  allow_failures:
+  # Clang 6.0~svn320382 has a bug that causes optimised builds to fail.
+  # See https://bugs.llvm.org/show_bug.cgi?id=34897
+  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=8
+ 
+before_install:
+- export CC="$CC-$CLANG_VERSION"
+- export CXX="$CXX-$CLANG_VERSION"
+- |
+  if [ ! -f "${TOOLS_DIR}/cmake-${CMAKE_VERSION}/cached" ]; then
+    CMAKE_URL="https://cmake.org/files/v3.9/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz"
+    mkdir -p "${TOOLS_DIR}/cmake-${CMAKE_VERSION}"
+    travis_retry wget --no-check-certificate --quiet -O - "${CMAKE_URL}" | tar --strip-components=1 -xz -C "${TOOLS_DIR}/cmake-${CMAKE_VERSION}"
+    touch "${TOOLS_DIR}/cmake-${CMAKE_VERSION}/cached"
+  else
+    echo "Using cached CMake version ${CMAKE_VERSION}"
+  fi
+  export PATH="${TOOLS_DIR}/cmake-${CMAKE_VERSION}/bin:$PATH"
+ 
+install:
+- ./build-libcxx.sh
+- export LD_LIBRARY_PATH="${LLVM_INSTALL_PREFIX}/lib"
+ 
+before_script:
+- source ./init.sh
+
+script:
+- cake architecture=$ARCH release=$RELEASE --clang-executable="$CC" --libcxx-install-prefix="${LLVM_INSTALL_PREFIX}"
+
+notifications:
+  email: false

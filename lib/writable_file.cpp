@@ -8,7 +8,9 @@
 #include <system_error>
 
 #if CPPCORO_OS_WINNT
-# define WIN32_LEAN_AND_MEAN
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
 # include <Windows.h>
 
 void cppcoro::writable_file::set_size(
@@ -18,7 +20,7 @@ void cppcoro::writable_file::set_size(
 	position.QuadPart = fileSize;
 
 	BOOL ok = ::SetFilePointerEx(m_fileHandle.handle(), position, nullptr, FILE_BEGIN);
-	if (ok)
+	if (!ok)
 	{
 		DWORD errorCode = ::GetLastError();
 		throw std::system_error
@@ -45,10 +47,23 @@ void cppcoro::writable_file::set_size(
 cppcoro::file_write_operation cppcoro::writable_file::write(
 	std::uint64_t offset,
 	const void* buffer,
+	std::size_t byteCount) noexcept
+{
+	return file_write_operation{
+		m_fileHandle.handle(),
+		offset,
+		buffer,
+		byteCount
+	};
+}
+
+cppcoro::file_write_operation_cancellable cppcoro::writable_file::write(
+	std::uint64_t offset,
+	const void* buffer,
 	std::size_t byteCount,
 	cancellation_token ct) noexcept
 {
-	return file_write_operation{
+	return file_write_operation_cancellable{
 		m_fileHandle.handle(),
 		offset,
 		buffer,

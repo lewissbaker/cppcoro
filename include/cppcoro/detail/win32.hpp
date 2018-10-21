@@ -14,6 +14,8 @@
 #include <utility>
 #include <cstdint>
 
+struct _OVERLAPPED;
+
 namespace cppcoro
 {
 	namespace detail
@@ -56,6 +58,16 @@ namespace cppcoro
 
 			struct wsabuf
 			{
+				constexpr wsabuf() noexcept
+					: len(0)
+					, buf(nullptr)
+				{}
+
+				constexpr wsabuf(void* ptr, std::size_t size)
+					: len(size <= ulong_t(-1) ? ulong_t(size) : ulong_t(-1))
+					, buf(static_cast<char*>(ptr))
+				{}
+
 				ulong_t len;
 				char* buf;
 			};
@@ -67,6 +79,29 @@ namespace cppcoro
 					win32::dword_t errorCode,
 					win32::dword_t numberOfBytesTransferred,
 					win32::ulongptr_t completionKey);
+
+				io_state(callback_type* callback = nullptr) noexcept
+					: io_state(std::uint64_t(0), callback)
+				{}
+
+				io_state(void* pointer, callback_type* callback) noexcept
+					: m_callback(callback)
+				{
+					this->Internal = 0;
+					this->InternalHigh = 0;
+					this->Pointer = pointer;
+					this->hEvent = nullptr;
+				}
+
+				io_state(std::uint64_t offset, callback_type* callback) noexcept
+					: m_callback(callback)
+				{
+					this->Internal = 0;
+					this->InternalHigh = 0;
+					this->Offset = static_cast<dword_t>(offset);
+					this->OffsetHigh = static_cast<dword_t>(offset >> 32);
+					this->hEvent = nullptr;
+				}
 
 				callback_type* m_callback;
 			};
