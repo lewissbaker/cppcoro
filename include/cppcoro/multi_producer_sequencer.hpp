@@ -5,6 +5,7 @@
 #ifndef CPPCORO_MULTI_PRODUCER_SEQUENCER_HPP_INCLUDED
 #define CPPCORO_MULTI_PRODUCER_SEQUENCER_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/sequence_barrier.hpp>
 #include <cppcoro/sequence_range.hpp>
 #include <cppcoro/sequence_traits.hpp>
@@ -84,10 +85,10 @@ namespace cppcoro
 		const std::size_t m_sequenceMask;
 		const std::unique_ptr<std::atomic<SEQUENCE>[]> m_published;
 
-		alignas(std::hardware_destructive_interference_size)
+		alignas(CPPCORO_CPU_CACHE_LINE)
 		std::atomic<SEQUENCE> m_nextToClaim;
 
-		alignas(std::hardware_destructive_interference_size)
+		alignas(CPPCORO_CPU_CACHE_LINE)
 		mutable std::atomic<multi_producer_sequencer_wait_operation<SEQUENCE, TRAITS>*> m_awaiters;
 
 #if CPPCORO_COMPILER_MSVC

@@ -5,6 +5,7 @@
 #ifndef CPPCORO_SINGLE_PRODUCER_SEQUENCER_HPP_INCLUDED
 #define CPPCORO_SINGLE_PRODUCER_SEQUENCER_HPP_INCLUDED
 
+#include <cppcoro/config.hpp>
 #include <cppcoro/sequence_barrier.hpp>
 #include <cppcoro/sequence_range.hpp>
 
@@ -97,7 +98,7 @@ namespace cppcoro
 		const sequence_barrier<SEQUENCE, TRAITS>& m_consumerBarrier;
 		const std::size_t m_bufferSize;
 
-		alignas(std::hardware_destructive_interference_size)
+		alignas(CPPCORO_CPU_CACHE_LINE)
 		SEQUENCE m_nextToClaim;
 
 		sequence_barrier<SEQUENCE, TRAITS> m_producerBarrier;

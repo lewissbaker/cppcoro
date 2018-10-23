@@ -115,11 +115,11 @@ namespace cppcoro
 #endif
 
 		// First cache-line is written to by the producer only
-		alignas(std::hardware_destructive_interference_size)
+		alignas(CPPCORO_CPU_CACHE_LINE)
 		std::atomic<SEQUENCE> m_lastPublished;
 
 		// Second cache-line is written to by both the producer and consumers
-		alignas(std::hardware_destructive_interference_size)
+		alignas(CPPCORO_CPU_CACHE_LINE)
 		mutable std::atomic<awaiter_t*> m_awaiters;
 
 #if CPPCORO_COMPILER_MSVC
