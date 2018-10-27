@@ -9,14 +9,10 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all.hpp>
-
-#if CPPCORO_OS_WINNT
-# include <cppcoro/io_service.hpp>
-# include <cppcoro/on_scope_exit.hpp>
+#include <cppcoro/static_thread_pool.hpp>
 
 #include <stdio.h>
-# include <thread>
-#endif
+#include <thread>
 
 #include "doctest/doctest.h"
 
@@ -136,19 +132,9 @@ DOCTEST_TEST_CASE("wait_until_published multiple awaiters")
 	CHECK(reachedE);
 }
 
-#if CPPCORO_OS_WINNT
-
 DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 {
-	io_service ioSvc;
-
-	// Spin up 2 io threads
-	std::thread ioThread1{ [&] { ioSvc.process_events(); } };
-	auto joinOnExit1 = on_scope_exit([&] { ioThread1.join(); });
-	auto stopOnExit1 = on_scope_exit([&] { ioSvc.stop(); });
-	std::thread ioThread2{ [&] { ioSvc.process_events(); } };
-	auto joinOnExit2 = on_scope_exit([&] { ioThread2.join(); });
-	auto stopOnExit2 = std::move(stopOnExit1);
+	static_thread_pool tp{ 2 };
 
 	sequence_barrier<std::size_t> writeBarrier;
 	sequence_barrier<std::size_t> readBarrier;
@@ -162,7 +148,7 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 		[&]() -> task<std::uint64_t>
 	{
 		// Consumer
-		co_await ioSvc.schedule();
+		co_await tp.schedule();
 
 		std::uint64_t sum = 0;
 
@@ -174,7 +160,7 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 			if (sequence_traits<std::size_t>::precedes(available, nextToRead))
 			{
 				available = co_await writeBarrier.wait_until_published(nextToRead);
-				co_await ioSvc.schedule();
+				co_await tp.schedule();
 			}
 
 			do
@@ -194,7 +180,7 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 		[&]() -> task<>
 	{
 		// Producer
-		co_await ioSvc.schedule();
+		co_await tp.schedule();
 
 		std::size_t available = readBarrier.last_published() + bufferSize;
 		for (std::size_t nextToWrite = 0; nextToWrite <= iterationCount; ++nextToWrite)
@@ -202,7 +188,7 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 			if (sequence_traits<std::size_t>::precedes(available, nextToWrite))
 			{
 				available = co_await readBarrier.wait_until_published(nextToWrite - bufferSize) + bufferSize;
-				co_await ioSvc.schedule();
+				co_await tp.schedule();
 			}
 
 			if (nextToWrite == iterationCount)
@@ -229,7 +215,5 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 
 	CHECK(result == expectedResult);
 }
-
-#endif
 
 DOCTEST_TEST_SUITE_END();
