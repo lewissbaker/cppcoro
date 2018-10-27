@@ -465,6 +465,9 @@ namespace cppcoro
 					*awaitersToRequeueTail = oldHead;
 				}
 
+				// Reset the awaitersToRequeue list
+				awaitersToRequeueTail = &awaitersToRequeue;
+
 				const SEQUENCE earliestTargetSequence = lastKnownPublished + minDiff;
 
 				// Now we need to check again to see if any of the waiters we just enqueued
