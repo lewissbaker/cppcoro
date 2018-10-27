@@ -411,6 +411,14 @@ namespace cppcoro
 	}
 
 	template<typename SEQUENCE, typename TRAITS>
+	bool multi_producer_sequencer<SEQUENCE, TRAITS>::any_available() const noexcept
+	{
+		return TRAITS::precedes(
+			m_nextToClaim.load(std::memory_order_relaxed),
+			m_consumerBarrier.last_published() + buffer_size());
+	}
+
+	template<typename SEQUENCE, typename TRAITS>
 	multi_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS>
 	multi_producer_sequencer<SEQUENCE, TRAITS>::claim_one() noexcept
 	{
