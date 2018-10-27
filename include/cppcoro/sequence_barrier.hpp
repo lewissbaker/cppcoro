@@ -347,7 +347,7 @@ namespace cppcoro
 			*awaitersToRequeueTail = nullptr;
 
 			// Calculate the earliest target sequence required by any of the awaiters to requeue.
-			targetSequence = static_cast<SEQUENCE>(lastKnownPublished - minDiff);
+			targetSequence = static_cast<SEQUENCE>(lastKnownPublished + minDiff);
 
 		} while (awaitersToRequeue != nullptr);
 
