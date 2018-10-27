@@ -9,11 +9,7 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/on_scope_exit.hpp>
-
-#if CPPCORO_OS_WINNT
-# include <cppcoro/io_service.hpp>
-# include "io_service_fixture.hpp"
-#endif
+#include <cppcoro/static_thread_pool.hpp>
 
 #include <string>
 #include <type_traits>
@@ -55,20 +51,19 @@ TEST_CASE("sync_wait(shared_task<T>)")
 	CHECK(cppcoro::sync_wait(makeTask()) == "foo");
 }
 
-#if CPPCORO_OS_WINNT
-
-TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "multiple threads")
+TEST_CASE("multiple threads")
 {
 	// We are creating a new task and starting it inside the sync_wait().
-	// The task will reschedule itself for resumption on an I/O thread
+	// The task will reschedule itself for resumption on a thread-pool thread
 	// which will sometimes complete before this thread calls event.wait()
 	// inside sync_wait(). Thus we're roughly testing the thread-safety of
 	// sync_wait().
+	cppcoro::static_thread_pool tp{ 1 };
 
 	int value = 0;
 	auto createLazyTask = [&]() -> cppcoro::task<int>
 	{
-		co_await io_service().schedule();
+		co_await tp.schedule();
 		co_return value++;
 	};
 
@@ -77,7 +72,5 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "multiple threads")
 		CHECK(cppcoro::sync_wait(createLazyTask()) == i);
 	}
 }
-
-#endif
 
 TEST_SUITE_END();
