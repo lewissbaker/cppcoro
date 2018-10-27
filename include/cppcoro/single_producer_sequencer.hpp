@@ -64,21 +64,45 @@ namespace cppcoro
 		[[nodiscard]]
 		single_producer_sequencer_claim_operation<SEQUENCE, TRAITS> claim_up_to(std::size_t count) noexcept;
 
+		/// Publish the specified sequence number.
+		///
+		/// This also implies that all prior sequence numbers have already been published.
 		void publish(SEQUENCE sequence) noexcept
 		{
 			m_producerBarrier.publish(sequence);
 		}
 
+		/// Publish a contiguous range of sequence numbers.
+		///
+		/// You must have already published all prior sequence numbers.
+		///
+		/// This is equivalent to just publishing the last sequence number in the range.
 		void publish(const sequence_range<SEQUENCE, TRAITS>& sequences) noexcept
 		{
 			m_producerBarrier.publish(sequences.back());
 		}
 
+		/// Query what the last-published sequence number is.
+		///
+		/// You can assume that all prior sequence numbers are also published.
 		SEQUENCE last_published() const noexcept
 		{
 			return m_producerBarrier.last_published();
 		}
 
+		/// Asynchronously wait until the specified sequence number is published.
+		///
+		/// \param targetSequence
+		/// The sequence number to wait for.
+		///
+		/// \return
+		/// Returns an Awaitable type that, when awaited, will suspend the awaiting coroutine until the
+		/// specified sequence number has been published.
+		///
+		/// The result of the 'co_await barrier.wait_until_published(seq)' expression will be the
+		/// last-published sequence number, which is guaranteed to be at least 'seq' but may be some
+		/// subsequent sequence number if additional items were published while waiting for the
+		/// the requested sequence number to be published.
 		[[nodiscard]]
 		auto wait_until_published(SEQUENCE targetSequence) const noexcept
 		{

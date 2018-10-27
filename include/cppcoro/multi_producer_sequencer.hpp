@@ -25,6 +25,29 @@ namespace cppcoro
 	template<typename SEQUENCE, typename TRAITS>
 	class multi_producer_sequencer_wait_operation;
 
+	/// A multi-producer sequencer is a thread-synchronisation primitive that can be
+	/// used to synchronise access to a ring-buffer of power-of-two size where you
+	/// have multiple producers concurrently claiming slots in the ring-buffer and
+	/// publishing items.
+	///
+	/// When a writer wants to write to a slot in the buffer it first atomically
+	/// increments a counter by the number of slots it wishes to allocate.
+	/// It then waits until all of those slots have become available and then
+	/// returns the range of sequence numbers allocated back to the caller.
+	/// The caller then writes to those slots and when done publishes them by
+	/// writing the sequence numbers published to each of the slots to the
+	/// corresponding element of an array of equal size to the ring buffer.
+	/// When a reader wants to check if the next sequence number is available
+	/// it then simply needs to read from the corresponding slot in this array
+	/// to check if the value stored there is equal to the sequence number it
+	/// is wanting to read.
+	///
+	/// This means concurrent writers are wait-free when there is space available
+	/// in the ring buffer, requiring a single atomic fetch-add operation as the
+	/// only contended write operation. All other writes are to memory locations
+	/// owned by a particular writer. Concurrent writers can publish items out of
+	/// order so that one writer does not hold up other writers until the ring
+	/// buffer fills up.
 	template<
 		typename SEQUENCE = std::size_t,
 		typename TRAITS = sequence_traits<SEQUENCE>>
@@ -37,16 +60,52 @@ namespace cppcoro
 			std::size_t bufferSize,
 			SEQUENCE initialSequence = TRAITS::initial_sequence);
 
+		/// The size of the circular buffer. This will be a power-of-two.
 		std::size_t buffer_size() const noexcept { return m_sequenceMask + 1; }
 
+		/// Lookup the last-known-published sequence number after the specified
+		/// sequence number.
 		SEQUENCE last_published_after(SEQUENCE lastKnownPublished) const noexcept;
 
+		/// Wait until the specified target sequence number has been published.
+		///
+		/// Returns an awaitable type that when co_awaited will suspend the awaiting
+		/// coroutine until the specified 'targetSequence' number and all prior sequence
+		/// numbers have been published.
 		multi_producer_sequencer_wait_operation<SEQUENCE, TRAITS> wait_until_published(
 			SEQUENCE targetSequence,
 			SEQUENCE lastKnownPublished) const noexcept;
 
+		/// Query if there are currently any slots available for claiming.
+		///
+		/// Note that this return-value is only approximate if you have multiple producers
+		/// since immediately after returning true another thread may have claimed the
+		/// last available slot.
+		bool any_available() const noexcept;
+
+		/// Claim a single slot in the buffer and wait until that slot becomes available.
+		///
+		/// Returns an Awaitable type that yields the sequence number of the slot that
+		/// was claimed.
+		///
+		/// Once the producer has claimed a slot then they are free to write to that
+		/// slot within the ring buffer. Once the value has been initialised the item
+		/// must be published by calling the .publish() method, passing the sequence
+		/// number.
 		multi_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS> claim_one() noexcept;
 
+		/// Claim a contiguous range of sequence numbers corresponding to slots within
+		/// a ring-buffer.
+		///
+		/// This will claim at most the specified count of sequence numbers but may claim
+		/// fewer if there are only fewer entries available in the buffer. But will claim
+		/// at least one sequence number.
+		///
+		/// Returns an awaitable that will yield a sequence_range object containing the
+		/// sequence numbers that were claimed.
+		///
+		/// The caller is responsible for ensuring that they publish every element of the
+		/// returned sequence range by calling .publish().
 		multi_producer_sequencer_claim_operation<SEQUENCE, TRAITS> claim_up_to(std::size_t count) noexcept;
 
 		/// Publish the element with the specified sequence number, making it available
@@ -62,9 +121,12 @@ namespace cppcoro
 		/// or 'claim_up_to()'.
 		void publish(SEQUENCE sequence) noexcept;
 
-		/// Publish a contiguous range of sequence numbers.
+		/// Publish a contiguous range of sequence numbers, making each of them available
+		/// to consumers.
 		///
-		///
+		/// This is equivalent to calling publish(seq) for each sequence number, seq, in
+		/// the specified range, but is more efficient since it only checks to see if
+		/// there are coroutines that need to be woken up once.
 		void publish(const sequence_range<SEQUENCE, TRAITS>& range) noexcept;
 
 	private:
