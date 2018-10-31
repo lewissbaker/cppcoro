@@ -25,7 +25,7 @@ namespace cppcoro
 	template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
 	class sequence_barrier_wait_operation;
 
-	/// A sequence barrier is a synchornisation primitive that allows a single-producer
+	/// A sequence barrier is a synchronisation primitive that allows a single-producer
 	/// and multiple-consumers to coordinate with respect to a monotonically increasing
 	/// sequence number.
 	///
