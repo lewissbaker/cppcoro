@@ -11,10 +11,10 @@
 
 namespace cppcoro
 {
-	template<typename SEQUENCE, typename TRAITS>
+	template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
 	class single_producer_sequencer_claim_one_operation;
 
-	template<typename SEQUENCE, typename TRAITS>
+	template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
 	class single_producer_sequencer_claim_operation;
 
 	template<
@@ -44,8 +44,10 @@ namespace cppcoro
 		/// co_await expression will be the sequence number of the slot.
 		/// The caller must publish() the claimed sequence number once they have written to
 		/// the ring-buffer.
+		template<typename SCHEDULER>
 		[[nodiscard]]
-		single_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS> claim_one() noexcept;
+		single_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS, SCHEDULER>
+		claim_one(SCHEDULER& scheduler) noexcept;
 
 		/// Claim one or more contiguous slots in the ring-buffer.
 		///
@@ -61,8 +63,10 @@ namespace cppcoro
 		/// the range of sequence numbers that were claimed. Once you have written element values
 		/// to all of the claimed slots you must publish() the sequence range in order to make
 		/// the elements available to consumers.
+		template<typename SCHEDULER>
 		[[nodiscard]]
-		single_producer_sequencer_claim_operation<SEQUENCE, TRAITS> claim_up_to(std::size_t count) noexcept;
+		single_producer_sequencer_claim_operation<SEQUENCE, TRAITS, SCHEDULER> claim_up_to(
+			std::size_t count, SCHEDULER& scheduler) noexcept;
 
 		/// Publish the specified sequence number.
 		///
@@ -103,16 +107,20 @@ namespace cppcoro
 		/// last-published sequence number, which is guaranteed to be at least 'seq' but may be some
 		/// subsequent sequence number if additional items were published while waiting for the
 		/// the requested sequence number to be published.
+		template<typename SCHEDULER>
 		[[nodiscard]]
-		auto wait_until_published(SEQUENCE targetSequence) const noexcept
+		auto wait_until_published(SEQUENCE targetSequence, SCHEDULER& scheduler) const noexcept
 		{
-			return m_producerBarrier.wait_until_published(targetSequence);
+			return m_producerBarrier.wait_until_published(targetSequence, scheduler);
 		}
 
 	private:
 
-		friend class single_producer_sequencer_claim_operation<SEQUENCE, TRAITS>;
-		friend class single_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS>;
+		template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
+		friend class single_producer_sequencer_claim_operation;
+
+		template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
+		friend class single_producer_sequencer_claim_one_operation;
 
 #if CPPCORO_COMPILER_MSVC
 # pragma warning(push)
@@ -132,14 +140,18 @@ namespace cppcoro
 #endif
 	};
 
-	template<typename SEQUENCE, typename TRAITS>
+	template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
 	class single_producer_sequencer_claim_one_operation
 	{
 	public:
 
 		single_producer_sequencer_claim_one_operation(
-			single_producer_sequencer<SEQUENCE, TRAITS>& sequencer) noexcept
-			: m_consumerWaitOperation(sequencer.m_consumerBarrier, static_cast<SEQUENCE>(sequencer.m_nextToClaim - sequencer.m_bufferSize))
+			single_producer_sequencer<SEQUENCE, TRAITS>& sequencer,
+			SCHEDULER& scheduler) noexcept
+			: m_consumerWaitOperation(
+				sequencer.m_consumerBarrier,
+				static_cast<SEQUENCE>(sequencer.m_nextToClaim - sequencer.m_bufferSize),
+				scheduler)
 			, m_sequencer(sequencer)
 		{}
 
@@ -160,20 +172,24 @@ namespace cppcoro
 
 	private:
 
-		sequence_barrier_wait_operation<SEQUENCE, TRAITS> m_consumerWaitOperation;
+		sequence_barrier_wait_operation<SEQUENCE, TRAITS, SCHEDULER> m_consumerWaitOperation;
 		single_producer_sequencer<SEQUENCE, TRAITS>& m_sequencer;
 
 	};
 
-	template<typename SEQUENCE, typename TRAITS>
+	template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
 	class single_producer_sequencer_claim_operation
 	{
 	public:
 
-		single_producer_sequencer_claim_operation(
+		explicit single_producer_sequencer_claim_operation(
 			single_producer_sequencer<SEQUENCE, TRAITS>& sequencer,
-			std::size_t count) noexcept
-			: m_consumerWaitOperation(sequencer.m_consumerBarrier, static_cast<SEQUENCE>(sequencer.m_nextToClaim - sequencer.m_bufferSize))
+			std::size_t count,
+			SCHEDULER& scheduler) noexcept
+			: m_consumerWaitOperation(
+				sequencer.m_consumerBarrier,
+				static_cast<SEQUENCE>(sequencer.m_nextToClaim - sequencer.m_bufferSize),
+				scheduler)
 			, m_sequencer(sequencer)
 			, m_count(count)
 		{}
@@ -202,26 +218,28 @@ namespace cppcoro
 
 	private:
 
-		sequence_barrier_wait_operation<SEQUENCE, TRAITS> m_consumerWaitOperation;
+		sequence_barrier_wait_operation<SEQUENCE, TRAITS, SCHEDULER> m_consumerWaitOperation;
 		single_producer_sequencer<SEQUENCE, TRAITS>& m_sequencer;
 		std::size_t m_count;
 
 	};
 
 	template<typename SEQUENCE, typename TRAITS>
+	template<typename SCHEDULER>
 	[[nodiscard]]
-	single_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS>
-	single_producer_sequencer<SEQUENCE, TRAITS>::claim_one() noexcept
+	single_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS, SCHEDULER>
+	single_producer_sequencer<SEQUENCE, TRAITS>::claim_one(SCHEDULER& scheduler) noexcept
 	{
-		return single_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS>{ *this };
+		return single_producer_sequencer_claim_one_operation<SEQUENCE, TRAITS, SCHEDULER>{ *this, scheduler };
 	}
 
 	template<typename SEQUENCE, typename TRAITS>
+	template<typename SCHEDULER>
 	[[nodiscard]]
-	single_producer_sequencer_claim_operation<SEQUENCE, TRAITS>
-	single_producer_sequencer<SEQUENCE, TRAITS>::claim_up_to(std::size_t count) noexcept
+	single_producer_sequencer_claim_operation<SEQUENCE, TRAITS, SCHEDULER>
+	single_producer_sequencer<SEQUENCE, TRAITS>::claim_up_to(std::size_t count, SCHEDULER& scheduler) noexcept
 	{
-		return single_producer_sequencer_claim_operation<SEQUENCE, TRAITS>(*this, count);
+		return single_producer_sequencer_claim_operation<SEQUENCE, TRAITS, SCHEDULER>(*this, count, scheduler);
 	}
 }
 

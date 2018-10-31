@@ -10,6 +10,7 @@
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all.hpp>
 #include <cppcoro/static_thread_pool.hpp>
+#include <cppcoro/inline_scheduler.hpp>
 
 #include <stdio.h>
 #include <thread>
@@ -36,6 +37,8 @@ DOCTEST_TEST_CASE("constructing with initial sequence number")
 
 DOCTEST_TEST_CASE("wait_until_published single-threaded")
 {
+	inline_scheduler scheduler;
+
 	sequence_barrier<std::uint32_t> barrier;
 	bool reachedA = false;
 	bool reachedB = false;
@@ -46,17 +49,17 @@ DOCTEST_TEST_CASE("wait_until_published single-threaded")
 	sync_wait(when_all(
 		[&]() -> task<>
 		{
-			CHECK(co_await barrier.wait_until_published(0) == 0);
+			CHECK(co_await barrier.wait_until_published(0, scheduler) == 0);
 			reachedA = true;
-			CHECK(co_await barrier.wait_until_published(1) == 1);
+			CHECK(co_await barrier.wait_until_published(1, scheduler) == 1);
 			reachedB = true;
-			CHECK(co_await barrier.wait_until_published(3) == 3);
+			CHECK(co_await barrier.wait_until_published(3, scheduler) == 3);
 			reachedC = true;
-			CHECK(co_await barrier.wait_until_published(4) == 10);
+			CHECK(co_await barrier.wait_until_published(4, scheduler) == 10);
 			reachedD = true;
-			co_await barrier.wait_until_published(5);
+			co_await barrier.wait_until_published(5, scheduler);
 			reachedE = true;
-			co_await barrier.wait_until_published(10);
+			co_await barrier.wait_until_published(10, scheduler);
 			reachedF = true;
 		}(),
 		[&]() -> task<>
@@ -84,6 +87,8 @@ DOCTEST_TEST_CASE("wait_until_published single-threaded")
 
 DOCTEST_TEST_CASE("wait_until_published multiple awaiters")
 {
+	inline_scheduler scheduler;
+
 	sequence_barrier<std::uint32_t> barrier;
 	bool reachedA = false;
 	bool reachedB = false;
@@ -93,18 +98,18 @@ DOCTEST_TEST_CASE("wait_until_published multiple awaiters")
 	sync_wait(when_all(
 		[&]() -> task<>
 	{
-		CHECK(co_await barrier.wait_until_published(0) == 0);
+		CHECK(co_await barrier.wait_until_published(0, scheduler) == 0);
 		reachedA = true;
-		CHECK(co_await barrier.wait_until_published(1) == 1);
+		CHECK(co_await barrier.wait_until_published(1, scheduler) == 1);
 		reachedB = true;
-		CHECK(co_await barrier.wait_until_published(3) == 3);
+		CHECK(co_await barrier.wait_until_published(3, scheduler) == 3);
 		reachedC = true;
 	}(),
 		[&]() -> task<>
 	{
-		CHECK(co_await barrier.wait_until_published(0) == 0);
+		CHECK(co_await barrier.wait_until_published(0, scheduler) == 0);
 		reachedD = true;
-		CHECK(co_await barrier.wait_until_published(3) == 3);
+		CHECK(co_await barrier.wait_until_published(3, scheduler) == 3);
 		reachedE = true;
 	}(),
 		[&]() -> task<>
@@ -148,21 +153,13 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 		[&]() -> task<std::uint64_t>
 	{
 		// Consumer
-		co_await tp.schedule();
-
 		std::uint64_t sum = 0;
 
 		bool reachedEnd = false;
 		std::size_t nextToRead = 0;
 		do
 		{
-			std::size_t available = writeBarrier.last_published();
-			if (sequence_traits<std::size_t>::precedes(available, nextToRead))
-			{
-				available = co_await writeBarrier.wait_until_published(nextToRead);
-				co_await tp.schedule();
-			}
-
+			std::size_t available = co_await writeBarrier.wait_until_published(nextToRead, tp);
 			do
 			{
 				sum += buffer[nextToRead % bufferSize];
@@ -180,15 +177,12 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 		[&]() -> task<>
 	{
 		// Producer
-		co_await tp.schedule();
-
 		std::size_t available = readBarrier.last_published() + bufferSize;
 		for (std::size_t nextToWrite = 0; nextToWrite <= iterationCount; ++nextToWrite)
 		{
 			if (sequence_traits<std::size_t>::precedes(available, nextToWrite))
 			{
-				available = co_await readBarrier.wait_until_published(nextToWrite - bufferSize) + bufferSize;
-				co_await tp.schedule();
+				available = co_await readBarrier.wait_until_published(nextToWrite - bufferSize, tp) + bufferSize;
 			}
 
 			if (nextToWrite == iterationCount)

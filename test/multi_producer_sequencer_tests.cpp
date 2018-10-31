@@ -42,17 +42,12 @@ namespace
 		std::uint64_t i = 0;
 		while (i < iterationCount)
 		{
-			const bool reschedule = !sequencer.any_available();
-			auto seq = co_await sequencer.claim_one();
-			if (reschedule)
-			{
-				co_await tp.schedule();
-			}
+			auto seq = co_await sequencer.claim_one(tp);
 			buffer[seq & mask] = ++i;
 			sequencer.publish(seq);
 		}
 
-		auto finalSeq = co_await sequencer.claim_one();
+		auto finalSeq = co_await sequencer.claim_one(tp);
 		buffer[finalSeq & mask] = 0;
 		sequencer.publish(finalSeq);
 	}
@@ -64,8 +59,6 @@ namespace
 		std::uint64_t iterationCount,
 		std::size_t maxBatchSize)
 	{
-		co_await tp.schedule();
-
 		const std::size_t bufferSize = sequencer.buffer_size();
 
 		std::uint64_t i = 0;
@@ -73,12 +66,7 @@ namespace
 		{
 			const std::size_t batchSize = static_cast<std::size_t>(
 				std::min<std::uint64_t>(maxBatchSize, iterationCount - i));
-			const bool reschedule = !sequencer.any_available();
-			auto sequences = co_await sequencer.claim_up_to(batchSize);
-			if (reschedule)
-			{
-				co_await tp.schedule();
-			}
+			auto sequences = co_await sequencer.claim_up_to(batchSize, tp);
 			for (auto seq : sequences)
 			{
 				buffer[seq % bufferSize] = ++i;
@@ -86,7 +74,7 @@ namespace
 			sequencer.publish(sequences);
 		}
 
-		auto finalSeq = co_await sequencer.claim_one();
+		auto finalSeq = co_await sequencer.claim_one(tp);
 		buffer[finalSeq % bufferSize] = 0;
 		sequencer.publish(finalSeq);
 	}
@@ -108,13 +96,7 @@ namespace
 		std::size_t nextToRead = 0;
 		do
 		{
-			std::size_t available = sequencer.last_published_after(nextToRead - 1);
-			if (sequence_traits<std::size_t>::precedes(available, nextToRead))
-			{
-				available = co_await sequencer.wait_until_published(nextToRead, nextToRead - 1);
-				co_await tp.schedule();
-			}
-
+			std::size_t available = co_await sequencer.wait_until_published(nextToRead, nextToRead - 1, tp);
 			do
 			{
 				const auto& value = buffer[nextToRead & mask];

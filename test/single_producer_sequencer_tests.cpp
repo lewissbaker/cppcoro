@@ -40,21 +40,13 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 		[&]() -> task<std::uint64_t>
 	{
 		// Consumer
-		co_await tp.schedule();
-
 		std::uint64_t sum = 0;
 
 		bool reachedEnd = false;
 		std::size_t nextToRead = 0;
 		do
 		{
-			std::size_t available = sequencer.last_published();
-			if (sequence_traits<std::size_t>::precedes(available, nextToRead))
-			{
-				available = co_await sequencer.wait_until_published(nextToRead);
-				co_await tp.schedule();
-			}
-
+			const std::size_t available = co_await sequencer.wait_until_published(nextToRead, tp);
 			do
 			{
 				sum += buffer[nextToRead % bufferSize];
@@ -72,15 +64,13 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 		[&]() -> task<>
 	{
 		// Producer
-		co_await tp.schedule();
-
 		constexpr std::size_t maxBatchSize = 10;
 
 		std::size_t i = 0;
 		while (i < iterationCount)
 		{
 			const std::size_t batchSize = std::min(maxBatchSize, iterationCount - i);
-			auto sequences = co_await sequencer.claim_up_to(batchSize);
+			auto sequences = co_await sequencer.claim_up_to(batchSize, tp);
 			for (auto seq : sequences)
 			{
 				buffer[seq % bufferSize] = ++i;
@@ -88,7 +78,7 @@ DOCTEST_TEST_CASE("multi-threaded usage single consumer")
 			sequencer.publish(sequences.back());
 		}
 
-		auto finalSeq = co_await sequencer.claim_one();
+		auto finalSeq = co_await sequencer.claim_one(tp);
 		buffer[finalSeq % bufferSize] = 0;
 		sequencer.publish(finalSeq);
 	}()));

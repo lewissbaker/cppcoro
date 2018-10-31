@@ -8,6 +8,7 @@
 #include <cppcoro/config.hpp>
 #include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/sequence_traits.hpp>
+#include <cppcoro/detail/manual_lifetime.hpp>
 
 #include <atomic>
 #include <cassert>
@@ -19,6 +20,9 @@
 namespace cppcoro
 {
 	template<typename SEQUENCE, typename TRAITS>
+	class sequence_barrier_wait_operation_base;
+
+	template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
 	class sequence_barrier_wait_operation;
 
 	/// A sequence barrier is a synchornisation primitive that allows a single-producer
@@ -43,7 +47,7 @@ namespace cppcoro
 			std::is_integral_v<SEQUENCE>,
 			"sequence_barrier requires an integral sequence type");
 
-		using awaiter_t = sequence_barrier_wait_operation<SEQUENCE, TRAITS>;
+		using awaiter_t = sequence_barrier_wait_operation_base<SEQUENCE, TRAITS>;
 
 	public:
 
@@ -87,9 +91,11 @@ namespace cppcoro
 		/// number. This is guaranteed not to precede \p targetSequence but may be a sequence
 		/// number after \p targetSequence, which indicates that more elements have been
 		/// published than you were waiting for.
+		template<typename SCHEDULER>
 		[[nodiscard]]
-		sequence_barrier_wait_operation<SEQUENCE, TRAITS> wait_until_published(
-			SEQUENCE targetSequence) const noexcept;
+		sequence_barrier_wait_operation<SEQUENCE, TRAITS, SCHEDULER> wait_until_published(
+			SEQUENCE targetSequence,
+			SCHEDULER& scheduler) const noexcept;
 
 		/// Publish the specified sequence number to consumers.
 		///
@@ -105,7 +111,7 @@ namespace cppcoro
 
 	private:
 
-		friend class sequence_barrier_wait_operation<SEQUENCE, TRAITS>;
+		friend class sequence_barrier_wait_operation_base<SEQUENCE, TRAITS>;
 
 		void add_awaiter(awaiter_t* awaiter) const noexcept;
 
@@ -129,11 +135,11 @@ namespace cppcoro
 	};
 
 	template<typename SEQUENCE, typename TRAITS>
-	class sequence_barrier_wait_operation
+	class sequence_barrier_wait_operation_base
 	{
 	public:
 
-		sequence_barrier_wait_operation(
+		explicit sequence_barrier_wait_operation_base(
 			const sequence_barrier<SEQUENCE, TRAITS>& barrier,
 			SEQUENCE targetSequence) noexcept
 			: m_barrier(barrier)
@@ -142,8 +148,8 @@ namespace cppcoro
 			, m_readyToResume(false)
 		{}
 
-		sequence_barrier_wait_operation(
-			const sequence_barrier_wait_operation& other) noexcept
+		sequence_barrier_wait_operation_base(
+			const sequence_barrier_wait_operation_base& other) noexcept
 			: m_barrier(other.m_barrier)
 			, m_targetSequence(other.m_targetSequence)
 			, m_lastKnownPublished(other.m_lastKnownPublished)
@@ -180,26 +186,122 @@ namespace cppcoro
 			}
 		}
 
-		virtual void resume_impl() noexcept
-		{
-			return m_awaitingCoroutine.resume();
-		}
+		virtual void resume_impl() noexcept = 0;
 
 		const sequence_barrier<SEQUENCE, TRAITS>& m_barrier;
 		const SEQUENCE m_targetSequence;
 		SEQUENCE m_lastKnownPublished;
-		sequence_barrier_wait_operation* m_next;
+		sequence_barrier_wait_operation_base* m_next;
 		std::experimental::coroutine_handle<> m_awaitingCoroutine;
 		std::atomic<bool> m_readyToResume;
 
 	};
 
-	template<typename SEQUENCE, typename TRAITS>
-	[[nodiscard]]
-	sequence_barrier_wait_operation<SEQUENCE, TRAITS> sequence_barrier<SEQUENCE, TRAITS>::wait_until_published(
-		SEQUENCE targetSequence) const noexcept
+	template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
+	class sequence_barrier_wait_operation : public sequence_barrier_wait_operation_base<SEQUENCE, TRAITS>
 	{
-		return sequence_barrier_wait_operation<SEQUENCE, TRAITS>{ *this, targetSequence };
+		using schedule_operation = decltype(std::declval<SCHEDULER&>().schedule());
+
+	public:
+		sequence_barrier_wait_operation(
+			const sequence_barrier<SEQUENCE, TRAITS>& barrier,
+			SEQUENCE targetSequence,
+			SCHEDULER& scheduler) noexcept
+			: sequence_barrier_wait_operation_base<SEQUENCE, TRAITS>(barrier, targetSequence)
+			, m_scheduler(scheduler)
+		{}
+
+		sequence_barrier_wait_operation(
+			const sequence_barrier_wait_operation& other) noexcept
+			: sequence_barrier_wait_operation_base<SEQUENCE, TRAITS>(other)
+			, m_scheduler(other.m_scheduler)
+		{}
+
+		~sequence_barrier_wait_operation()
+		{
+			if (m_isScheduleAwaiterCreated)
+			{
+				m_scheduleAwaiter.destruct();
+			}
+			if (m_isScheduleOperationCreated)
+			{
+				m_scheduleOperation.destruct();
+			}
+		}
+
+		decltype(auto) await_resume() noexcept(noexcept(m_scheduleAwaiter->await_resume()))
+		{
+			if (m_isScheduleAwaiterCreated)
+			{
+				m_scheduleAwaiter->await_resume();
+			}
+
+			return sequence_barrier_wait_operation_base<SEQUENCE, TRAITS>::await_resume();
+		}
+
+	private:
+
+		void resume_impl() noexcept override
+		{
+			try
+			{
+				m_scheduleOperation.construct(m_scheduler.schedule());
+				m_isScheduleOperationCreated = true;
+
+				m_scheduleAwaiter.construct(detail::get_awaiter(
+					static_cast<schedule_operation&&>(*m_scheduleOperation)));
+				m_isScheduleAwaiterCreated = true;
+
+				if (!m_scheduleAwaiter->await_ready())
+				{
+					using await_suspend_result_t = decltype(m_scheduleAwaiter->await_suspend(m_awaitingCoroutine));
+					if constexpr (std::is_void_v<await_suspend_result_t>)
+					{
+						m_scheduleAwaiter->await_suspend(m_awaitingCoroutine);
+						return;
+					}
+					else if constexpr (std::is_same_v<await_suspend_result_t, bool>)
+					{
+						if (m_scheduleAwaiter->await_suspend(m_awaitingCoroutine))
+						{
+							return;
+						}
+					}
+					else
+					{
+						// Assume it returns a coroutine_handle.
+						m_scheduleAwaiter->await_suspend(m_awaitingCoroutine).resume();
+						return;
+					}
+				}
+			}
+			catch (...)
+			{
+				// Ignore failure to reschedule and resume inline?
+				// Should we catch the exception and rethrow from await_resume()?
+				// Or should we require that 'co_await scheduler.schedule()' is noexcept?
+			}
+
+			// Resume outside the catch-block.
+			m_awaitingCoroutine.resume();
+		}
+
+		SCHEDULER& m_scheduler;
+		// Can't use std::optional<T> here since T could be a reference.
+		detail::manual_lifetime<schedule_operation> m_scheduleOperation;
+		detail::manual_lifetime<typename awaitable_traits<schedule_operation>::awaiter_t> m_scheduleAwaiter;
+		bool m_isScheduleOperationCreated = false;
+		bool m_isScheduleAwaiterCreated = false;
+	};
+
+	template<typename SEQUENCE, typename TRAITS>
+	template<typename SCHEDULER>
+	[[nodiscard]]
+	sequence_barrier_wait_operation<SEQUENCE, TRAITS, SCHEDULER> sequence_barrier<SEQUENCE, TRAITS>::wait_until_published(
+		SEQUENCE targetSequence,
+		SCHEDULER& scheduler) const noexcept
+	{
+		return sequence_barrier_wait_operation<SEQUENCE, TRAITS, SCHEDULER>(*this, targetSequence, scheduler);
 	}
 
 	template<typename SEQUENCE, typename TRAITS>
