@@ -254,15 +254,15 @@ namespace cppcoro
 
 				if (!m_scheduleAwaiter->await_ready())
 				{
-					using await_suspend_result_t = decltype(m_scheduleAwaiter->await_suspend(m_awaitingCoroutine));
+					using await_suspend_result_t = decltype(m_scheduleAwaiter->await_suspend(this->m_awaitingCoroutine));
 					if constexpr (std::is_void_v<await_suspend_result_t>)
 					{
-						m_scheduleAwaiter->await_suspend(m_awaitingCoroutine);
+						m_scheduleAwaiter->await_suspend(this->m_awaitingCoroutine);
 						return;
 					}
 					else if constexpr (std::is_same_v<await_suspend_result_t, bool>)
 					{
-						if (m_scheduleAwaiter->await_suspend(m_awaitingCoroutine))
+						if (m_scheduleAwaiter->await_suspend(this->m_awaitingCoroutine))
 						{
 							return;
 						}
@@ -270,7 +270,7 @@ namespace cppcoro
 					else
 					{
 						// Assume it returns a coroutine_handle.
-						m_scheduleAwaiter->await_suspend(m_awaitingCoroutine).resume();
+						m_scheduleAwaiter->await_suspend(this->m_awaitingCoroutine).resume();
 						return;
 					}
 				}
@@ -283,7 +283,7 @@ namespace cppcoro
 			}
 
 			// Resume outside the catch-block.
-			m_awaitingCoroutine.resume();
+			this->m_awaitingCoroutine.resume();
 		}
 
 		SCHEDULER& m_scheduler;

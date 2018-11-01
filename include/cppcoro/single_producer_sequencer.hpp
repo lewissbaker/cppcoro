@@ -116,10 +116,10 @@ namespace cppcoro
 
 	private:
 
-		template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
+		template<typename SEQUENCE2, typename TRAITS2, typename SCHEDULER>
 		friend class single_producer_sequencer_claim_operation;
 
-		template<typename SEQUENCE, typename TRAITS, typename SCHEDULER>
+		template<typename SEQUENCE2, typename TRAITS2, typename SCHEDULER>
 		friend class single_producer_sequencer_claim_one_operation;
 
 #if CPPCORO_COMPILER_MSVC
