@@ -30,7 +30,7 @@ cppcoro::net::detail::sockaddr_to_ip_endpoint(const sockaddr& address) noexcept
 
 		return ipv4_endpoint{
 			ipv4_address{ addressBytes },
-			::htons(ipv4Address.sin_port)
+			::ntohs(ipv4Address.sin_port)
 		};
 	}
 	else
@@ -42,7 +42,7 @@ cppcoro::net::detail::sockaddr_to_ip_endpoint(const sockaddr& address) noexcept
 
 		return ipv6_endpoint{
 			ipv6_address{ ipv6Address.sin6_addr.u.Byte },
-			::htons(ipv6Address.sin6_port)
+			::ntohs(ipv6Address.sin6_port)
 		};
 	}
 }
