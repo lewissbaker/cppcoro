@@ -1608,7 +1608,7 @@ namespace cppcoro::net
                            cancellation_token ct) noexcept;
 
     [[nodiscard]]
-    Awaitable<void> disconnect() noexcep0t;
+    Awaitable<void> disconnect() noexcept;
     [[nodiscard]]
     Awaitable<void> disconnect(cancellation_token ct) noexcept;
 
