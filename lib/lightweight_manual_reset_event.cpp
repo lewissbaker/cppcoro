@@ -215,10 +215,8 @@ cppcoro::detail::lightweight_manual_reset_event::~lightweight_manual_reset_event
 
 void cppcoro::detail::lightweight_manual_reset_event::set() noexcept
 {
-	{
-		std::lock_guard<std::mutex> lock(m_mutex);
-		m_isSet = true;
-	}
+	std::lock_guard<std::mutex> lock(m_mutex);
+	m_isSet = true;
 	m_cv.notify_all();
 }
 
