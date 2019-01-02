@@ -34,9 +34,9 @@ namespace cppcoro
 			constexpr std::experimental::suspend_always final_suspend() const { return {}; }
 
 			template<
-				typename U,
-				typename = std::enable_if_t<std::is_same<U, T>::value>>
-			std::experimental::suspend_always yield_value(U& value) noexcept
+				typename U = T,
+				std::enable_if_t<!std::is_lvalue_reference<U>::value, int> = 0>
+			std::experimental::suspend_always yield_value(T& value) noexcept
 			{
 				m_value = std::addressof(value);
 				return {};

@@ -60,6 +60,31 @@ TEST_CASE("generator of reference returns by reference")
 	CHECK(value == 2.0f);
 }
 
+TEST_CASE("generator of const type")
+{
+	auto fib = []() -> generator<const std::uint64_t>
+	{
+		std::uint64_t a = 0, b = 1;
+		while (true)
+		{
+			co_yield b;
+			b += std::exchange(a, b);
+		}
+	};
+
+	std::uint64_t count = 0;
+	for (auto i : fib())
+	{
+		if (i > 1'000'000) {
+			break;
+		}
+		++count;
+	}
+
+	// 30th fib number is 832'040
+	CHECK(count == 30);
+}
+
 TEST_CASE("generator doesn't start until its called")
 {
 	bool reachedA = false;
