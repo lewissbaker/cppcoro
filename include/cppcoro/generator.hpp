@@ -35,14 +35,14 @@ namespace cppcoro
 
 			template<
 				typename U = T,
-				std::enable_if_t<!std::is_lvalue_reference<U>::value, int> = 0>
-			std::experimental::suspend_always yield_value(T& value) noexcept
+				std::enable_if_t<!std::is_rvalue_reference<U>::value, int> = 0>
+			std::experimental::suspend_always yield_value(std::remove_reference_t<T>& value) noexcept
 			{
 				m_value = std::addressof(value);
 				return {};
 			}
 
-			std::experimental::suspend_always yield_value(T&& value) noexcept
+			std::experimental::suspend_always yield_value(std::remove_reference_t<T>&& value) noexcept
 			{
 				m_value = std::addressof(value);
 				return {};
