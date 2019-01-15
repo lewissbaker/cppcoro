@@ -11,11 +11,7 @@
 #include <cppcoro/when_all.hpp>
 #include <cppcoro/when_all_ready.hpp>
 #include <cppcoro/on_scope_exit.hpp>
-
-#if CPPCORO_OS_WINNT
-# include <cppcoro/io_service.hpp>
-# include "io_service_fixture.hpp"
-#endif
+#include <cppcoro/static_thread_pool.hpp>
 
 #include <thread>
 #include <cassert>
@@ -53,10 +49,10 @@ TEST_CASE("single waiter")
 	cppcoro::sync_wait(cppcoro::when_all_ready(run(), check()));
 }
 
-#if CPPCORO_OS_WINNT
-
-TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
+TEST_CASE("multi-threaded")
 {
+	cppcoro::static_thread_pool tp;
+
 	cppcoro::sync_wait([&]() -> cppcoro::task<>
 	{
 		cppcoro::single_consumer_async_auto_reset_event valueChangedEvent;
@@ -75,7 +71,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 
 		auto modifier = [&](int count) -> cppcoro::task<int>
 		{
-			co_await io_service().schedule();
+			co_await tp.schedule();
 			for (int i = 0; i < count; ++i)
 			{
 				value.fetch_add(1, std::memory_order_relaxed);
@@ -93,7 +89,5 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<3>, "multi-threaded")
 		}
 	}());
 }
-
-#endif
 
 TEST_SUITE_END();

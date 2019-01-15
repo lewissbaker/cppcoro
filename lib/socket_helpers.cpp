@@ -30,7 +30,7 @@ cppcoro::net::detail::sockaddr_to_ip_endpoint(const sockaddr& address) noexcept
 
 		return ipv4_endpoint{
 			ipv4_address{ addressBytes },
-			ipv4Address.sin_port
+			ntohs(ipv4Address.sin_port)
 		};
 	}
 	else
@@ -42,7 +42,7 @@ cppcoro::net::detail::sockaddr_to_ip_endpoint(const sockaddr& address) noexcept
 
 		return ipv6_endpoint{
 			ipv6_address{ ipv6Address.sin6_addr.u.Byte },
-			ipv6Address.sin6_port
+			ntohs(ipv6Address.sin6_port)
 		};
 	}
 }
@@ -58,7 +58,7 @@ int cppcoro::net::detail::ip_endpoint_to_sockaddr(
 		SOCKADDR_IN ipv4Address;
 		ipv4Address.sin_family = AF_INET;
 		std::memcpy(&ipv4Address.sin_addr, ipv4EndPoint.address().bytes(), 4);
-		ipv4Address.sin_port = ipv4EndPoint.port();
+		ipv4Address.sin_port = htons(ipv4EndPoint.port());
 		std::memset(&ipv4Address.sin_zero, 0, sizeof(ipv4Address.sin_zero));
 
 		std::memcpy(&address.get(), &ipv4Address, sizeof(ipv4Address));
@@ -72,7 +72,7 @@ int cppcoro::net::detail::ip_endpoint_to_sockaddr(
 		SOCKADDR_IN6 ipv6Address;
 		ipv6Address.sin6_family = AF_INET6;
 		std::memcpy(&ipv6Address.sin6_addr, ipv6EndPoint.address().bytes(), 16);
-		ipv6Address.sin6_port = ipv6EndPoint.port();
+		ipv6Address.sin6_port = htons(ipv6EndPoint.port());
 		ipv6Address.sin6_flowinfo = 0;
 		ipv6Address.sin6_scope_struct = SCOPEID_UNSPECIFIED_INIT;
 

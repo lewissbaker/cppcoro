@@ -34,15 +34,15 @@ namespace cppcoro
 			constexpr std::experimental::suspend_always final_suspend() const { return {}; }
 
 			template<
-				typename U,
-				typename = std::enable_if_t<std::is_same<U, T>::value>>
-			std::experimental::suspend_always yield_value(U& value) noexcept
+				typename U = T,
+				std::enable_if_t<!std::is_rvalue_reference<U>::value, int> = 0>
+			std::experimental::suspend_always yield_value(std::remove_reference_t<T>& value) noexcept
 			{
 				m_value = std::addressof(value);
 				return {};
 			}
 
-			std::experimental::suspend_always yield_value(T&& value) noexcept
+			std::experimental::suspend_always yield_value(std::remove_reference_t<T>&& value) noexcept
 			{
 				m_value = std::addressof(value);
 				return {};
@@ -61,7 +61,7 @@ namespace cppcoro
 
 			reference_type value() const noexcept
 			{
-				return *m_value;
+				return static_cast<reference_type>(*m_value);
 			}
 
 			// Don't allow any use of 'co_await' inside the generator coroutine.
@@ -93,10 +93,15 @@ namespace cppcoro
 			using iterator_category = std::input_iterator_tag;
 			// What type should we use for counting elements of a potentially infinite sequence?
 			using difference_type = std::size_t;
-			using value_type = std::remove_reference_t<T>;
-			using reference = value_type&;
-			using pointer = value_type*;
+			using value_type = typename generator_promise<T>::value_type;
+			using reference = typename generator_promise<T>::reference_type;
+			using pointer = typename generator_promise<T>::pointer_type;
 
+			// Iterator needs to be default-constructible to satisfy the Range concept.
+			generator_iterator() noexcept
+				: m_coroutine(nullptr)
+			{}
+			
 			explicit generator_iterator(std::nullptr_t) noexcept
 				: m_coroutine(nullptr)
 			{}
@@ -126,11 +131,11 @@ namespace cppcoro
 				return *this;
 			}
 
-			// Don't support post-increment as that would require taking a
-			// copy of the old value into the returned iterator as there
-			// are no guarantees it's still going to be valid after the
-			// increment is executed.
-			generator_iterator operator++(int) = delete;
+			// Need to provide post-increment operator to implement the 'Range' concept.
+			void operator++(int)
+			{
+				(void)operator++();
+			}
 
 			reference operator*() const noexcept
 			{
