@@ -50,13 +50,11 @@ namespace cppcoro
 
 			void unhandled_exception()
 			{
-				m_value = nullptr;
 				m_exception = std::current_exception();
 			}
 
 			void return_void()
 			{
-				m_value = nullptr;
 			}
 
 			reference_type value() const noexcept
@@ -83,6 +81,8 @@ namespace cppcoro
 
 		};
 
+        struct generator_sentinel {};
+
 		template<typename T>
 		class generator_iterator
 		{
@@ -102,10 +102,6 @@ namespace cppcoro
 				: m_coroutine(nullptr)
 			{}
 			
-			explicit generator_iterator(std::nullptr_t) noexcept
-				: m_coroutine(nullptr)
-			{}
-
 			explicit generator_iterator(coroutine_handle coroutine) noexcept
 				: m_coroutine(coroutine)
 			{}
@@ -115,17 +111,27 @@ namespace cppcoro
 				return m_coroutine == other.m_coroutine;
 			}
 
+            bool operator==(generator_sentinel) const noexcept
+            {
+                return !m_coroutine || m_coroutine.done();
+            }
+
 			bool operator!=(const generator_iterator& other) const noexcept
 			{
 				return !(*this == other);
 			}
+
+            bool operator!=(generator_sentinel other) const noexcept
+            {
+                return !operator==(other);
+            }
 
 			generator_iterator& operator++()
 			{
 				m_coroutine.resume();
 				if (m_coroutine.done())
 				{
-					std::exchange(m_coroutine, {}).promise().rethrow_if_exception();
+					m_coroutine.promise().rethrow_if_exception();
 				}
 
 				return *this;
@@ -192,20 +198,18 @@ namespace cppcoro
 			if (m_coroutine)
 			{
 				m_coroutine.resume();
-				if (!m_coroutine.done())
+				if (m_coroutine.done())
 				{
-					return iterator{ m_coroutine };
+                    m_coroutine.promise().rethrow_if_exception();
 				}
-
-				m_coroutine.promise().rethrow_if_exception();
 			}
 
-			return iterator{ nullptr };
+            return iterator{ m_coroutine };
 		}
 
-		iterator end() noexcept
+		detail::generator_sentinel end() noexcept
 		{
-			return iterator{ nullptr };
+			return detail::generator_sentinel{};
 		}
 
 		void swap(generator& other) noexcept
