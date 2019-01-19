@@ -11,7 +11,7 @@ These include:
   * `async_generator<T>`
 * Awaitable Types
   * `single_consumer_event`
-  * `single_consumer_auto_reset_event`
+  * `single_consumer_async_auto_reset_event`
   * `async_mutex`
   * `async_manual_reset_event`
   * `async_auto_reset_event`
