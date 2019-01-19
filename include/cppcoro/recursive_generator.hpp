@@ -170,7 +170,7 @@ namespace cppcoro
 				std::experimental::coroutine_handle<promise_type>::from_promise(*this).resume();
 			}
 
-			T* m_value;
+			std::add_pointer_t<T> m_value;
 			std::exception_ptr m_exception;
 
 			promise_type* m_root;
@@ -229,12 +229,16 @@ namespace cppcoro
 
 			using iterator_category = std::input_iterator_tag;
 			// What type should we use for counting elements of a potentially infinite sequence?
-			using difference_type = std::size_t;
+			using difference_type = std::ptrdiff_t;
 			using value_type = std::remove_reference_t<T>;
-			using reference = value_type&;
-			using pointer = value_type*;
+			using reference = std::conditional_t<std::is_reference_v<T>, T, T&>;
+			using pointer = std::add_pointer_t<T>;
 
-			iterator(promise_type* promise) noexcept
+			iterator() noexcept
+				: m_promise(nullptr)
+			{}
+
+			explicit iterator(promise_type* promise) noexcept
 				: m_promise(promise)
 			{}
 
@@ -264,10 +268,15 @@ namespace cppcoro
 				return *this;
 			}
 
+			void operator++(int)
+			{
+				(void)operator++();
+			}
+
 			reference operator*() const noexcept
 			{
 				assert(m_promise != nullptr);
-				return m_promise->value();
+				return static_cast<reference>(m_promise->value());
 			}
 
 			pointer operator->() const noexcept
