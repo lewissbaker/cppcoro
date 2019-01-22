@@ -143,4 +143,11 @@
 # define CPPCORO_CPU_64BIT 0
 #endif
 
+#if CPPCORO_COMPILER_MSVC
+# define CPPCORO_CPU_CACHE_LINE std::hardware_destructive_interference_size
+#else
+// On most architectures we can assume a 64-byte cache line.
+# define CPPCORO_CPU_CACHE_LINE 64
+#endif
+
 #endif
