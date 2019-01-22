@@ -16,6 +16,9 @@ These include:
   * `async_manual_reset_event`
   * `async_auto_reset_event`
   * `async_latch`
+  * `sequence_barrier`
+  * `multi_producer_sequencer`
+  * `single_producer_sequencer`
 * Functions
   * `sync_wait()`
   * `when_all()`
@@ -945,6 +948,262 @@ namespace cppcoro
     // continues without suspending.
     Awaiter<void> operator co_await() const noexcept;
 
+  };
+}
+```
+
+## `sequence_barrier`
+
+A `sequence_barrier` is a synchronisation primitive that allows a single-producer
+and multiple consumers to coordinate with respect to a monotonically increasing
+sequence number.
+
+A single producer advances the sequence number by publishing new sequence numbers
+in a monotonically increasing order. One or more consumers can query the last
+published sequence number and can wait until a particular sequence number has been
+published.
+
+A sequence barrier can be used to represent a cursor into a thread-safe producer/consumer
+ring-buffer
+
+See the LMAX Disruptor pattern for more background:
+https://lmax-exchange.github.io/disruptor/files/Disruptor-1.0.pdf
+
+API Synopsis:
+```c++
+namespace cppcoro
+{
+  template<typename SEQUENCE = std::size_t,
+           typename TRAITS = sequence_traits<SEQUENCE>>
+  class sequence_barrier
+  {
+  public:
+    sequence_barrier(SEQUENCE initialSequence = TRAITS::initial_sequence) noexcept;
+	~sequence_barrier();
+
+	SEQUENCE last_published() const noexcept;
+
+	// Wait until the specified targetSequence number has been published.
+	//
+	// If the operation does not complete synchonously then the awaiting
+	// coroutine is resumed on the specified scheduler. Otherwise, the
+	// coroutine continues without suspending.
+	//
+	// The co_await expression resumes with the updated last_published()
+	// value, which is guaranteed to be at least 'targetSequence'.
+	template<typename SCHEDULER>
+	[[nodiscard]]
+	Awaitable<SEQUENCE> wait_until_published(SEQUENCE targetSequence,
+                                             SCHEDULER& scheduler) const noexcept;
+
+    void publish(SEQUENCE sequence) noexcept;
+  };
+}
+```
+
+## `single_producer_sequencer`
+
+A `single_producer_sequencer` is a synchronisation primitived that can be used to
+coordinate access to a ring-buffer for a single producer and one or more consumers.
+
+A producer first acquires one or more slots in a ring-buffer, writes to the ring-buffer
+elements corresponding to those slots, and then finally publishes the values written to
+those slots. A producer can never produce more than 'bufferSize' elements in advance
+of where the consumer has consumed up to.
+
+A consumer then waits for certain elements to be published, processes the items and
+then notifies the producer when it has finished processing items by publishing the
+sequence number it has finished consuming in a `sequence_barrier` object.
+
+
+API Synopsis:
+```
+// <cppcoro/single_producer_sequencer.hpp>
+namespace cppcoro
+{
+  template<
+    typename SEQUENCE = std::size_t,
+    typename TRAITS = sequence_traits<SEQUENCE>>
+  class single_producer_sequencer
+  {
+  public:
+    using size_type = typename sequence_range<SEQUENCE, TRAITS>::size_type;
+
+    single_producer_sequencer(
+      const sequence_barrier<SEQUENCE, TRAITS>& consumerBarrier,
+      std::size_t bufferSize,
+      SEQUENCE initialSequence = TRAITS::initial_sequence) noexcept;
+
+    // Publisher API:
+
+    template<typename SCHEDULER>
+    [[nodiscard]]
+    Awaitable<SEQUENCE> claim_one(SCHEDULER& scheduler) noexcept;
+
+    template<typename SCHEDULER>
+    [[nodiscard]]
+    Awaitable<sequence_range<SEQUENCE>> claim_up_to(
+      std::size_t count,
+      SCHEDULER& scheduler) noexcept;
+
+    void publish(SEQUENCE sequence) noexcept;
+
+    // Consumer API:
+
+    SEQUENCE last_published() const noexcept;
+
+    template<typename SCHEDULER>
+    [[nodsicard]]
+    Awaitable<SEQUENCE> wait_until_published(
+      SEQUENCE targetSequence,
+      SCHEDULER& scheduler) const noexcept;
+
+  };
+}
+```
+
+Example usage:
+```c++
+using namespace cppcoro;
+using namespace std::chrono;
+
+struct message
+{
+  int id;
+  steady_clock::time_point timestamp;
+  float data;
+};
+
+constexpr size_t bufferSize = 16384; // Must be power-of-two
+constexpr size_t indexMask = bufferSize - 1;
+message buffer[bufferSize];
+
+task<void> producer(
+  io_service& ioSvc,
+  single_producer_sequencer<size_t>& sequencer)
+{
+  auto start = steady_clock::now();
+  for (int i = 0; i < 1'000'000; ++i)
+  {
+    // Wait until a slot is free in the buffer.
+    size_t seq = co_await sequencer.claim_one(ioSvc);
+
+    // Populate the message.
+    auto& msg = buffer[seq & indexMask];
+    msg.id = i;
+    msg.timestammp = steady_clock::now();
+    msg.data = s;
+
+    // Publish the message.
+    sequencer.publish(seq);
+  }
+
+  // Publish a sentinel
+  auto seq = co_await sequencer.claim_one(ioSvc);
+  auto& msg = buffer[seq & indexMask];
+  msg.id = -1;
+  sequencer.publish(seq);
+}
+
+task<void> consumer(
+  static_thread_pool& threadPool,
+  const single_producer_sequencer<size_t>& sequencer,
+  consumer_barrier<size_t>& consumerBarrier)
+{
+  size_t nextToRead = 0;
+  while (true)
+  {
+    // Wait until the next message is available
+    // There may be more than one available.
+    const size_t available = co_await sequencer.wait_until_published(nextToRead, threadPool);
+    do {
+      auto& msg = buffer[nextToRead & indexMask];
+      if (msg.id == -1)
+      {
+        consumerBarrier.publish(nextToRead);
+        co_return;
+      }
+
+      processMessage(msg);
+    } while (nextToRead++ != available);
+
+    // Notify the producer that we've finished processing
+    // up to 'nextToRead - 1'.
+    consumerBarrier.publish(available);
+  }
+}
+
+task<void> example(io_service& ioSvc, static_thread_pool& threadPool)
+{
+  consumer_barrier<size_t> barrier;
+  single_producer_sequencer<size_t> sequencer{barrier, bufferSize};
+
+  co_await when_all(
+    publisher(ioSvc, sequencer),
+    consumer(threadPool, sequencer, barrier));
+}
+```
+
+## `multi_producer_sequencer`
+
+The `multi_producer_sequencer` class is a synchronisation primitive that coordinates
+access to a ring-buffer for multiple producers and one or more consumers.
+
+For a single-producer variant see the `single_producer_sequencer` class.
+
+Note that the ring-buffer must have a size that is a power-of-two. This is because
+the implementation uses bitmasks instead of integer division/modulo to calculate
+the offset into the buffer. Also, this allows the sequence number to safely wrap
+around the 32-bit/64-bit value.
+
+API Summary:
+```c++
+// <cppcoro/multi_producer_sequencer.hpp>
+namespace cppcoro
+{
+  template<typename SEQUENCE = std::size_t,
+           typename TRAITS = sequence_traits<SEQUENCE>>
+  class multi_producer_sequencer
+  {
+  public:
+    multi_producer_sequencer(
+      const sequence_barrier<SEQUENCE, TRAITS>& consumerBarrier,
+      SEQUENCE initialSequence = TRAITS::initial_sequence);
+
+    std::size_t buffer_size() const noexcept;
+
+    // Consumer interface
+    //
+    // Each consumer keeps track of their own 'lastKnownPublished' value
+    // and must pass this to the methods that query for an updated last-known
+    // published sequence number.
+
+    SEQUENCE last_published_after(SEQUENCE lastKnownPublished) const noexcept;
+
+    template<typename SCHEDULER>
+    Awaitable<SEQUENCE> wait_until_published(
+      SEQUENCE targetSequence,
+      SEQUENCE lastKnownPublished,
+      SCHEDULER& scheduler) const noexcept;
+
+    // Producer interface
+
+    // Query whether any slots available for claiming (approx.)
+    bool any_available() const noexcept;
+
+    template<typename SCHEDULER>
+    Awaitable<SEQUENCE> claim_one(SCHEDULER& scheduler) noexcept;
+
+    template<typename SCHEDULER>
+    Awaitable<sequence_range<SEQUENCE, TRAITS>> claim_up_to(
+      std::size_t count,
+      SCHEDULER& scheduler) noexcept;
+
+    // Mark the specified sequence number as published.
+    void publish(SEQUENCE sequence) noexcept;
+
+    // Mark all sequence numbers in the specified range as published.
+    void publish(const sequence_range<SEQUENCE, TRAITS>& range) noexcept;
   };
 }
 ```
