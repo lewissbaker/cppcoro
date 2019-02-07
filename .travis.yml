@@ -19,8 +19,8 @@ addons:
     - llvm-toolchain-trusty
     packages:
     - python2.7
-    - clang-8
-    - lld-8
+    - clang-9
+    - lld-9
     - ninja-build
 
 cache:
@@ -37,12 +37,12 @@ env:
   - CMAKE_VERSION="3.9.1"
 matrix:
   include:
-  - env: RELEASE=debug ARCH=x64 CLANG_VERSION=8
-  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=8
+  - env: RELEASE=debug ARCH=x64 CLANG_VERSION=9
+  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=9
   allow_failures:
   # Clang 6.0~svn320382 has a bug that causes optimised builds to fail.
   # See https://bugs.llvm.org/show_bug.cgi?id=34897
-  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=8
+  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=9
  
 before_install:
 - export CC="$CC-$CLANG_VERSION"
