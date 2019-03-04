@@ -3018,36 +3018,33 @@ $ cake --debug=run release=debug lib/build.cake
 
 ### Customising location of Clang
 
-If your clang compiler is not located at `/usr/bin/clang` then you need to
-modify the `config.cake` file to tell cake where to find clang.
+If your clang compiler is not located at `/usr/bin/clang` then you can specify an
+alternative location using one or more of the following command-line options for `cake`:
 
-Edit the following line in `config.cake`:
-```python
-  # If you have built your own version of Clang, you can modify
-  # this variable to point to the CMAKE_INSTALL_PREFIX for
-  # where you have installed your clang/libcxx build.
-  clangInstallPrefix = '/usr'
+* `--clang-executable=<name>` - Specify the clang executable name to use instead of `clang`.
+  eg. to force use of Clang 8.0 pass `--clang-executable=clang-8`
+* `--clang-executable=<abspath>` - Specify the full path to clang executable.
+  The build system will also look for other executables in the same directory.
+  If this path has the form `<prefix>/bin/<name>` then this will also set the default clang-install-prefix to `<prefix>`.
+* `--clang-install-prefix=<path>` - Specify path where clang has been installed.
+  This will cause the build system to look for clang under `<path>/bin` (unless overridden by `--clang-executable`).
+* `--libcxx-install-prefix=<path>` - Specify path where libc++ has been installed.
+  By default the build system will look for libc++ in the same location as clang.
+  Use this command-line option if it is installed in a different location.
+
+Example: Use a specific version of clang installed in the default location
+```
+$ cake --clang-executable=clang-8
 ```
 
-If you have `libc++` installed in a different location then you can
-customise its location by modifying the following line in `config.cake`.
-```python
-  # Set this to the install-prefix of where libc++ is installed.
-  # You only need to set this if it is not installed at the same
-  # location as clangInstallPrefix.
-  libCxxInstallPrefix = None # '/path/to/install'
+Example: Use the default version of clang from a custom location
+```
+$ cake --clang-install-prefix=/path/to/clang-install
 ```
 
-If the install location has multiple versions of Clang installed and
-the one you want to use is not `<install-prefix>/bin/clang` then you
-can explicitly specify which one to use by modifying the `config.cake`
-file to specify the name of the clang binaries:
-```python
-  compiler = ClangCompiler(
-    configuration=configuration,
-    clangExe=cake.path.join(clangBinPath, 'clang-6.0'),
-    llvmArExe=cake.path.join(clangBinPath, 'llvm-ar-6.0'),
-    binPaths=[clangBinPath])
+Example: Use a specific version of clang, in a custom location, with libc++ from a different location
+```
+$ cake --clang-executable=/path/to/clang-install/bin/clang-8 --libcxx-install-prefix=/path/to/libcxx-install
 ```
 
 ### Using a snapshot build of Clang
