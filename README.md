@@ -145,10 +145,10 @@ namespace cppcoro
     // coroutine until the task completes.
     //
     // The 'co_await t.when_ready()' expression differs from 'co_await t' in
-    // that when_ready() only performs synchronisation, it does not return
+    // that when_ready() only performs synchronization, it does not return
     // the result or rethrow the exception.
     //
-    // This can be useful if you want to synchronise with the task without
+    // This can be useful if you want to synchronize with the task without
     // the possibility of it throwing an exception.
     Awaitable<void> when_ready() const noexcept;
   };
@@ -257,7 +257,7 @@ namespace cppcoro
     // is available.
     //
     // The result is not returned from the co_await expression.
-    // This can be used to synchronise with the task without the
+    // This can be used to synchronize with the task without the
     // possibility of the co_await expression throwing an exception.
     Awaiter<void> when_ready() const noexcept;
 
@@ -616,7 +616,7 @@ void producer()
 
 ## `single_consumer_async_auto_reset_event`
 
-This class provides an async synchronisation primitive that allows a single coroutine to
+This class provides an async synchronization primitive that allows a single coroutine to
 wait until the event is signalled by a call to the `set()` method.
 
 Once the coroutine that is awaiting the event is released by either a prior or subsequent call to `set()`
@@ -763,7 +763,7 @@ cppcoro::task<> add_item(std::string value)
 
 ## `async_manual_reset_event`
 
-A manual-reset event is a coroutine/thread-synchronisation primitive that allows one or more threads
+A manual-reset event is a coroutine/thread-synchronization primitive that allows one or more threads
 to wait until the event is signalled by a thread that calls `set()`.
 
 The event is in one of two states; *'set'* and *'not set'*.
@@ -844,7 +844,7 @@ namespace cppcoro
 
 ## `async_auto_reset_event`
 
-An auto-reset event is a coroutine/thread-synchronisation primitive that allows one or more threads
+An auto-reset event is a coroutine/thread-synchronization primitive that allows one or more threads
 to wait until the event is signalled by a thread by calling `set()`.
 
 Once a coroutine that is awaiting the event is released by either a prior or subsequent call to `set()`
@@ -913,7 +913,7 @@ namespace cppcoro
 
 ## `async_latch`
 
-An async latch is a synchronisation primitive that allows coroutines to asynchronously
+An async latch is a synchronization primitive that allows coroutines to asynchronously
 wait until a counter has been decremented to zero.
 
 The latch is a single-use object. Once the counter reaches zero the latch becomes 'ready'
@@ -953,7 +953,7 @@ namespace cppcoro
 
 ## `sequence_barrier`
 
-A `sequence_barrier` is a synchronisation primitive that allows a single-producer
+A `sequence_barrier` is a synchronization primitive that allows a single-producer
 and multiple consumers to coordinate with respect to a monotonically increasing
 sequence number.
 
@@ -984,7 +984,7 @@ namespace cppcoro
 
 	// Wait until the specified targetSequence number has been published.
 	//
-	// If the operation does not complete synchonously then the awaiting
+	// If the operation does not complete synchronously then the awaiting
 	// coroutine is resumed on the specified scheduler. Otherwise, the
 	// coroutine continues without suspending.
 	//
@@ -1002,7 +1002,7 @@ namespace cppcoro
 
 ## `single_producer_sequencer`
 
-A `single_producer_sequencer` is a synchronisation primitived that can be used to
+A `single_producer_sequencer` is a synchronization primitive that can be used to
 coordinate access to a ring-buffer for a single producer and one or more consumers.
 
 A producer first acquires one or more slots in a ring-buffer, writes to the ring-buffer
@@ -1052,7 +1052,7 @@ namespace cppcoro
     SEQUENCE last_published() const noexcept;
 
     template<typename SCHEDULER>
-    [[nodsicard]]
+    [[nodiscard]]
     Awaitable<SEQUENCE> wait_until_published(
       SEQUENCE targetSequence,
       SCHEDULER& scheduler) const noexcept;
@@ -1090,7 +1090,7 @@ task<void> producer(
     // Populate the message.
     auto& msg = buffer[seq & indexMask];
     msg.id = i;
-    msg.timestammp = steady_clock::now();
+    msg.timestamp = steady_clock::now();
     msg.data = s;
 
     // Publish the message.
@@ -1145,7 +1145,7 @@ task<void> example(io_service& ioSvc, static_thread_pool& threadPool)
 
 ## `multi_producer_sequencer`
 
-The `multi_producer_sequencer` class is a synchronisation primitive that coordinates
+The `multi_producer_sequencer` class is a synchronization primitive that coordinates
 access to a ring-buffer for multiple producers and one or more consumers.
 
 For a single-producer variant see the `single_producer_sequencer` class.
@@ -1653,7 +1653,7 @@ int main()
 
 ### `io_service` as a scheduler
 
-An `io_sevice` class implements the interfaces for the `Scheduler` and `DelayedScheduler` concepts.
+An `io_service` class implements the interfaces for the `Scheduler` and `DelayedScheduler` concepts.
 
 This allows a coroutine to suspend execution on the current thread and schedule itself for resumption
 on an I/O thread associated with a particular `io_service` object.
@@ -2044,7 +2044,7 @@ namespace cppcoro::net
 
     constexpr const bytes_t& bytes() const;
 
-    cosntexpr std::uint32_t to_integer() const;
+    constexpr std::uint32_t to_integer() const;
 
     static constexpr ipv4_address loopback();
 
@@ -2241,7 +2241,7 @@ the `co_await` expression or rethrow the exception if the `co_await` expression 
 an unhandled exception.
 
 The `sync_wait()` function is mostly useful for starting a top-level task from within `main()`
-and waiting until the task finishes, in practise it is the only way to start the first/top-level
+and waiting until the task finishes, in practice it is the only way to start the first/top-level
 `task`.
 
 API Summary:
@@ -2312,7 +2312,7 @@ The result of `co_await`ing the returned awaitable is a `std::tuple` or `std::ve
 of `when_all_task<RESULT>` objects. These objects allow you to obtain the result (or exception)
 of each input awaitable separately by calling the `when_all_task<RESULT>::result()`
 method of the corresponding output task.
-This allows the caller to concurrently await multiple awaitables and synchronise on
+This allows the caller to concurrently await multiple awaitables and synchronize on
 their completion while still retaining the ability to subsequently inspect the results of
 each of the `co_await` operations for success/failure.
 
