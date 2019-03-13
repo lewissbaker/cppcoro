@@ -4,50 +4,49 @@ The 'cppcoro' library provides a set of general-purpose primitives for making us
 
 These include:
 * Coroutine Types
-  * `task<T>`
-  * `shared_task<T>`
-  * `generator<T>`
-  * `recursive_generator<T>`
-  * `async_generator<T>`
+  * [`task<T>`](#taskt)
+  * [`shared_task<T>`](#shared_taskt)
+  * [`generator<T>`](#generatort)
+  * [`recursive_generator<T>`](#recursive_generatort)
+  * [`async_generator<T>`](#async_generatort)
 * Awaitable Types
-  * `single_consumer_event`
-  * `single_consumer_async_auto_reset_event`
-  * `async_mutex`
-  * `async_manual_reset_event`
-  * `async_auto_reset_event`
-  * `async_latch`
-  * `sequence_barrier`
-  * `multi_producer_sequencer`
-  * `single_producer_sequencer`
+  * [`single_consumer_event`](#single_consumer_event)
+  * [`single_consumer_async_auto_reset_event`](#single_consumer_async_auto_reset_event)
+  * [`async_mutex`](#async_mutex)
+  * [`async_manual_reset_event`](#async_manual_reset_event)
+  * [`async_auto_reset_event`](#async_auto_reset_event)
+  * [`async_latch`](#async_latch)
+  * [`sequence_barrier`](#sequence_barrier)
+  * [`multi_producer_sequencer`](#multi_producer_sequencer)
+  * [`single_producer_sequencer`](#single_producer_sequencer)
 * Functions
-  * `sync_wait()`
-  * `when_all()`
-  * `when_all_ready()`
-  * `fmap()`
-  * `schedule_on()`
-  * `resume_on()`
-* Cancellation
+  * [`sync_wait()`](#sync_wait)
+  * [`when_all()`](#when_all)
+  * [`when_all_ready()`](#when_all_ready)
+  * [`fmap()`](#fmap)
+  * [`schedule_on()`](#schedule_on)
+  * [`resume_on()`](#resume_on)
+* [Cancellation](#Cancellation)
   * `cancellation_token`
   * `cancellation_source`
   * `cancellation_registration`
 * Schedulers and I/O
-  * `static_thread_pool`
-  * `io_service`
-  * `io_work_scope`
-  * `file`, `readable_file`, `writable_file`
-  * `read_only_file`, `write_only_file`, `read_write_file`
-Networking
-  * `socket`
-  * `ip_address`, `ipv4_address`, `ipv6_address`
-  * `ip_endpoint`, `ipv4_endpoint`, `ipv6_endpoint`
+  * [`static_thread_pool`](#static_thread_pool)
+  * [`io_service` and `io_work_scope`](#io_service-and-io_work_scope)
+  * [`file`, `readable_file`, `writable_file`](#file-readable_file-writable_file)
+  * [`read_only_file`, `write_only_file`, `read_write_file`](#read_only_file-write_only_file-read_write_file)
+* Networking
+  * [`socket`](#socket)
+  * [`ip_address`, `ipv4_address`, `ipv6_address`](#ip_address-ipv4_address-ipv6_address)
+  * [`ip_endpoint`, `ipv4_endpoint`, `ipv6_endpoint`](#ip_endpoint-ipv4_endpoint-ipv6_endpoint)
 * Metafunctions
-  * `is_awaitable<T>`
-  * `awaitable_traits<T>`
+  * [`is_awaitable<T>`](#is_awaitablet)
+  * [`awaitable_traits<T>`](#awaitable_traitst)
 * Concepts
-  * `Awaitable<T>`
-  * `Awaiter<T>`
-  * `Scheduler`
-  * `DelayedScheduler`
+  * [`Awaitable<T>`](#Awaitablet-concept)
+  * [`Awaiter<T>`](#Awaitert-concept)
+  * [`Scheduler`](#Scheduler-concept)
+  * [`DelayedScheduler`](#DelayedScheduler-concept)
 
 This library is an experimental library that is exploring the space of high-performance,
 scalable asynchronous programming abstractions that can be built on top of the C++ coroutines
@@ -89,7 +88,7 @@ cppcoro::task<int> count_lines(std::string path)
     lineCount += std::count(buffer, buffer + bytesRead, '\n');
     offset += bytesRead;
   } while (bytesRead > 0);
-  
+
   co_return lineCount;
 }
 
@@ -98,9 +97,9 @@ cppcoro::task<> usage_example()
   // Calling function creates a new task but doesn't start
   // executing the coroutine yet.
   cppcoro::task<int> countTask = count_lines("foo.txt");
-  
+
   // ...
-  
+
   // Coroutine is only started when we later co_await the task.
   int lineCount = co_await countTask;
 
@@ -281,7 +280,7 @@ namespace cppcoro
 }
 ```
 
-All const-methods on `shared_task<T>` are safe to call concurrently with other 
+All const-methods on `shared_task<T>` are safe to call concurrently with other
 const-methods on the same instance from multiple threads. It is not safe to call
 non-const methods of `shared_task<T>` concurrently with any other method on the
 same instance of a `shared_task<T>`.
@@ -387,7 +386,7 @@ namespace cppcoro
 
         generator(generator&& other) noexcept;
         generator& operator=(generator&& other) noexcept;
-        
+
         generator(const generator& other) = delete;
         generator& operator=(const generator&) = delete;
 
@@ -428,7 +427,7 @@ of the current coroutine will resume execution to produce the next element.
 
 The benefit of `recursive_generator<T>` over `generator<T>` for iterating over recursive data-structures is that the `iterator::operator++()`
 is able to directly resume the leaf-most coroutine to produce the next element, rather than having to resume/suspend O(depth) coroutines for each element.
-The down-side is that there is additional overhead 
+The down-side is that there is additional overhead
 
 For example:
 ```c++
@@ -499,7 +498,7 @@ namespace cppcoro
       using value_type = std::remove_reference_t<T>;
       using reference = value_type&;
       using pointer = value_type*;
-      
+
       iterator(const iterator& other) noexcept;
       iterator& operator=(const iterator& other) noexcept;
 
@@ -570,7 +569,7 @@ consumer coroutine is executing a `co_await` expression waiting for the next ite
 
 This is a simple manual-reset event type that supports only a single
 coroutine awaiting it at a time.
-This can be used to 
+This can be used to
 
 API Summary:
 ```c++
@@ -1208,7 +1207,7 @@ namespace cppcoro
 }
 ```
 
-## `cancellation_token`
+## Cancellation
 
 A `cancellation_token` is a value that can be passed to a function that allows the caller to subsequently communicate a request to cancel the operation to that function.
 
@@ -1399,7 +1398,7 @@ namespace cppcoro
 
     // Return an operation that can be awaited by a coroutine.
     //
-    // 
+    //
     [[nodiscard]]
     schedule_operation schedule() noexcept;
 
@@ -1450,7 +1449,7 @@ cppcoro::task<double> dot_product(static_thread_pool& tp, double a[], double b[]
 }
 ```
 
-## `io_service`
+## `io_service` and `io_work_scope`
 
 The `io_service` class provides an abstraction for processing I/O completion events
 from asynchronous I/O operations.
@@ -2232,7 +2231,7 @@ namespace cppcoro::net
 
 ## `sync_wait()`
 
-The `sync_wait()`function can be used to synchronously wait until the specified `awaitable`
+The `sync_wait()` function can be used to synchronously wait until the specified `awaitable`
 completes.
 
 The specified awaitable will be `co_await`ed on current thread inside a newly created coroutine.
@@ -3080,7 +3079,7 @@ See below.
 
 You can also use the bleeding-edge Clang version by building Clang from source yourself.
 
-See instructions here: 
+See instructions here:
 
 To do this you will need to install the following pre-requisites:
 ```
