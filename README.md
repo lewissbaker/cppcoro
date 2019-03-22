@@ -3009,6 +3009,7 @@ You can specify additional command-line arguments to customise the build:
    either debug or optimised (by default it will build both).
 * `lib/build.cake` will just build the cppcoro library and not the tests.
 * `test/build.cake@task_tests.cpp` will just compile a particular source file
+* `test/build.cake@testresult` will build and run the tests
 
 For example:
 ```
