@@ -4,50 +4,49 @@ The 'cppcoro' library provides a set of general-purpose primitives for making us
 
 These include:
 * Coroutine Types
-  * `task<T>`
-  * `shared_task<T>`
-  * `generator<T>`
-  * `recursive_generator<T>`
-  * `async_generator<T>`
+  * [`task<T>`](#taskt)
+  * [`shared_task<T>`](#shared_taskt)
+  * [`generator<T>`](#generatort)
+  * [`recursive_generator<T>`](#recursive_generatort)
+  * [`async_generator<T>`](#async_generatort)
 * Awaitable Types
-  * `single_consumer_event`
-  * `single_consumer_async_auto_reset_event`
-  * `async_mutex`
-  * `async_manual_reset_event`
-  * `async_auto_reset_event`
-  * `async_latch`
-  * `sequence_barrier`
-  * `multi_producer_sequencer`
-  * `single_producer_sequencer`
+  * [`single_consumer_event`](#single_consumer_event)
+  * [`single_consumer_async_auto_reset_event`](#single_consumer_async_auto_reset_event)
+  * [`async_mutex`](#async_mutex)
+  * [`async_manual_reset_event`](#async_manual_reset_event)
+  * [`async_auto_reset_event`](#async_auto_reset_event)
+  * [`async_latch`](#async_latch)
+  * [`sequence_barrier`](#sequence_barrier)
+  * [`multi_producer_sequencer`](#multi_producer_sequencer)
+  * [`single_producer_sequencer`](#single_producer_sequencer)
 * Functions
-  * `sync_wait()`
-  * `when_all()`
-  * `when_all_ready()`
-  * `fmap()`
-  * `schedule_on()`
-  * `resume_on()`
-* Cancellation
+  * [`sync_wait()`](#sync_wait)
+  * [`when_all()`](#when_all)
+  * [`when_all_ready()`](#when_all_ready)
+  * [`fmap()`](#fmap)
+  * [`schedule_on()`](#schedule_on)
+  * [`resume_on()`](#resume_on)
+* [Cancellation](#Cancellation)
   * `cancellation_token`
   * `cancellation_source`
   * `cancellation_registration`
 * Schedulers and I/O
-  * `static_thread_pool`
-  * `io_service`
-  * `io_work_scope`
-  * `file`, `readable_file`, `writable_file`
-  * `read_only_file`, `write_only_file`, `read_write_file`
-Networking
-  * `socket`
-  * `ip_address`, `ipv4_address`, `ipv6_address`
-  * `ip_endpoint`, `ipv4_endpoint`, `ipv6_endpoint`
+  * [`static_thread_pool`](#static_thread_pool)
+  * [`io_service` and `io_work_scope`](#io_service-and-io_work_scope)
+  * [`file`, `readable_file`, `writable_file`](#file-readable_file-writable_file)
+  * [`read_only_file`, `write_only_file`, `read_write_file`](#read_only_file-write_only_file-read_write_file)
+* Networking
+  * [`socket`](#socket)
+  * [`ip_address`, `ipv4_address`, `ipv6_address`](#ip_address-ipv4_address-ipv6_address)
+  * [`ip_endpoint`, `ipv4_endpoint`, `ipv6_endpoint`](#ip_endpoint-ipv4_endpoint-ipv6_endpoint)
 * Metafunctions
-  * `is_awaitable<T>`
-  * `awaitable_traits<T>`
+  * [`is_awaitable<T>`](#is_awaitablet)
+  * [`awaitable_traits<T>`](#awaitable_traitst)
 * Concepts
-  * `Awaitable<T>`
-  * `Awaiter<T>`
-  * `Scheduler`
-  * `DelayedScheduler`
+  * [`Awaitable<T>`](#Awaitablet-concept)
+  * [`Awaiter<T>`](#Awaitert-concept)
+  * [`Scheduler`](#Scheduler-concept)
+  * [`DelayedScheduler`](#DelayedScheduler-concept)
 
 This library is an experimental library that is exploring the space of high-performance,
 scalable asynchronous programming abstractions that can be built on top of the C++ coroutines
@@ -89,7 +88,7 @@ cppcoro::task<int> count_lines(std::string path)
     lineCount += std::count(buffer, buffer + bytesRead, '\n');
     offset += bytesRead;
   } while (bytesRead > 0);
-  
+
   co_return lineCount;
 }
 
@@ -98,9 +97,9 @@ cppcoro::task<> usage_example()
   // Calling function creates a new task but doesn't start
   // executing the coroutine yet.
   cppcoro::task<int> countTask = count_lines("foo.txt");
-  
+
   // ...
-  
+
   // Coroutine is only started when we later co_await the task.
   int lineCount = co_await countTask;
 
@@ -146,10 +145,10 @@ namespace cppcoro
     // coroutine until the task completes.
     //
     // The 'co_await t.when_ready()' expression differs from 'co_await t' in
-    // that when_ready() only performs synchronisation, it does not return
+    // that when_ready() only performs synchronization, it does not return
     // the result or rethrow the exception.
     //
-    // This can be useful if you want to synchronise with the task without
+    // This can be useful if you want to synchronize with the task without
     // the possibility of it throwing an exception.
     Awaitable<void> when_ready() const noexcept;
   };
@@ -258,7 +257,7 @@ namespace cppcoro
     // is available.
     //
     // The result is not returned from the co_await expression.
-    // This can be used to synchronise with the task without the
+    // This can be used to synchronize with the task without the
     // possibility of the co_await expression throwing an exception.
     Awaiter<void> when_ready() const noexcept;
 
@@ -281,7 +280,7 @@ namespace cppcoro
 }
 ```
 
-All const-methods on `shared_task<T>` are safe to call concurrently with other 
+All const-methods on `shared_task<T>` are safe to call concurrently with other
 const-methods on the same instance from multiple threads. It is not safe to call
 non-const methods of `shared_task<T>` concurrently with any other method on the
 same instance of a `shared_task<T>`.
@@ -387,7 +386,7 @@ namespace cppcoro
 
         generator(generator&& other) noexcept;
         generator& operator=(generator&& other) noexcept;
-        
+
         generator(const generator& other) = delete;
         generator& operator=(const generator&) = delete;
 
@@ -428,7 +427,7 @@ of the current coroutine will resume execution to produce the next element.
 
 The benefit of `recursive_generator<T>` over `generator<T>` for iterating over recursive data-structures is that the `iterator::operator++()`
 is able to directly resume the leaf-most coroutine to produce the next element, rather than having to resume/suspend O(depth) coroutines for each element.
-The down-side is that there is additional overhead 
+The down-side is that there is additional overhead
 
 For example:
 ```c++
@@ -499,7 +498,7 @@ namespace cppcoro
       using value_type = std::remove_reference_t<T>;
       using reference = value_type&;
       using pointer = value_type*;
-      
+
       iterator(const iterator& other) noexcept;
       iterator& operator=(const iterator& other) noexcept;
 
@@ -570,7 +569,7 @@ consumer coroutine is executing a `co_await` expression waiting for the next ite
 
 This is a simple manual-reset event type that supports only a single
 coroutine awaiting it at a time.
-This can be used to 
+This can be used to
 
 API Summary:
 ```c++
@@ -617,7 +616,7 @@ void producer()
 
 ## `single_consumer_async_auto_reset_event`
 
-This class provides an async synchronisation primitive that allows a single coroutine to
+This class provides an async synchronization primitive that allows a single coroutine to
 wait until the event is signalled by a call to the `set()` method.
 
 Once the coroutine that is awaiting the event is released by either a prior or subsequent call to `set()`
@@ -764,7 +763,7 @@ cppcoro::task<> add_item(std::string value)
 
 ## `async_manual_reset_event`
 
-A manual-reset event is a coroutine/thread-synchronisation primitive that allows one or more threads
+A manual-reset event is a coroutine/thread-synchronization primitive that allows one or more threads
 to wait until the event is signalled by a thread that calls `set()`.
 
 The event is in one of two states; *'set'* and *'not set'*.
@@ -845,7 +844,7 @@ namespace cppcoro
 
 ## `async_auto_reset_event`
 
-An auto-reset event is a coroutine/thread-synchronisation primitive that allows one or more threads
+An auto-reset event is a coroutine/thread-synchronization primitive that allows one or more threads
 to wait until the event is signalled by a thread by calling `set()`.
 
 Once a coroutine that is awaiting the event is released by either a prior or subsequent call to `set()`
@@ -914,7 +913,7 @@ namespace cppcoro
 
 ## `async_latch`
 
-An async latch is a synchronisation primitive that allows coroutines to asynchronously
+An async latch is a synchronization primitive that allows coroutines to asynchronously
 wait until a counter has been decremented to zero.
 
 The latch is a single-use object. Once the counter reaches zero the latch becomes 'ready'
@@ -954,7 +953,7 @@ namespace cppcoro
 
 ## `sequence_barrier`
 
-A `sequence_barrier` is a synchronisation primitive that allows a single-producer
+A `sequence_barrier` is a synchronization primitive that allows a single-producer
 and multiple consumers to coordinate with respect to a monotonically increasing
 sequence number.
 
@@ -985,7 +984,7 @@ namespace cppcoro
 
 	// Wait until the specified targetSequence number has been published.
 	//
-	// If the operation does not complete synchonously then the awaiting
+	// If the operation does not complete synchronously then the awaiting
 	// coroutine is resumed on the specified scheduler. Otherwise, the
 	// coroutine continues without suspending.
 	//
@@ -1003,7 +1002,7 @@ namespace cppcoro
 
 ## `single_producer_sequencer`
 
-A `single_producer_sequencer` is a synchronisation primitived that can be used to
+A `single_producer_sequencer` is a synchronization primitive that can be used to
 coordinate access to a ring-buffer for a single producer and one or more consumers.
 
 A producer first acquires one or more slots in a ring-buffer, writes to the ring-buffer
@@ -1053,7 +1052,7 @@ namespace cppcoro
     SEQUENCE last_published() const noexcept;
 
     template<typename SCHEDULER>
-    [[nodsicard]]
+    [[nodiscard]]
     Awaitable<SEQUENCE> wait_until_published(
       SEQUENCE targetSequence,
       SCHEDULER& scheduler) const noexcept;
@@ -1091,7 +1090,7 @@ task<void> producer(
     // Populate the message.
     auto& msg = buffer[seq & indexMask];
     msg.id = i;
-    msg.timestammp = steady_clock::now();
+    msg.timestamp = steady_clock::now();
     msg.data = s;
 
     // Publish the message.
@@ -1146,7 +1145,7 @@ task<void> example(io_service& ioSvc, static_thread_pool& threadPool)
 
 ## `multi_producer_sequencer`
 
-The `multi_producer_sequencer` class is a synchronisation primitive that coordinates
+The `multi_producer_sequencer` class is a synchronization primitive that coordinates
 access to a ring-buffer for multiple producers and one or more consumers.
 
 For a single-producer variant see the `single_producer_sequencer` class.
@@ -1208,7 +1207,7 @@ namespace cppcoro
 }
 ```
 
-## `cancellation_token`
+## Cancellation
 
 A `cancellation_token` is a value that can be passed to a function that allows the caller to subsequently communicate a request to cancel the operation to that function.
 
@@ -1399,7 +1398,7 @@ namespace cppcoro
 
     // Return an operation that can be awaited by a coroutine.
     //
-    // 
+    //
     [[nodiscard]]
     schedule_operation schedule() noexcept;
 
@@ -1450,7 +1449,7 @@ cppcoro::task<double> dot_product(static_thread_pool& tp, double a[], double b[]
 }
 ```
 
-## `io_service`
+## `io_service` and `io_work_scope`
 
 The `io_service` class provides an abstraction for processing I/O completion events
 from asynchronous I/O operations.
@@ -1654,7 +1653,7 @@ int main()
 
 ### `io_service` as a scheduler
 
-An `io_sevice` class implements the interfaces for the `Scheduler` and `DelayedScheduler` concepts.
+An `io_service` class implements the interfaces for the `Scheduler` and `DelayedScheduler` concepts.
 
 This allows a coroutine to suspend execution on the current thread and schedule itself for resumption
 on an I/O thread associated with a particular `io_service` object.
@@ -2045,7 +2044,7 @@ namespace cppcoro::net
 
     constexpr const bytes_t& bytes() const;
 
-    cosntexpr std::uint32_t to_integer() const;
+    constexpr std::uint32_t to_integer() const;
 
     static constexpr ipv4_address loopback();
 
@@ -2232,7 +2231,7 @@ namespace cppcoro::net
 
 ## `sync_wait()`
 
-The `sync_wait()`function can be used to synchronously wait until the specified `awaitable`
+The `sync_wait()` function can be used to synchronously wait until the specified `awaitable`
 completes.
 
 The specified awaitable will be `co_await`ed on current thread inside a newly created coroutine.
@@ -2242,7 +2241,7 @@ the `co_await` expression or rethrow the exception if the `co_await` expression 
 an unhandled exception.
 
 The `sync_wait()` function is mostly useful for starting a top-level task from within `main()`
-and waiting until the task finishes, in practise it is the only way to start the first/top-level
+and waiting until the task finishes, in practice it is the only way to start the first/top-level
 `task`.
 
 API Summary:
@@ -2313,7 +2312,7 @@ The result of `co_await`ing the returned awaitable is a `std::tuple` or `std::ve
 of `when_all_task<RESULT>` objects. These objects allow you to obtain the result (or exception)
 of each input awaitable separately by calling the `when_all_task<RESULT>::result()`
 method of the corresponding output task.
-This allows the caller to concurrently await multiple awaitables and synchronise on
+This allows the caller to concurrently await multiple awaitables and synchronize on
 their completion while still retaining the ability to subsequently inspect the results of
 each of the `co_await` operations for success/failure.
 
@@ -3081,7 +3080,7 @@ See below.
 
 You can also use the bleeding-edge Clang version by building Clang from source yourself.
 
-See instructions here: 
+See instructions here:
 
 To do this you will need to install the following pre-requisites:
 ```
