@@ -160,7 +160,7 @@ namespace cppcoro
 	}
 
 	template<typename T>
-	class generator
+	class [[nodiscard]] generator
 	{
 	public:
 
