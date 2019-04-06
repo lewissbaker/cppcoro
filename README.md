@@ -1091,7 +1091,7 @@ task<void> producer(
     auto& msg = buffer[seq & indexMask];
     msg.id = i;
     msg.timestamp = steady_clock::now();
-    msg.data = s;
+    msg.data = 123;
 
     // Publish the message.
     sequencer.publish(seq);
@@ -1107,7 +1107,7 @@ task<void> producer(
 task<void> consumer(
   static_thread_pool& threadPool,
   const single_producer_sequencer<size_t>& sequencer,
-  consumer_barrier<size_t>& consumerBarrier)
+  sequence_barrier<size_t>& consumerBarrier)
 {
   size_t nextToRead = 0;
   while (true)
@@ -1134,12 +1134,12 @@ task<void> consumer(
 
 task<void> example(io_service& ioSvc, static_thread_pool& threadPool)
 {
-  consumer_barrier<size_t> barrier;
+  sequence_barrier<size_t> barrier;
   single_producer_sequencer<size_t> sequencer{barrier, bufferSize};
 
   co_await when_all(
-    publisher(ioSvc, sequencer),
-    consumer(threadPool, sequencer, barrier));
+    producer(tp, sequencer),
+    consumer(tp, sequencer, barrier));
 }
 ```
 
