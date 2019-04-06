@@ -280,7 +280,7 @@ namespace cppcoro
 	/// caller. Execution of the coroutine body does not start until the
 	/// coroutine is first co_await'ed.
 	template<typename T = void>
-	class task
+	class [[nodiscard]] task
 	{
 	public:
 

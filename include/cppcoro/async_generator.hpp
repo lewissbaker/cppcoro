@@ -346,7 +346,7 @@ namespace cppcoro
 	}
 
 	template<typename T>
-	class async_generator
+	class [[nodiscard]] async_generator
 	{
 	public:
 

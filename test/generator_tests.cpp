@@ -85,6 +85,49 @@ TEST_CASE("generator of const type")
 	CHECK(count == 30);
 }
 
+TEST_CASE("value-category of fmap() matches reference type")
+{
+    using cppcoro::fmap;
+
+    auto checkIsRvalue = [](auto&& x) {
+        static_assert(std::is_rvalue_reference_v<decltype(x)>);
+        static_assert(!std::is_const_v<std::remove_reference_t<decltype(x)>>);
+        CHECK(x == 123);
+        return x;
+    };
+    auto checkIsLvalue = [](auto&& x) {
+        static_assert(std::is_lvalue_reference_v<decltype(x)>);
+        static_assert(!std::is_const_v<std::remove_reference_t<decltype(x)>>);
+        CHECK(x == 123);
+        return x;
+    };
+    auto checkIsConstLvalue = [](auto&& x) {
+        static_assert(std::is_lvalue_reference_v<decltype(x)>);
+        static_assert(std::is_const_v<std::remove_reference_t<decltype(x)>>);
+        CHECK(x == 123);
+        return x;
+    };
+    auto checkIsConstRvalue = [](auto&& x) {
+        static_assert(std::is_rvalue_reference_v<decltype(x)>);
+        static_assert(std::is_const_v<std::remove_reference_t<decltype(x)>>);
+        CHECK(x == 123);
+        return x;
+    };
+
+    auto consume = [](auto&& range) {
+        for (auto&& x : range) {
+            (void)x;
+        }
+    };
+
+    consume([]() -> generator<int> { co_yield 123; }() | fmap(checkIsLvalue));
+    consume([]() -> generator<const int> { co_yield 123; }() | fmap(checkIsConstLvalue));
+    consume([]() -> generator<int&> { co_yield 123; }() | fmap(checkIsLvalue));
+    consume([]() -> generator<const int&> { co_yield 123; }() | fmap(checkIsConstLvalue));
+    consume([]() -> generator<int&&> { co_yield 123; }() | fmap(checkIsRvalue));
+    consume([]() -> generator<const int&&> { co_yield 123; }() | fmap(checkIsConstRvalue));
+}
+
 TEST_CASE("generator doesn't start until its called")
 {
 	bool reachedA = false;
