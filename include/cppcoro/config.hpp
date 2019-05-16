@@ -81,7 +81,15 @@
 #if defined(_WIN32_WINNT) || defined(_WIN32)
 # if !defined(_WIN32_WINNT)
 // Default to targeting Windows 10 if not defined.
-#  define _WIN32_WINNT 0x0A00
+//  Suppress clang-msvc warning
+#   if defined(__clang__) && defined(_MSC_VER) 
+#    pragma clang diagnostic push
+#    pragma clang diagnostic ignored "-Wreserved-id-macro"
+#   endif
+#     define _WIN32_WINNT 0x0A00
+#   if defined(__clang__) && defined(_MSC_VER) 
+#    pragma clang diagnostic pop
+#   endif
 # endif
 # define CPPCORO_OS_WINNT _WIN32_WINNT
 #else
