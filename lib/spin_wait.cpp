@@ -44,8 +44,8 @@ namespace cppcoro
 	{
 #if CPPCORO_OS_WINNT
 		// Spin strategy taken from .NET System.SpinWait class.
-		// I assume the Microsoft guys knew what they're doing.
-		if (next_spin_will_yield())
+		// I assume the Microsoft developers knew what they're doing.
+		if (!next_spin_will_yield())
 		{
 			// CPU-level pause
 			// Allow other hyper-threads to run while we busy-wait.
