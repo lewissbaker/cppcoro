@@ -80,16 +80,16 @@
 /// 0x0A00 - Windows 10
 #if defined(_WIN32_WINNT) || defined(_WIN32)
 # if !defined(_WIN32_WINNT)
-// Default to targeting Windows 10 if not defined.
-//  Suppress clang-msvc warning
-#   if defined(__clang__) && defined(_MSC_VER) 
-#    pragma clang diagnostic push
-#    pragma clang diagnostic ignored "-Wreserved-id-macro"
-#   endif
-#     define _WIN32_WINNT 0x0A00
-#   if defined(__clang__) && defined(_MSC_VER) 
-#    pragma clang diagnostic pop
-#   endif
+#  if __has_include(<SDKDDKVer.h>)
+#   // By default, we just use SDKDDKVer.h in the include paths
+#   // for _WIN32_WINNT value
+#   include <SDKDDKVer.h>
+#  else
+    static_assert("Ensure SDKDDKVer.h header from WindowsSDK of your target"
+                  " exists in the include paths, or otherwise explicitly"
+                  " define _WIN32_WINNT as corresponding value of"
+                  " your target via compile command.");
+#  endif
 # endif
 # define CPPCORO_OS_WINNT _WIN32_WINNT
 #else
