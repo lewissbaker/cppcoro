@@ -84,12 +84,15 @@
 #   // By default, we just use SDKDDKVer.h in the include paths
 #   // for _WIN32_WINNT value
 #   include <SDKDDKVer.h>
+#   define CPPCORO_HAS_SDKDDKVER_H 1
 #  else
-    static_assert("Ensure SDKDDKVer.h header from WindowsSDK of your target"
-                  " exists in the include paths, or otherwise explicitly"
-                  " define _WIN32_WINNT as corresponding value of"
-                  " your target via compile command.");
+#   define CPPCORO_HAS_SDKDDKVER_H 0
 #  endif
+   static_assert(CPPCORO_HAS_SDKDDKVER_H,
+                 "Ensure SDKDDKVer.h header from WindowsSDK of your target"
+                 " exists in the include paths, or otherwise explicitly"
+                 " define _WIN32_WINNT as corresponding value of"
+                 " your target via compile command.");
 # endif
 # define CPPCORO_OS_WINNT _WIN32_WINNT
 #else
