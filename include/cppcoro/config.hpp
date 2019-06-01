@@ -80,16 +80,16 @@
 /// 0x0A00 - Windows 10
 #if defined(_WIN32_WINNT) || defined(_WIN32)
 # if !defined(_WIN32_WINNT)
-#  if __has_include(<SDKDDKVer.h>)
+#  if __has_include(<sdkddkver.h>)
 #   // By default, we just use SDKDDKVer.h in the include paths
 #   // for _WIN32_WINNT value
-#   include <SDKDDKVer.h>
+#   include <sdkddkver.h>
 #   define CPPCORO_HAS_SDKDDKVER_H 1
 #  else
 #   define CPPCORO_HAS_SDKDDKVER_H 0
 #  endif
    static_assert(CPPCORO_HAS_SDKDDKVER_H,
-                 "Ensure SDKDDKVer.h header from WindowsSDK of your target"
+                 "Ensure sdkddkver.h header from WindowsSDK of your target"
                  " exists in the include paths, or otherwise explicitly"
                  " define _WIN32_WINNT as corresponding value of"
                  " your target via compile command.");
