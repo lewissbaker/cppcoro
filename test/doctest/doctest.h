@@ -421,7 +421,7 @@ extern "C" __declspec(dllimport) void __stdcall DebugBreak();
 //#include <iosfwd>
 #include <ostream>
 #elif (_MSC_VER >= 1920)
-// MSVC 2019 removes <iostream> from <string>
+// MSVC 2019 removes <iostream> from <string> 
 // https://developercommunity.visualstudio.com/content/problem/525532/visual-studio-2019-compilation-issue.html
 #include <ostream>
 #else
