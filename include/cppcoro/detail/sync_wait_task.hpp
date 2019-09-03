@@ -11,6 +11,7 @@
 
 #include <experimental/coroutine>
 #include <cassert>
+#include <exception>
 
 namespace cppcoro
 {
