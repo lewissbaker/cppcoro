@@ -1016,7 +1016,7 @@ sequence number it has finished consuming in a `sequence_barrier` object.
 
 
 API Synopsis:
-```
+```c++
 // <cppcoro/single_producer_sequencer.hpp>
 namespace cppcoro
 {
