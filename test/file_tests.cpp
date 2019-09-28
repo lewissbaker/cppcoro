@@ -171,6 +171,10 @@ TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "read write file")
 	cppcoro::sync_wait(run());
 }
 
+// Disable under MSVC 2019.3
+// Results in an ICE under debug x64 builds
+#if CPPCORO_COMPILER_MSVC != 192328105
+
 TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "cancel read")
 {
 	cppcoro::sync_wait([&]() -> cppcoro::task<>
@@ -214,5 +218,7 @@ TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "cancel read")
 		}
 	}());
 }
+
+#endif
 
 TEST_SUITE_END();
