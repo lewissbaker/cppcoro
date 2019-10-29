@@ -112,9 +112,9 @@ namespace cppcoro
 				return !it.m_coroutine || it.m_coroutine.done();
 			}
 
-			friend bool operator!=(const generator_iterator& it, generator_sentinel) noexcept
+			friend bool operator!=(const generator_iterator& it, generator_sentinel s) noexcept
 			{
-				return !(*this == other);
+				return !(it == s);
 			}
 
 			friend bool operator==(generator_sentinel s, const generator_iterator& it) noexcept
