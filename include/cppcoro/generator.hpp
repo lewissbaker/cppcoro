@@ -10,6 +10,7 @@
 #include <utility>
 #include <exception>
 #include <iterator>
+#include <functional>
 
 namespace cppcoro
 {
