@@ -10,6 +10,7 @@
 #include <utility>
 #include <exception>
 #include <iterator>
+#include <functional>
 
 namespace cppcoro
 {
@@ -93,7 +94,7 @@ namespace cppcoro
 
 			using iterator_category = std::input_iterator_tag;
 			// What type should we use for counting elements of a potentially infinite sequence?
-			using difference_type = std::size_t;
+			using difference_type = std::ptrdiff_t;
 			using value_type = typename generator_promise<T>::value_type;
 			using reference = typename generator_promise<T>::reference_type;
 			using pointer = typename generator_promise<T>::pointer_type;
@@ -107,25 +108,25 @@ namespace cppcoro
 				: m_coroutine(coroutine)
 			{}
 
-			bool operator==(const generator_iterator& other) const noexcept
+			friend bool operator==(const generator_iterator& it, generator_sentinel) noexcept
 			{
-				return m_coroutine == other.m_coroutine;
+				return !it.m_coroutine || it.m_coroutine.done();
 			}
 
-            bool operator==(generator_sentinel) const noexcept
-            {
-                return !m_coroutine || m_coroutine.done();
-            }
-
-			bool operator!=(const generator_iterator& other) const noexcept
+			friend bool operator!=(const generator_iterator& it, generator_sentinel s) noexcept
 			{
-				return !(*this == other);
+				return !(it == s);
 			}
 
-            bool operator!=(generator_sentinel other) const noexcept
-            {
-                return !operator==(other);
-            }
+			friend bool operator==(generator_sentinel s, const generator_iterator& it) noexcept
+			{
+				return (it == s);
+			}
+
+			friend bool operator!=(generator_sentinel s, const generator_iterator& it) noexcept
+			{
+				return it != s;
+			}
 
 			generator_iterator& operator++()
 			{
@@ -201,11 +202,11 @@ namespace cppcoro
 				m_coroutine.resume();
 				if (m_coroutine.done())
 				{
-                    m_coroutine.promise().rethrow_if_exception();
+					m_coroutine.promise().rethrow_if_exception();
 				}
 			}
 
-            return iterator{ m_coroutine };
+			return iterator{ m_coroutine };
 		}
 
 		detail::generator_sentinel end() noexcept
