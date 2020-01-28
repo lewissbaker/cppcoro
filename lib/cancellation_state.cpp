@@ -79,13 +79,13 @@ cppcoro::detail::cancellation_registration_list_chunk::allocate(std::uint32_t en
 		throw std::bad_alloc{};
 	}
 
-	std::atomic_init(&chunk->m_nextChunk, static_cast<cancellation_registration_list_chunk*>(nullptr));
+	::new (&chunk->m_nextChunk) std::atomic<cancellation_registration_list_chunk*>(nullptr);
 	chunk->m_prevChunk = nullptr;
-	std::atomic_init(&chunk->m_approximateFreeCount, static_cast<std::int32_t>(entryCount - 1));
+	::new (&chunk->m_approximateFreeCount) std::atomic<int32_t>(static_cast<std::int32_t>(entryCount - 1));
 	chunk->m_entryCount = entryCount;
 	for (std::uint32_t i = 0; i < entryCount; ++i)
 	{
-		std::atomic_init(&chunk->m_entries[i], static_cast<cancellation_registration*>(nullptr));
+		::new (&chunk->m_entries[i]) std::atomic<cancellation_registration*>(nullptr);
 	}
 
 	return chunk;
@@ -112,14 +112,15 @@ cppcoro::detail::cancellation_registration_list::allocate()
 		throw std::bad_alloc{};
 	}
 
-	std::atomic_init(&bucket->m_approximateTail, &bucket->m_headChunk);
-	std::atomic_init(&bucket->m_headChunk.m_nextChunk, static_cast<cancellation_registration_list_chunk*>(nullptr));
+	::new (&bucket->m_approximateTail) std::atomic<cancellation_registration_list_chunk*>(&bucket->m_headChunk);
+	::new (&bucket->m_headChunk.m_nextChunk) std::atomic<cancellation_registration_list_chunk*>(nullptr);
 	bucket->m_headChunk.m_prevChunk = nullptr;
-	std::atomic_init(&bucket->m_headChunk.m_approximateFreeCount, static_cast<std::int32_t>(initialChunkSize - 1));
+	::new (&bucket->m_headChunk.m_approximateFreeCount)
+		std::atomic<int32_t>(static_cast<std::int32_t>(initialChunkSize - 1));
 	bucket->m_headChunk.m_entryCount = initialChunkSize;
 	for (std::uint32_t i = 0; i < initialChunkSize; ++i)
 	{
-		std::atomic_init(&bucket->m_headChunk.m_entries[i], static_cast<cancellation_registration*>(nullptr));
+		::new (&bucket->m_headChunk.m_entries[i]) std::atomic<cancellation_registration*>(nullptr);
 	}
 
 	return bucket;
@@ -158,7 +159,7 @@ cppcoro::detail::cancellation_registration_state::allocate()
 	state->m_listCount = listCount;
 	for (std::uint32_t i = 0; i < listCount; ++i)
 	{
-		std::atomic_init(&state->m_lists[i], static_cast<cancellation_registration_list*>(nullptr));
+		::new (&state->m_lists[i]) std::atomic<cancellation_registration_list*>(nullptr);
 	}
 
 	return state;
@@ -187,7 +188,7 @@ cppcoro::detail::cancellation_registration_state::add_registration(
 		// Pre-claim the first slot.
 		registration->m_chunk = &newList->m_headChunk;
 		registration->m_entryIndex = 0;
-		std::atomic_init(&newList->m_headChunk.m_entries[0], registration);
+		::new (&newList->m_headChunk.m_entries[0]) std::atomic<cancellation_registration*>(registration);
 
 		if (listPtr.compare_exchange_strong(
 			list,
@@ -305,7 +306,7 @@ cppcoro::detail::cancellation_registration_state::add_registration(
 		// Pre-allocate first slot.
 		registration->m_chunk = newChunk;
 		registration->m_entryIndex = 0;
-		std::atomic_init(&newChunk->m_entries[0], registration);
+		::new (&newChunk->m_entries[0]) std::atomic<cancellation_registration*>(registration);
 
 		cancellation_registration_list_chunk* oldNext = nullptr;
 		if (lastChunk->m_nextChunk.compare_exchange_strong(
