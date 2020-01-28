@@ -508,13 +508,15 @@ namespace cppcoro
 		constexpr unsigned_diff_t maxSize = static_cast<unsigned_diff_t>(std::numeric_limits<diff_t>::max());
 		assert(bufferSize <= maxSize);
 
-#ifndef __cpp_lib_atomic_value_initialization
 		SEQUENCE seq = initialSequence - (bufferSize - 1);
 		do
 		{
+#ifdef __cpp_lib_atomic_value_initialization
+			m_published[seq & m_sequenceMask].store(seq, std::memory_order_relaxed);
+#else // ^^^ __cpp_lib_atomic_value_initialization // !__cpp_lib_atomic_value_initialization vvv
 			std::atomic_init(&m_published[seq & m_sequenceMask], seq);
-		} while (seq++ != initialSequence);
 #endif // !__cpp_lib_atomic_value_initialization
+		} while (seq++ != initialSequence);
 	}
 
 	template<typename SEQUENCE, typename TRAITS>
