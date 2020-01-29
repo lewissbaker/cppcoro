@@ -7,7 +7,7 @@ language: cpp
 
 os: linux
 
-dist: trusty
+dist: bionic
 
 git:
   submodules: true
@@ -16,11 +16,11 @@ addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
-    - llvm-toolchain-trusty
+    - llvm-toolchain-bionic
     packages:
     - python2.7
-    - clang-9
-    - lld-9
+    - clang-11
+    - lld-11
     - ninja-build
 
 cache:
@@ -37,12 +37,8 @@ env:
   - CMAKE_VERSION="3.9.1"
 matrix:
   include:
-  - env: RELEASE=debug ARCH=x64 CLANG_VERSION=9
-  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=9
-  allow_failures:
-  # Clang 6.0~svn320382 has a bug that causes optimised builds to fail.
-  # See https://bugs.llvm.org/show_bug.cgi?id=34897
-  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=9
+  - env: RELEASE=debug ARCH=x64 CLANG_VERSION=11
+  - env: RELEASE=optimised ARCH=x64 CLANG_VERSION=11
  
 before_install:
 - export CC="$CC-$CLANG_VERSION"
