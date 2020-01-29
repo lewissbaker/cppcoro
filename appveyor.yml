@@ -3,7 +3,6 @@ version: 1.0.{build}
 image:
 - Visual Studio 2017
 - Visual Studio 2019
-- Visual Studio 2019 Preview
 
 platform:
 - x64
