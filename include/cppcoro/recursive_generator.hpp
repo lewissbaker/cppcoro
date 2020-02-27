@@ -16,7 +16,7 @@
 namespace cppcoro
 {
 	template<typename T>
-	class recursive_generator
+	class [[nodiscard]] recursive_generator
 	{
 	public:
 

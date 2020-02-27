@@ -292,7 +292,7 @@ namespace cppcoro
 	}
 
 	template<typename T = void>
-	class shared_task
+	class [[nodiscard]] shared_task
 	{
 	public:
 
