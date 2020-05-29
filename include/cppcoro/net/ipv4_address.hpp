@@ -66,7 +66,7 @@ namespace cppcoro::net
 		constexpr bool is_private_network() const
 		{
 			return m_bytes[0] == 10 ||
-				(m_bytes[0] == 172 && (m_bytes[1] & 0xC0) == 0x10) ||
+				(m_bytes[0] == 172 && (m_bytes[1] & 0xF0) == 0x10) ||
 				(m_bytes[0] == 192 && m_bytes[2] == 168);
 		}
 
