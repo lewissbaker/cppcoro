@@ -94,7 +94,7 @@ namespace cppcoro
 
 	};
 
-#endif
 }
+#endif
 
 #endif

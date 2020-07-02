@@ -10,7 +10,7 @@
 #include <cppcoro/detail/when_all_counter.hpp>
 #include <cppcoro/detail/void_value.hpp>
 
-#include <experimental/coroutine>
+#include <cppcoro/stdcoro.hpp>
 #include <cassert>
 
 namespace cppcoro
@@ -28,7 +28,7 @@ namespace cppcoro
 		{
 		public:
 
-			using coroutine_handle_t = std::experimental::coroutine_handle<when_all_task_promise<RESULT>>;
+			using coroutine_handle_t = stdcoro::coroutine_handle<when_all_task_promise<RESULT>>;
 
 			when_all_task_promise() noexcept
 			{}
@@ -38,7 +38,7 @@ namespace cppcoro
 				return coroutine_handle_t::from_promise(*this);
 			}
 
-			std::experimental::suspend_always initial_suspend() noexcept
+			stdcoro::suspend_always initial_suspend() noexcept
 			{
 				return{};
 			}
@@ -97,7 +97,7 @@ namespace cppcoro
 					bool await_ready() noexcept {
 						return true;
 					}
-					void await_suspend(std::experimental::coroutine_handle<>) noexcept {}
+					void await_suspend(stdcoro::coroutine_handle<>) noexcept {}
 					when_all_task_promise& await_resume() noexcept
 					{
 						return *m_promise;
@@ -155,7 +155,7 @@ namespace cppcoro
 		{
 		public:
 
-			using coroutine_handle_t = std::experimental::coroutine_handle<when_all_task_promise<void>>;
+			using coroutine_handle_t = stdcoro::coroutine_handle<when_all_task_promise<void>>;
 
 			when_all_task_promise() noexcept
 			{}
@@ -165,7 +165,7 @@ namespace cppcoro
 				return coroutine_handle_t::from_promise(*this);
 			}
 
-			std::experimental::suspend_always initial_suspend() noexcept
+			stdcoro::suspend_always initial_suspend() noexcept
 			{
 				return{};
 			}

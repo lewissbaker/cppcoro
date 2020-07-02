@@ -85,7 +85,7 @@ void cppcoro::async_mutex::unlock()
 	waitersHead->m_awaiter.resume();
 }
 
-bool cppcoro::async_mutex_lock_operation::await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+bool cppcoro::async_mutex_lock_operation::await_suspend(stdcoro::coroutine_handle<> awaiter) noexcept
 {
 	m_awaiter = awaiter;
 

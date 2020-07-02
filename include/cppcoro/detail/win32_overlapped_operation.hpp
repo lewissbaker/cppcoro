@@ -13,7 +13,7 @@
 
 #include <optional>
 #include <system_error>
-#include <experimental/coroutine>
+#include <cppcoro/stdcoro.hpp>
 #include <cassert>
 
 namespace cppcoro
@@ -100,7 +100,7 @@ namespace cppcoro
 			bool await_ready() const noexcept { return false; }
 
 			CPPCORO_NOINLINE
-			bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine)
+			bool await_suspend(stdcoro::coroutine_handle<> awaitingCoroutine)
 			{
 				static_assert(std::is_base_of_v<win32_overlapped_operation, OPERATION>);
 
@@ -127,7 +127,7 @@ namespace cppcoro
 				operation->m_awaitingCoroutine.resume();
 			}
 
-			std::experimental::coroutine_handle<> m_awaitingCoroutine;
+			stdcoro::coroutine_handle<> m_awaitingCoroutine;
 
 		};
 
@@ -186,7 +186,7 @@ namespace cppcoro
 			}
 
 			CPPCORO_NOINLINE
-			bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine)
+			bool await_suspend(stdcoro::coroutine_handle<> awaitingCoroutine)
 			{
 				static_assert(std::is_base_of_v<win32_overlapped_operation_cancellable, OPERATION>);
 
@@ -367,7 +367,7 @@ namespace cppcoro
 			std::atomic<state> m_state;
 			cppcoro::cancellation_token m_cancellationToken;
 			std::optional<cppcoro::cancellation_registration> m_cancellationCallback;
-			std::experimental::coroutine_handle<> m_awaitingCoroutine;
+			stdcoro::coroutine_handle<> m_awaitingCoroutine;
 
 		};
 	}

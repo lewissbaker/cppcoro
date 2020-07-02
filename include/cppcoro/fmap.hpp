@@ -38,8 +38,8 @@ namespace cppcoro
 			}
 
 			template<typename PROMISE>
-			decltype(auto) await_suspend(std::experimental::coroutine_handle<PROMISE> coro)
-				noexcept(noexcept(static_cast<awaiter_t&&>(m_awaiter).await_suspend(std::move(coro))))
+			decltype(auto) await_suspend(stdcoro::coroutine_handle<PROMISE> coro)
+				//noexcept(noexcept(static_cast<awaiter_t&&>(m_awaiter).await_suspend(std::move(coro))))
 			{
 				return static_cast<awaiter_t&&>(m_awaiter).await_suspend(std::move(coro));
 			}
