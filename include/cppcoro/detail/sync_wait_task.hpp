@@ -9,9 +9,10 @@
 #include <cppcoro/awaitable_traits.hpp>
 #include <cppcoro/detail/lightweight_manual_reset_event.hpp>
 
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 #include <cassert>
 #include <exception>
+#include <utility>
 
 namespace cppcoro
 {
@@ -23,7 +24,7 @@ namespace cppcoro
 		template<typename RESULT>
 		class sync_wait_task_promise final
 		{
-			using coroutine_handle_t = std::experimental::coroutine_handle<sync_wait_task_promise<RESULT>>;
+			using coroutine_handle_t = cppcoro::coroutine_handle<sync_wait_task_promise<RESULT>>;
 
 		public:
 
@@ -43,7 +44,7 @@ namespace cppcoro
 				return coroutine_handle_t::from_promise(*this);
 			}
 
-			std::experimental::suspend_always initial_suspend() noexcept
+			cppcoro::suspend_always initial_suspend() noexcept
 			{
 				return{};
 			}
@@ -88,7 +89,7 @@ namespace cppcoro
 					bool await_ready() noexcept {
 						return true;
 					}
-					void await_suspend(std::experimental::coroutine_handle<>) noexcept {}
+					void await_suspend(cppcoro::coroutine_handle<>) noexcept {}
 					sync_wait_task_promise& await_resume() noexcept
 					{
 						return *m_promise;
@@ -139,7 +140,7 @@ namespace cppcoro
 		template<>
 		class sync_wait_task_promise<void>
 		{
-			using coroutine_handle_t = std::experimental::coroutine_handle<sync_wait_task_promise<void>>;
+			using coroutine_handle_t = cppcoro::coroutine_handle<sync_wait_task_promise<void>>;
 
 		public:
 
@@ -157,7 +158,7 @@ namespace cppcoro
 				return coroutine_handle_t::from_promise(*this);
 			}
 
-			std::experimental::suspend_always initial_suspend() noexcept
+			cppcoro::suspend_always initial_suspend() noexcept
 			{
 				return{};
 			}
@@ -210,7 +211,7 @@ namespace cppcoro
 
 			using promise_type = sync_wait_task_promise<RESULT>;
 
-			using coroutine_handle_t = std::experimental::coroutine_handle<promise_type>;
+			using coroutine_handle_t = cppcoro::coroutine_handle<promise_type>;
 
 			sync_wait_task(coroutine_handle_t coroutine) noexcept
 				: m_coroutine(coroutine)

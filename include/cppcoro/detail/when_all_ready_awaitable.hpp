@@ -7,7 +7,7 @@
 
 #include <cppcoro/detail/when_all_counter.hpp>
 
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 #include <tuple>
 
 namespace cppcoro
@@ -26,7 +26,7 @@ namespace cppcoro
 			explicit constexpr when_all_ready_awaitable(std::tuple<>) noexcept {}
 
 			constexpr bool await_ready() const noexcept { return true; }
-			void await_suspend(std::experimental::coroutine_handle<>) noexcept {}
+			void await_suspend(cppcoro::coroutine_handle<>) noexcept {}
 			std::tuple<> await_resume() const noexcept { return {}; }
 
 		};
@@ -66,7 +66,7 @@ namespace cppcoro
 						return m_awaitable.is_ready();
 					}
 
-					bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+					bool await_suspend(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 					{
 						return m_awaitable.try_await(awaitingCoroutine);
 					}
@@ -98,7 +98,7 @@ namespace cppcoro
 						return m_awaitable.is_ready();
 					}
 
-					bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+					bool await_suspend(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 					{
 						return m_awaitable.try_await(awaitingCoroutine);
 					}
@@ -124,7 +124,7 @@ namespace cppcoro
 				return m_counter.is_ready();
 			}
 
-			bool try_await(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+			bool try_await(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 			{
 				start_tasks(std::make_integer_sequence<std::size_t, sizeof...(TASKS)>{});
 				return m_counter.try_await(awaitingCoroutine);
@@ -177,7 +177,7 @@ namespace cppcoro
 						return m_awaitable.is_ready();
 					}
 
-					bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+					bool await_suspend(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 					{
 						return m_awaitable.try_await(awaitingCoroutine);
 					}
@@ -212,7 +212,7 @@ namespace cppcoro
 						return m_awaitable.is_ready();
 					}
 
-					bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+					bool await_suspend(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 					{
 						return m_awaitable.try_await(awaitingCoroutine);
 					}
@@ -238,7 +238,7 @@ namespace cppcoro
 				return m_counter.is_ready();
 			}
 
-			bool try_await(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+			bool try_await(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 			{
 				for (auto&& task : m_tasks)
 				{

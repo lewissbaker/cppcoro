@@ -382,7 +382,10 @@ namespace
 	{
 		while (start < end)
 		{
-			co_yield start++;
+      // GCC 10.1 workaround: "co_yield start++ always returns the same value, resulting in an infinite loop
+      // ((++start)-1) seems to have the same issue, while ++start works, but breaks the test
+      start++;
+			co_yield start-1;
 		}
 	}
 

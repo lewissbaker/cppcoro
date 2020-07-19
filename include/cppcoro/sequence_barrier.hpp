@@ -15,7 +15,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 
 namespace cppcoro
 {
@@ -161,7 +161,7 @@ namespace cppcoro
 			return !TRAITS::precedes(m_lastKnownPublished, m_targetSequence);
 		}
 
-		bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+		bool await_suspend(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 		{
 			m_awaitingCoroutine = awaitingCoroutine;
 			m_barrier.add_awaiter(this);
@@ -192,7 +192,7 @@ namespace cppcoro
 		const SEQUENCE m_targetSequence;
 		SEQUENCE m_lastKnownPublished;
 		sequence_barrier_wait_operation_base* m_next;
-		std::experimental::coroutine_handle<> m_awaitingCoroutine;
+		cppcoro::coroutine_handle<> m_awaitingCoroutine;
 		std::atomic<bool> m_readyToResume;
 
 	};

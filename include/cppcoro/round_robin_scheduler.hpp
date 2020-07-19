@@ -7,7 +7,7 @@
 
 #include <cppcoro/config.hpp>
 
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 #include <array>
 #include <cassert>
 #include <algorithm>
@@ -44,8 +44,8 @@ namespace cppcoro
 				return false;
 			}
 
-			std::experimental::coroutine_handle<> await_suspend(
-				std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+			cppcoro::coroutine_handle<> await_suspend(
+				cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 			{
 				return m_scheduler.exchange_next(awaitingCoroutine);
 			}
@@ -61,7 +61,7 @@ namespace cppcoro
 	public:
 		round_robin_scheduler() noexcept
 			: m_index(0)
-			, m_noop(std::experimental::noop_coroutine())
+			, m_noop(cppcoro::noop_coroutine())
 		{
 			for (size_t i = 0; i < N - 1; ++i)
 			{
@@ -104,8 +104,8 @@ namespace cppcoro
 
 	private:
 
-		std::experimental::coroutine_handle exchange_next(
-			std::experimental::coroutine_handle<> coroutine) noexcept
+		cppcoro::coroutine_handle exchange_next(
+			cppcoro::coroutine_handle<> coroutine) noexcept
 		{
 			auto coroutineToResume = std::exchange(
 				m_scheduler.m_coroutines[m_scheduler.m_index],
@@ -115,8 +115,8 @@ namespace cppcoro
 		}
 
 		size_t m_index;
-		const std::experimental::coroutine_handle<> m_noop;
-		std::array<std::experimental::coroutine_handle<>, N - 1> m_coroutines;
+		const cppcoro::coroutine_handle<> m_noop;
+		std::array<cppcoro::coroutine_handle<>, N - 1> m_coroutines;
 	};
 #endif
 }

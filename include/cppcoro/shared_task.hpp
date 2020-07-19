@@ -17,7 +17,7 @@
 #include <utility>
 #include <type_traits>
 
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 
 namespace cppcoro
 {
@@ -28,7 +28,7 @@ namespace cppcoro
 	{
 		struct shared_task_waiter
 		{
-			std::experimental::coroutine_handle<> m_continuation;
+			cppcoro::coroutine_handle<> m_continuation;
 			shared_task_waiter* m_next;
 		};
 
@@ -41,7 +41,7 @@ namespace cppcoro
 				bool await_ready() const noexcept { return false; }
 
 				template<typename PROMISE>
-				void await_suspend(std::experimental::coroutine_handle<PROMISE> h) noexcept
+				void await_suspend(cppcoro::coroutine_handle<PROMISE> h) noexcept
 				{
 					shared_task_promise_base& promise = h.promise();
 
@@ -79,7 +79,7 @@ namespace cppcoro
 				, m_exception(nullptr)
 			{}
 
-			std::experimental::suspend_always initial_suspend() noexcept { return {}; }
+			cppcoro::suspend_always initial_suspend() noexcept { return {}; }
 			final_awaiter final_suspend() noexcept { return {}; }
 
 			void unhandled_exception() noexcept
@@ -124,7 +124,7 @@ namespace cppcoro
 			/// waiter->m_coroutine will be resumed when the task completes.
 			/// false if the coroutine was already completed and the awaiting
 			/// coroutine can continue without suspending.
-			bool try_await(shared_task_waiter* waiter, std::experimental::coroutine_handle<> coroutine)
+			bool try_await(shared_task_waiter* waiter, cppcoro::coroutine_handle<> coroutine)
 			{
 				void* const valueReadyValue = this;
 				void* const notStartedValue = &this->m_waiters;
@@ -304,10 +304,10 @@ namespace cppcoro
 
 		struct awaitable_base
 		{
-			std::experimental::coroutine_handle<promise_type> m_coroutine;
+			cppcoro::coroutine_handle<promise_type> m_coroutine;
 			detail::shared_task_waiter m_waiter;
 
-			awaitable_base(std::experimental::coroutine_handle<promise_type> coroutine) noexcept
+			awaitable_base(cppcoro::coroutine_handle<promise_type> coroutine) noexcept
 				: m_coroutine(coroutine)
 			{}
 
@@ -316,7 +316,7 @@ namespace cppcoro
 				return !m_coroutine || m_coroutine.promise().is_ready();
 			}
 
-			bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+			bool await_suspend(cppcoro::coroutine_handle<> awaiter) noexcept
 			{
 				m_waiter.m_continuation = awaiter;
 				return m_coroutine.promise().try_await(&m_waiter, m_coroutine);
@@ -329,7 +329,7 @@ namespace cppcoro
 			: m_coroutine(nullptr)
 		{}
 
-		explicit shared_task(std::experimental::coroutine_handle<promise_type> coroutine)
+		explicit shared_task(cppcoro::coroutine_handle<promise_type> coroutine)
 			: m_coroutine(coroutine)
 		{
 			// Don't increment the ref-count here since it has already been
@@ -452,7 +452,7 @@ namespace cppcoro
 			}
 		}
 
-		std::experimental::coroutine_handle<promise_type> m_coroutine;
+		cppcoro::coroutine_handle<promise_type> m_coroutine;
 
 	};
 
@@ -480,7 +480,7 @@ namespace cppcoro
 		shared_task<T> shared_task_promise<T>::get_return_object() noexcept
 		{
 			return shared_task<T>{
-				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
+				cppcoro::coroutine_handle<shared_task_promise>::from_promise(*this)
 			};
 		}
 
@@ -488,14 +488,14 @@ namespace cppcoro
 		shared_task<T&> shared_task_promise<T&>::get_return_object() noexcept
 		{
 			return shared_task<T&>{
-				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
+				cppcoro::coroutine_handle<shared_task_promise>::from_promise(*this)
 			};
 		}
 
 		inline shared_task<void> shared_task_promise<void>::get_return_object() noexcept
 		{
 			return shared_task<void>{
-				std::experimental::coroutine_handle<shared_task_promise>::from_promise(*this)
+				cppcoro::coroutine_handle<shared_task_promise>::from_promise(*this)
 			};
 		}
 	}

@@ -112,6 +112,9 @@ TEST_CASE("when_all() with all task types")
 
 		CHECK(a == "foo");
 		CHECK(b.id == 0);
+    // GCC 10.1 fails this check: at this point there are 3 objects alive
+    // * One will be destructed later
+    // * One object is completely leaked
 		CHECK(counted::active_count() == 1);
 	};
 
