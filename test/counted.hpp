@@ -5,6 +5,8 @@
 #ifndef CPPCORO_TESTS_COUNTED_HPP_INCLUDED
 #define CPPCORO_TESTS_COUNTED_HPP_INCLUDED
 
+#include <iostream>
+
 struct counted
 {
 	static int default_construction_count;
@@ -32,10 +34,10 @@ struct counted
 		return construction_count() - destruction_count;
 	}
 
-	counted() : id(default_construction_count++) {}
-	counted(const counted& other) : id(other.id) { ++copy_construction_count; }
-	counted(counted&& other) : id(other.id) { ++move_construction_count; other.id = -1; }
-	~counted() { ++destruction_count; }
+	counted() : id(default_construction_count++) { std::cout << "constructed" << std::endl; }
+	counted(const counted& other) : id(other.id) { ++copy_construction_count; std::cout << "copied" << std::endl; }
+	counted(counted&& other) : id(other.id) { ++move_construction_count; other.id = -1; std::cout << "moved" << std::endl; }
+	~counted() { ++destruction_count; std::cout <<"destructed" << std::endl; }
 
 };
 

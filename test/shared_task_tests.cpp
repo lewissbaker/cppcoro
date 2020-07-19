@@ -120,6 +120,8 @@ TEST_CASE("waiting on shared_task in loop doesn't cause stack-overflow")
 		int result = 0;
 		for (int i = 0; i < 1'000'000; ++i)
 		{
+    // GCC 10.1 workaround: GCC doesn't generate any code for a for loop with only a co_await in it
+      [](){}();
 			result += co_await completesSynchronously();
 		}
 		CHECK(result == 1'000'000);
