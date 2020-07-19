@@ -256,6 +256,11 @@ TEST_CASE("exception thrown after first yield is rethrown from increment operato
 	}());
 }
 
+#if (defined(__GNUC__) && !defined(__clang__))
+#define GCC_COMPILER 1
+#endif
+// GCC 10.1 doesn't support "for co_await"
+#ifndef GCC_COMPILER
 TEST_CASE("large number of synchronous completions doesn't result in stack-overflow")
 {
 
@@ -298,6 +303,7 @@ TEST_CASE("large number of synchronous completions doesn't result in stack-overf
 			consumer(makeSequence(event)),
 			unblocker(event)));
 }
+#endif // GCC_COMPILER
 
 TEST_CASE("fmap")
 {
