@@ -12,6 +12,9 @@
 #if CPPCORO_OS_WINNT
 # include <cppcoro/detail/win32.hpp>
 #endif
+#if CPPCORO_OS_LINUX
+#include <cppcoro/detail/linux.hpp>
+#endif
 
 #include <optional>
 #include <chrono>
@@ -43,7 +46,11 @@ namespace cppcoro
 		/// actively processing events.
 		/// Note that the number of active threads may temporarily go
 		/// above this number.
-		io_service(std::uint32_t concurrencyHint);
+#if CPPCORO_OS_WINNT
+        io_service(std::uint32_t concurrencyHint);
+#elif CPPCORO_OS_LINUX
+        io_service(size_t queue_length);
+#endif
 
 		~io_service();
 
@@ -135,6 +142,8 @@ namespace cppcoro
 #if CPPCORO_OS_WINNT
 		detail::win32::handle_t native_iocp_handle() noexcept;
 		void ensure_winsock_initialised();
+#elif defined(CPPCORO_OS_LINUX)
+		io_uring *native_uring_handle() noexcept;
 #endif
 
 	private:
@@ -172,6 +181,11 @@ namespace cppcoro
 
 		std::atomic<bool> m_winsockInitialised;
 		std::mutex m_winsockInitialisationMutex;
+#endif
+
+#if CPPCORO_OS_LINUX
+        detail::lnx::message_queue m_mq;
+		detail::lnx::uring_queue m_uq;
 #endif
 
 		// Head of a linked-list of schedule operations that are

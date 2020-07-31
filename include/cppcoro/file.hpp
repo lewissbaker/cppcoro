@@ -13,6 +13,8 @@
 
 #if CPPCORO_OS_WINNT
 # include <cppcoro/detail/win32.hpp>
+#else
+# include <cppcoro/detail/linux.hpp>
 #endif
 
 #include <experimental/filesystem>
@@ -34,7 +36,6 @@ namespace cppcoro
 
 	protected:
 
-#if CPPCORO_OS_WINNT
 		file(detail::win32::safe_handle&& fileHandle) noexcept;
 
 		static detail::win32::safe_handle open(
@@ -46,8 +47,6 @@ namespace cppcoro
 			file_buffering_mode bufferingMode);
 
 		detail::win32::safe_handle m_fileHandle;
-#endif
-
 	};
 }
 

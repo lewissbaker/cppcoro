@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 include(CheckIncludeFileCXX)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 project(cppcoro)
 
 set(${PROJECT_NAME}_SOURCES
@@ -74,6 +76,7 @@ set(${PROJECT_NAME}_SOURCES
   include/cppcoro/net/ipv6_endpoint.hpp
   include/cppcoro/net/ip_address.hpp
   include/cppcoro/net/ip_endpoint.hpp
+  include/cppcoro/io_service.hpp
 
   # sources
   lib/async_auto_reset_event.cpp
@@ -94,6 +97,7 @@ set(${PROJECT_NAME}_SOURCES
   lib/ipv6_endpoint.cpp
   lib/ip_address.cpp
   lib/ip_endpoint.cpp
+  lib/io_service.cpp
 )
 
 
@@ -110,7 +114,6 @@ if(WIN32)
     include/cppcoro/net/socket_send_operation.hpp
     include/cppcoro/net/socket_send_to_operation.hpp
 
-    include/cppcoro/io_service.hpp
 
     # sources
 
@@ -122,7 +125,7 @@ if(WIN32)
     lib/read_only_file.cpp
     lib/read_write_file.cpp
     lib/win32.cpp
-    lib/file_win32.cpp
+          lib/file.cpp
 
     lib/socket.cpp
     lib/socket_accept_operation.cpp
@@ -133,8 +136,6 @@ if(WIN32)
     lib/socket_recv_operation.cpp
     lib/socket_send_operation.cpp
     lib/socket_send_to_operation.cpp
-
-    lib/io_service.cpp
   )
 
   list(APPEND ${PROJECT_NAME}_SOURCES
@@ -143,7 +144,6 @@ if(WIN32)
     include/cppcoro/detail/win32_overlapped_operation.hpp
   )
 else()
-
   list(APPEND ${PROJECT_NAME}_SOURCES
           # headers
           include/cppcoro/detail/linux.hpp
@@ -159,15 +159,31 @@ if(WIN32)
   target_compile_options(${PROJECT_NAME} PUBLIC "/std:c++latest")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES GNU)
   target_compile_options(${PROJECT_NAME} PUBLIC -fcoroutines)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+  target_compile_options(${PROJECT_NAME} PUBLIC -stdlib=libc++)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
 endif()
 
-check_include_file_cxx(coroutine HAS_STD_COROUTINE_HEADER)
-check_include_file_cxx(experimental/coroutine HAS_STD_EXPERIMENTAL_COROUTINES_HEADER)
+if(UNIX)
+  find_package(Threads REQUIRED)
+  find_package(uring REQUIRED)
+  target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads uring::uring rt uuid)
+endif()
+
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL GNU AND CMAKE_CXX_COMPILER_VERSION GREATER_EQUAL 10)
   # TODO remove this check when cmake is able to detect it
   set(HAS_STD_COROUTINE_HEADER 1)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
+    # TODO remove this check when cmake is able to detect it
+    unset(HAS_STD_COROUTINE_HEADER)
+    set(HAS_STD_EXPERIMENTAL_COROUTINES_HEADER 1)
+else()
+  check_include_file_cxx(coroutine HAS_STD_COROUTINE_HEADER)
+  check_include_file_cxx(experimental/coroutine HAS_STD_EXPERIMENTAL_COROUTINES_HEADER)
 endif()
+message(STATUS "HAS_STD_COROUTINE_HEADER: ${HAS_STD_COROUTINE_HEADER}")
+message(STATUS "HAS_STD_EXPERIMENTAL_COROUTINES_HEADER: ${HAS_STD_EXPERIMENTAL_COROUTINES_HEADER}")
 
 if(HAS_STD_COROUTINE_HEADER)
   target_compile_options(${PROJECT_NAME} PUBLIC ${CMAKE_REQUIRED_FLAGS}
@@ -176,3 +192,14 @@ if(HAS_STD_COROUTINE_HEADER)
 endif()
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${CMAKE_REQUIRED_DEFINITIONS})
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_REQUIRED_INCLUDES})
+add_library(cppcoro::coro ALIAS ${PROJECT_NAME})
+
+option(BUILD_EXAMPLES "Build examples" ON)
+if(BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+  add_subdirectory(test)
+endif()
