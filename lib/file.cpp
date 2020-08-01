@@ -210,7 +210,6 @@ cppcoro::detail::safe_handle cppcoro::file::open(
 	}
 #elif defined(CPPCORO_OS_LINUX)
     (void) bufferingMode; // unused yet
-    (void) fileAccess;
 
 	int flags = 0;
 
@@ -239,13 +238,14 @@ cppcoro::detail::safe_handle cppcoro::file::open(
             flags |= O_WRONLY;
             break;
         case file_share_mode::read_write:
+        case file_share_mode::none:
             flags |= O_RDWR;
             break;
 		default:
             throw std::system_error {0, std::system_category(), "file::open unsupported share_mode"};
 	}
 
-    detail::safe_handle fileHandle(::open(path.c_str(), flags));
+    detail::safe_handle fileHandle(::open(path.c_str(), flags, fileAccess));
 	if (fileHandle.fd() < 0)
 	{
 		throw std::system_error {

@@ -43,6 +43,22 @@ void cppcoro::writable_file::set_size(
 		};
 	}
 }
+#else
+
+void cppcoro::writable_file::set_size(
+    std::uint64_t fileSize)
+{
+    if (ftruncate(m_fileHandle.fd(), fileSize) < 0) {
+        throw std::system_error
+            {
+                static_cast<int>(errno),
+                std::system_category(),
+                "error setting file size: ftruncate"
+            };
+    }
+}
+
+#endif
 
 cppcoro::file_write_operation cppcoro::writable_file::write(
 	std::uint64_t offset,
@@ -50,6 +66,9 @@ cppcoro::file_write_operation cppcoro::writable_file::write(
 	std::size_t byteCount) noexcept
 {
 	return file_write_operation{
+#ifdef CPPCORO_OS_LINUX
+		*m_ioService,
+#endif
 		m_fileHandle.handle(),
 		offset,
 		buffer,
@@ -64,6 +83,9 @@ cppcoro::file_write_operation_cancellable cppcoro::writable_file::write(
 	cancellation_token ct) noexcept
 {
 	return file_write_operation_cancellable{
+#ifdef CPPCORO_OS_LINUX
+        *m_ioService,
+#endif
 		m_fileHandle.handle(),
 		offset,
 		buffer,
@@ -71,5 +93,3 @@ cppcoro::file_write_operation_cancellable cppcoro::writable_file::write(
 		std::move(ct)
 	};
 }
-
-#endif

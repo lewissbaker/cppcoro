@@ -6,6 +6,7 @@
 #include <cppcoro/io_service.hpp>
 #include <cppcoro/on_scope_exit.hpp>
 #include <cppcoro/read_only_file.hpp>
+#include <cppcoro/read_write_file.hpp>
 
 #include <sys/ioctl.h>
 
@@ -100,7 +101,8 @@ int main(int argc, char** argv)
 	using namespace std::chrono_literals;
 	using namespace cppcoro;
 	io_service ios;
-	std::string content;
+    std::string check;
+	std::string content{"Hello world"};
 	(void)sync_wait(when_all(
 		[&]() -> task<> {
 			auto _ = on_scope_exit([&] { ios.stop(); });
@@ -115,11 +117,21 @@ int main(int argc, char** argv)
 //          std::cout << "2\n";
 //          co_await ios.schedule_after(1s);
 //			std::cout << "1\n";
-		  auto f = read_only_file::open(ios, __FILE__);
-		  content.resize(f.size());
-		  co_await f.read(0, content.data(), content.size());
 
-		  std::cout << "got: " << content << '\n';
+			std::string tmp;
+			auto this_file = read_only_file::open(ios, __FILE__);
+			tmp.resize(this_file.size());
+			co_await this_file.read(0, tmp.data(), tmp.size());
+          std::cout << "got: " << tmp << '\n';
+
+          auto f = read_write_file::open(ios, "./test.txt", file_open_mode::create_always);
+		  co_await f.write(0, content.data(), content.size());
+		  check.resize(content.size());
+		  co_await f.read(0, check.data(), check.size());
+
+		  assert(check == content);
+
+		  std::cout << "got: " << check << '\n';
 
 		  co_return;
 		}(),

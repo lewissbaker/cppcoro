@@ -58,10 +58,12 @@ bool cppcoro::file_read_operation_impl::try_start(
     const size_t numberOfBytesToRead =
         m_byteCount <= std::numeric_limits<size_t>::max() ?
               m_byteCount : std::numeric_limits<size_t>::max();
-	iovec vec {m_buffer, numberOfBytesToRead};
     m_message.m_ptr = operation.m_awaitingCoroutine.address();
     auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
-    io_uring_prep_readv(sqe, m_fileHandle, &vec, 1, 0);
+    m_vec.iov_base = m_buffer;
+    m_vec.iov_len = numberOfBytesToRead;
+	iovec vec {m_buffer, numberOfBytesToRead};
+    io_uring_prep_readv(sqe, m_fileHandle, &m_vec, 1, 0);
     io_uring_sqe_set_data(sqe, &m_message);
     io_uring_submit(m_ioService.native_uring_handle());
     return true;

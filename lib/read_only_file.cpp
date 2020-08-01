@@ -11,7 +11,7 @@
 # endif
 # include <Windows.h>
 #elif defined(CPPCORO_OS_LINUX)
-#define GENERIC_READ 0
+#define GENERIC_READ (S_IRUSR | S_IRGRP | S_IROTH)
 #endif
 
 cppcoro::read_only_file cppcoro::read_only_file::open(

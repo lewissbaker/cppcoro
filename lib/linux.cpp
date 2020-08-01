@@ -171,13 +171,19 @@ namespace cppcoro
             } else if (ret < 0) {
                 throw std::system_error{-ret,
                                         std::system_category(),
-                                        std::string{"io_uring_peek_cqe failed"} +
-                                        std::strerror(-ret)};
+                                        std::string{"io_uring_peek_cqe failed"}};
             } else {
 				io_uring_cqe_seen(&ring_, cqe);
+				auto res = cqe->res;
                 message *msg_ptr = reinterpret_cast<message*>(io_uring_cqe_get_data(cqe));
-				msg = msg_ptr->m_ptr;
-				type = msg_ptr->m_type;
+                msg = msg_ptr->m_ptr;
+                type = msg_ptr->m_type;
+				if (res < 0) {
+                    throw std::system_error{-res,
+                                            std::system_category(),
+                                            std::string{"io_ring operation failed"} +
+                                            std::strerror(-res)};
+				}
 				return true;  // completed
 			}
 		}

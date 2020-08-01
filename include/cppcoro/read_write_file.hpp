@@ -56,10 +56,7 @@ namespace cppcoro
 
 	protected:
 
-#if CPPCORO_OS_WINNT
 		read_write_file(detail::safe_handle&& fileHandle) noexcept;
-#endif
-
 	};
 }
 

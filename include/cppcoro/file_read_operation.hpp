@@ -128,6 +128,7 @@ namespace cppcoro
         std::size_t m_byteCount;
 		io_service &m_ioService;
 		detail::lnx::message m_message;
+		iovec m_vec;
     };
 
     class file_read_operation
@@ -138,7 +139,7 @@ namespace cppcoro
         file_read_operation(
 			io_service &ioService,
             detail::lnx::fd_t fileHandle,
-            std::size_t fileOffset,
+            std::uint64_t fileOffset,
             void* buffer,
             std::size_t byteCount) noexcept
             : cppcoro::detail::uring_operation<file_read_operation>(fileOffset)

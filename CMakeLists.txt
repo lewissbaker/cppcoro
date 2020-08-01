@@ -108,6 +108,10 @@ set(${PROJECT_NAME}_SOURCES
   lib/read_only_file.cpp
   lib/file_read_operation.cpp
   lib/readable_file.cpp
+  lib/file_write_operation.cpp
+  lib/writable_file.cpp
+  lib/write_only_file.cpp
+  lib/read_write_file.cpp
 )
 
 
@@ -126,11 +130,6 @@ if(WIN32)
 
 
     # sources
-
-    lib/file_write_operation.cpp
-    lib/writable_file.cpp
-    lib/write_only_file.cpp
-    lib/read_write_file.cpp
     lib/win32.cpp
 
     lib/socket.cpp
