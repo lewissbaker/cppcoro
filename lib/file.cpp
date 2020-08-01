@@ -14,6 +14,11 @@
 #  define WIN32_LEAN_AND_MEAN
 # endif
 # include <Windows.h>
+#elif defined(CPPCORO_OS_LINUX)
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #endif
 
 cppcoro::file::~file()
@@ -36,22 +41,62 @@ std::uint64_t cppcoro::file::size() const
 	}
 
 	return size.QuadPart;
+#else
+    struct stat st;
+
+    if (fstat(m_fileHandle.fd(), &st) < 0)
+	{
+        throw std::system_error
+            {
+                static_cast<int>(errno),
+                std::system_category(),
+                "error getting file size: fstat"
+            };
+	}
+	if (S_ISREG(st.st_mode))
+    {
+        return st.st_size;
+    }
+    else if (S_ISBLK(st.st_mode))
+    {
+        unsigned long long bytes;
+
+        if (ioctl(m_fileHandle.fd(), BLKGETSIZE64, &bytes) != 0)
+		{
+            throw std::system_error
+                {
+                    static_cast<int>(errno),
+                    std::system_category(),
+                    "error getting file size: ioctl"
+                };
+		}
+
+		return bytes;
+    }
+
+    throw std::system_error
+        {
+            static_cast<int>(errno),
+            std::system_category(),
+            "error getting file size"
+        };
 #endif
 }
 
-cppcoro::file::file(detail::win32::safe_handle&& fileHandle) noexcept
+cppcoro::file::file(detail::safe_handle&& fileHandle) noexcept
 	: m_fileHandle(std::move(fileHandle))
 {
 }
 
-cppcoro::detail::win32::safe_handle cppcoro::file::open(
-	detail::win32::dword_t fileAccess,
+cppcoro::detail::safe_handle cppcoro::file::open(
+	detail::dword_t fileAccess,
 	io_service& ioService,
-	const std::experimental::filesystem::path& path,
+	const stdcoro::filesystem::path& path,
 	file_open_mode openMode,
 	file_share_mode shareMode,
 	file_buffering_mode bufferingMode)
 {
+#if CPPCORO_OS_WINNT
 	DWORD flags = FILE_FLAG_OVERLAPPED;
 	if ((bufferingMode & file_buffering_mode::random_access) == file_buffering_mode::random_access)
 	{
@@ -163,6 +208,52 @@ cppcoro::detail::win32::safe_handle cppcoro::file::open(
 			"error opening file: SetFileCompletionNotificationModes"
 		};
 	}
+#elif defined(CPPCORO_OS_LINUX)
+    (void) bufferingMode; // unused yet
+    (void) fileAccess;
+
+	int flags = 0;
+
+    switch (openMode) {
+        case file_open_mode::create_or_open:
+            flags = O_CREAT;
+            break;
+        case file_open_mode::create_always:
+            flags = O_CREAT | O_TRUNC;
+            break;
+        case file_open_mode::create_new:
+            flags = O_CREAT | O_EXCL;
+            break;
+        case file_open_mode::open_existing:
+            break;
+        case file_open_mode::truncate_existing:
+            flags = O_TRUNC;
+            break;
+	}
+
+    switch (shareMode) {
+		case file_share_mode::read:
+			flags |= O_RDONLY;
+			break;
+        case file_share_mode::write:
+            flags |= O_WRONLY;
+            break;
+        case file_share_mode::read_write:
+            flags |= O_RDWR;
+            break;
+		default:
+            throw std::system_error {0, std::system_category(), "file::open unsupported share_mode"};
+	}
+
+    detail::safe_handle fileHandle(::open(path.c_str(), flags));
+	if (fileHandle.fd() < 0)
+	{
+		throw std::system_error {
+			errno,
+            std::generic_category()
+		};
+	}
+#endif
 
 	return std::move(fileHandle);
 }

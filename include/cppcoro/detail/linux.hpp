@@ -69,6 +69,7 @@ namespace cppcoro
 				}
 
 				constexpr fd_t fd() const { return m_fd; }
+                constexpr fd_t handle() const { return m_fd; }
 
 				/// Calls close() and sets the fd to -1.
 				void close() noexcept;
@@ -130,7 +131,10 @@ namespace cppcoro
 			safe_fd create_timer_fd();
 			safe_fd create_epoll_fd();
 		}  // namespace linux
+
 		using safe_handle = lnx::safe_fd;
+        using dword_t = int;
+
     }  // namespace detail
 }  // namespace cppcoro
 

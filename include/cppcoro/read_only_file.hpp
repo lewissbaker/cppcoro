@@ -49,10 +49,7 @@ namespace cppcoro
 
 	protected:
 
-#if CPPCORO_OS_WINNT
-		read_only_file(detail::win32::safe_handle&& fileHandle) noexcept;
-#endif
-
+		read_only_file(detail::safe_handle&& fileHandle) noexcept;
 	};
 }
 

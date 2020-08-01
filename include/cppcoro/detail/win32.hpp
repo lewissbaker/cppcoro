@@ -174,6 +174,7 @@ namespace cppcoro
 			};
 		}
 	}
+	using safe_handle = win32::safe_handle;
 }
 
 #endif

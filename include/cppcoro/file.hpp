@@ -7,6 +7,7 @@
 
 #include <cppcoro/config.hpp>
 
+#include <cppcoro/stdcoro.hpp>
 #include <cppcoro/file_open_mode.hpp>
 #include <cppcoro/file_share_mode.hpp>
 #include <cppcoro/file_buffering_mode.hpp>
@@ -16,8 +17,6 @@
 #else
 # include <cppcoro/detail/linux.hpp>
 #endif
-
-#include <experimental/filesystem>
 
 namespace cppcoro
 {
@@ -36,17 +35,20 @@ namespace cppcoro
 
 	protected:
 
-		file(detail::win32::safe_handle&& fileHandle) noexcept;
+		file(detail::safe_handle&& fileHandle) noexcept;
 
-		static detail::win32::safe_handle open(
-			detail::win32::dword_t fileAccess,
+		static detail::safe_handle open(
+			detail::dword_t fileAccess,
 			io_service& ioService,
 			const stdcoro::filesystem::path& path,
 			file_open_mode openMode,
 			file_share_mode shareMode,
 			file_buffering_mode bufferingMode);
 
-		detail::win32::safe_handle m_fileHandle;
+		detail::safe_handle m_fileHandle;
+#ifdef CPPCORO_OS_LINUX
+		io_service *m_ioService;
+#endif
 	};
 }
 

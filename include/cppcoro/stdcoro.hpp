@@ -1,6 +1,8 @@
 #ifndef CPPCORO_STDCORO_HPP_INCLUDED
 #define CPPCORO_STDCORO_HPP_INCLUDED
 
+#include <filesystem>
+
 #ifdef HAS_STD_COROUTINE_HEADER
 #include <coroutine>
 namespace stdcoro = std;

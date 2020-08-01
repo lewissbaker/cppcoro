@@ -78,6 +78,11 @@ set(${PROJECT_NAME}_SOURCES
   include/cppcoro/net/ip_endpoint.hpp
   include/cppcoro/io_service.hpp
 
+  include/cppcoro/file.hpp
+  include/cppcoro/read_only_file.hpp
+  include/cppcoro/file_read_operation.hpp
+  include/cppcoro/readable_file.hpp
+
   # sources
   lib/async_auto_reset_event.cpp
   lib/async_manual_reset_event.cpp
@@ -98,6 +103,11 @@ set(${PROJECT_NAME}_SOURCES
   lib/ip_address.cpp
   lib/ip_endpoint.cpp
   lib/io_service.cpp
+
+  lib/file.cpp
+  lib/read_only_file.cpp
+  lib/file_read_operation.cpp
+  lib/readable_file.cpp
 )
 
 
@@ -117,15 +127,11 @@ if(WIN32)
 
     # sources
 
-    lib/file_read_operation.cpp
     lib/file_write_operation.cpp
     lib/writable_file.cpp
     lib/write_only_file.cpp
-    lib/readable_file.cpp
-    lib/read_only_file.cpp
     lib/read_write_file.cpp
     lib/win32.cpp
-          lib/file.cpp
 
     lib/socket.cpp
     lib/socket_accept_operation.cpp

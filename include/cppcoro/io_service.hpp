@@ -148,7 +148,10 @@ namespace cppcoro
 
 	private:
 
+#if CPPCORO_OS_WINNT
 		class timer_thread_state;
+#endif
+
 		class timer_queue;
 
 		friend class schedule_operation;
@@ -165,7 +168,9 @@ namespace cppcoro
 
 		void post_wake_up_event() noexcept;
 
+#if CPPCORO_OS_WINNT
 		timer_thread_state* ensure_timer_thread_started();
+#endif
 
 		static constexpr std::uint32_t stop_requested_flag = 1;
 		static constexpr std::uint32_t active_thread_count_increment = 2;
@@ -184,8 +189,8 @@ namespace cppcoro
 #endif
 
 #if CPPCORO_OS_LINUX
-        detail::lnx::message_queue m_mq;
 		detail::lnx::uring_queue m_uq;
+		detail::lnx::message m_nopMessage{ detail::lnx::message_type::RESUME_TYPE, nullptr };
 #endif
 
 		// Head of a linked-list of schedule operations that are
@@ -193,7 +198,10 @@ namespace cppcoro
 		// completion port (eg. due to low memory).
 		std::atomic<schedule_operation*> m_scheduleOperations;
 
+
+#if CPPCORO_OS_WINNT
 		std::atomic<timer_thread_state*> m_timerState;
+#endif
 
 	};
 
@@ -218,6 +226,9 @@ namespace cppcoro
 		stdcoro::coroutine_handle<> m_awaiter;
 		schedule_operation* m_next;
 
+#ifdef CPPCORO_OS_LINUX
+		detail::lnx::message m_message{detail::lnx::message_type::RESUME_TYPE};
+#endif
 	};
 
 	class io_service::timed_schedule_operation
@@ -244,7 +255,10 @@ namespace cppcoro
 	private:
 
 		friend class io_service::timer_queue;
+
+#if CPPCORO_OS_WINNT
 		friend class io_service::timer_thread_state;
+#endif
 
 		io_service::schedule_operation m_scheduleOperation;
 		std::chrono::high_resolution_clock::time_point m_resumeTime;
@@ -256,6 +270,9 @@ namespace cppcoro
 
 		std::atomic<std::uint32_t> m_refCount;
 
+#ifdef CPPCORO_OS_LINUX
+        detail::lnx::message m_message{detail::lnx::message_type::RESUME_TYPE};
+#endif
 	};
 
 	class io_work_scope
