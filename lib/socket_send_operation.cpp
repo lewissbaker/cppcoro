@@ -13,7 +13,7 @@
 # include <Windows.h>
 
 bool cppcoro::net::socket_send_operation_impl::try_start(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+	cppcoro::detail::io_operation_base& operation) noexcept
 {
 	// Need to read this flag before starting the operation, otherwise
 	// it may be possible that the operation will complete immediately
@@ -54,7 +54,7 @@ bool cppcoro::net::socket_send_operation_impl::try_start(
 }
 
 void cppcoro::net::socket_send_operation_impl::cancel(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+	cppcoro::detail::io_operation_base& operation) noexcept
 {
 	(void)::CancelIoEx(
 		reinterpret_cast<HANDLE>(m_socket.native_handle()),

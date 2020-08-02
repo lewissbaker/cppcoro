@@ -14,7 +14,7 @@
 #  define WIN32_LEAN_AND_MEAN
 # endif
 # include <Windows.h>
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -208,7 +208,7 @@ cppcoro::detail::safe_handle cppcoro::file::open(
 			"error opening file: SetFileCompletionNotificationModes"
 		};
 	}
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
     (void) bufferingMode; // unused yet
 
 	int flags = 0;

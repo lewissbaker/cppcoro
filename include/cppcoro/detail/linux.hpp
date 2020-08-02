@@ -92,6 +92,7 @@ namespace cppcoro
 			{
 				enum message_type m_type;
 				void* m_ptr;
+				int m_result;
 			};
 
 			struct io_state : lnx::message
@@ -134,6 +135,11 @@ namespace cppcoro
 
 		using safe_handle = lnx::safe_fd;
         using dword_t = int;
+		struct sock_buf {
+            sock_buf(void *buf, size_t sz) : buffer(buf), size(sz) {}
+			void * buffer;
+			size_t size;
+		};
 
     }  // namespace detail
 }  // namespace cppcoro

@@ -6,7 +6,7 @@ include(ExternalProject)
 
 ExternalProject_Add(_fetch_uring
         GIT_REPOSITORY https://github.com/axboe/liburing.git
-        GIT_TAG liburing-0.6
+        GIT_TAG master
         CONFIGURE_COMMAND ./configure --prefix=${CMAKE_CURRENT_BINARY_DIR}
         BUILD_COMMAND make -j4
         BUILD_IN_SOURCE 1

@@ -83,6 +83,15 @@ set(${PROJECT_NAME}_SOURCES
   include/cppcoro/file_read_operation.hpp
   include/cppcoro/readable_file.hpp
 
+  include/cppcoro/net/socket.hpp
+  include/cppcoro/net/socket_accept_operation.hpp
+  include/cppcoro/net/socket_connect_operation.hpp
+  include/cppcoro/net/socket_disconnect_operation.hpp
+  include/cppcoro/net/socket_recv_from_operation.hpp
+  include/cppcoro/net/socket_recv_operation.hpp
+  include/cppcoro/net/socket_send_operation.hpp
+  include/cppcoro/net/socket_send_to_operation.hpp
+
   # sources
   lib/async_auto_reset_event.cpp
   lib/async_manual_reset_event.cpp
@@ -112,6 +121,16 @@ set(${PROJECT_NAME}_SOURCES
   lib/writable_file.cpp
   lib/write_only_file.cpp
   lib/read_write_file.cpp
+
+  lib/socket.cpp
+  lib/socket_accept_operation.cpp
+  lib/socket_connect_operation.cpp
+  lib/socket_disconnect_operation.cpp
+  lib/socket_helpers.cpp
+  lib/socket_recv_from_operation.cpp
+  lib/socket_recv_operation.cpp
+  lib/socket_send_operation.cpp
+  lib/socket_send_to_operation.cpp
 )
 
 
@@ -119,34 +138,14 @@ if(WIN32)
   list(APPEND ${PROJECT_NAME}_SOURCES
     # headers
 
-    include/cppcoro/net/socket.hpp
-    include/cppcoro/net/socket_accept_operation.hpp
-    include/cppcoro/net/socket_connect_operation.hpp
-    include/cppcoro/net/socket_disconnect_operation.hpp
-    include/cppcoro/net/socket_recv_from_operation.hpp
-    include/cppcoro/net/socket_recv_operation.hpp
-    include/cppcoro/net/socket_send_operation.hpp
-    include/cppcoro/net/socket_send_to_operation.hpp
-
-
     # sources
     lib/win32.cpp
-
-    lib/socket.cpp
-    lib/socket_accept_operation.cpp
-    lib/socket_connect_operation.cpp
-    lib/socket_disconnect_operation.cpp
-    lib/socket_helpers.cpp
-    lib/socket_recv_from_operation.cpp
-    lib/socket_recv_operation.cpp
-    lib/socket_send_operation.cpp
-    lib/socket_send_to_operation.cpp
   )
 
   list(APPEND ${PROJECT_NAME}_SOURCES
     # headers
     include/cppcoro/detail/win32.hpp
-    include/cppcoro/detail/win32_overlapped_operation.hpp
+    include/cppcoro/detail/io_operation.hpp
   )
 else()
   list(APPEND ${PROJECT_NAME}_SOURCES

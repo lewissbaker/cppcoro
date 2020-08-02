@@ -142,7 +142,7 @@ namespace cppcoro
 #if CPPCORO_OS_WINNT
 		detail::win32::handle_t native_iocp_handle() noexcept;
 		void ensure_winsock_initialised();
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
 		io_uring *native_uring_handle() noexcept;
 #endif
 

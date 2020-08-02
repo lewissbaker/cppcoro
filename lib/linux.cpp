@@ -178,12 +178,7 @@ namespace cppcoro
                 message *msg_ptr = reinterpret_cast<message*>(io_uring_cqe_get_data(cqe));
                 msg = msg_ptr->m_ptr;
                 type = msg_ptr->m_type;
-				if (res < 0) {
-                    throw std::system_error{-res,
-                                            std::system_category(),
-                                            std::string{"io_ring operation failed"} +
-                                            std::strerror(-res)};
-				}
+				msg_ptr->m_result = res;
 				return true;  // completed
 			}
 		}

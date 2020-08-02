@@ -16,6 +16,8 @@
 #include <system_error>
 #include <cppcoro/stdcoro.hpp>
 #include <cassert>
+#include <cstring>
+#include <arpa/inet.h>
 
 namespace cppcoro
 {
@@ -23,31 +25,87 @@ namespace cppcoro
     {
         class uring_operation_base
         {
+			void submitt(io_uring_sqe *sqe) {
+                m_message.m_ptr = m_awaitingCoroutine.address();
+                io_uring_sqe_set_data(sqe, &m_message);
+                io_uring_submit(m_ioService.native_uring_handle());
+			}
         public:
 
-            uring_operation_base(size_t offset) noexcept
-                : m_errorCode(0)
-                , m_numberOfBytesTransferred(0)
-			    , m_offset(offset)
+            uring_operation_base(io_service &ioService, size_t offset = 0) noexcept
+			    : m_ioService(ioService), m_offset(offset)
+			    , m_message{detail::lnx::message_type::RESUME_TYPE, nullptr, -1}
             {}
+
+            bool try_start_read(int fd, void *buffer, size_t size) noexcept
+            {
+                m_vec.iov_base = buffer;
+                m_vec.iov_len = size;
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_readv(sqe, fd, &m_vec, 1, 0);
+				submitt(sqe);
+                return true;
+            }
+
+            bool try_start_write(int fd, const void *buffer, size_t size) noexcept
+            {
+                m_vec.iov_base = const_cast<void*>(buffer);
+                m_vec.iov_len = size;
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_writev(sqe, fd, &m_vec, 1, 0);
+                submitt(sqe);
+                return true;
+            }
+
+            bool try_start_sendto(int fd, const void* to, size_t to_size, void *buffer, size_t size) noexcept
+            {
+                m_vec.iov_base = buffer;
+                m_vec.iov_len = size;
+                std::memset(&m_msghdr, 0, sizeof(m_msghdr));
+                m_msghdr.msg_name = const_cast<void*>(to);
+				m_msghdr.msg_namelen = to_size;
+                m_msghdr.msg_iov = &m_vec;
+				m_msghdr.msg_iovlen = 1;
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_sendmsg(sqe, fd, &m_msghdr, 0);
+                submitt(sqe);
+                return true;
+            }
+
+            bool try_start_recvfrom(int fd, void* from, size_t from_size, void *buffer, size_t size) noexcept
+            {
+                m_vec.iov_base = buffer;
+                m_vec.iov_len = size;
+                std::memset(&m_msghdr, 0, sizeof(m_msghdr));
+                m_msghdr.msg_name = from;
+                m_msghdr.msg_namelen = from_size;
+                m_msghdr.msg_iov = &m_vec;
+                m_msghdr.msg_iovlen = 1;
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_recvmsg(sqe, fd, &m_msghdr, 0);
+                submitt(sqe);
+                return true;
+            }
 
             std::size_t get_result()
             {
-                if (m_errorCode != 0)
+                if (m_message.m_result < 0)
                 {
                     throw std::system_error{
-                        static_cast<int>(m_errorCode),
+                        static_cast<int>(-m_message.m_result),
                         std::system_category()
                     };
                 }
 
-                return m_numberOfBytesTransferred;
+                return m_message.m_result;
             }
 
-            int m_errorCode;
-            size_t m_numberOfBytesTransferred;
 			size_t m_offset;
             stdcoro::coroutine_handle<> m_awaitingCoroutine;
+			iovec m_vec;
+			msghdr m_msghdr;
+			detail::lnx::message m_message;
+			io_service &m_ioService;
         };
 
         template<typename OPERATION>
@@ -56,8 +114,8 @@ namespace cppcoro
         {
         protected:
 
-            uring_operation(size_t offset) noexcept
-				: uring_operation_base(offset)
+            uring_operation(io_service &ioService, size_t offset = 0) noexcept
+				: uring_operation_base(ioService, offset)
             {}
 
         public:
@@ -88,18 +146,18 @@ namespace cppcoro
 
         protected:
 
-            uring_operation_cancellable(cancellation_token&& ct) noexcept
-                : uring_operation_base(0)
+            uring_operation_cancellable(io_service &ioService, cancellation_token&& ct) noexcept
+                : uring_operation_base(ioService, 0)
 				, m_cancellationToken(std::move(ct))
             {
-                m_errorCode = error_operation_aborted;
+                m_message.m_result = error_operation_aborted;
             }
 
-            uring_operation_cancellable(size_t offset, cancellation_token&& ct) noexcept
-                : uring_operation_base(offset)
+            uring_operation_cancellable(io_service &ioService, size_t offset, cancellation_token&& ct) noexcept
+                : uring_operation_base(ioService, offset)
                 , m_cancellationToken(std::move(ct))
             {
-                m_errorCode = error_operation_aborted;
+                m_message.m_result = error_operation_aborted;
             }
 
         public:
@@ -187,7 +245,7 @@ namespace cppcoro
 
             decltype(auto) await_resume()
             {
-                if (m_errorCode == error_operation_aborted)
+                if (m_message.m_result == error_operation_aborted)
                 {
                     throw operation_cancelled{};
                 }
@@ -239,8 +297,15 @@ namespace cppcoro
             std::atomic<state> m_state;
             cppcoro::cancellation_token m_cancellationToken;
             stdcoro::coroutine_handle<> m_awaitingCoroutine;
-
         };
+
+        using io_operation_base = uring_operation_base;
+
+        template<typename OPERATION>
+        using io_operation = uring_operation<OPERATION>;
+
+        template<typename OPERATION>
+        using io_operation_cancellable = uring_operation_cancellable<OPERATION>;
     }
 }
 

@@ -7,14 +7,15 @@
 
 #include <cppcoro/net/ip_endpoint.hpp>
 
-#if CPPCORO_OS_WINNT
 #include <cstring>
 #include <cassert>
 
+#if CPPCORO_OS_WINNT
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <MSWSock.h>
 #include <Windows.h>
+#endif
 
 
 cppcoro::net::ip_endpoint
@@ -41,7 +42,7 @@ cppcoro::net::detail::sockaddr_to_ip_endpoint(const sockaddr& address) noexcept
 		std::memcpy(&ipv6Address, &address, sizeof(ipv6Address));
 
 		return ipv6_endpoint{
-			ipv6_address{ ipv6Address.sin6_addr.u.Byte },
+			ipv6_address{ ipv6Address.sin6_addr.s6_addr },
 			ntohs(ipv6Address.sin6_port)
 		};
 	}
@@ -74,12 +75,14 @@ int cppcoro::net::detail::ip_endpoint_to_sockaddr(
 		std::memcpy(&ipv6Address.sin6_addr, ipv6EndPoint.address().bytes(), 16);
 		ipv6Address.sin6_port = htons(ipv6EndPoint.port());
 		ipv6Address.sin6_flowinfo = 0;
-		ipv6Address.sin6_scope_struct = SCOPEID_UNSPECIFIED_INIT;
+#if CPPCORO_OS_WINNT
+        ipv6Address.sin6_scope_struct = SCOPEID_UNSPECIFIED_INIT;
+#else
+        ipv6Address.sin6_scope_id = 0;
+#endif
 
 		std::memcpy(&address.get(), &ipv6Address, sizeof(ipv6Address));
 
 		return sizeof(SOCKADDR_IN6);
 	}
 }
-
-#endif // CPPCORO_OS_WINNT

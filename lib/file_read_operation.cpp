@@ -12,7 +12,7 @@
 # include <Windows.h>
 
 bool cppcoro::file_read_operation_impl::try_start(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+	cppcoro::detail::io_operation_base& operation) noexcept
 {
 	const DWORD numberOfBytesToRead =
 		m_byteCount <= 0xFFFFFFFF ?
@@ -45,12 +45,12 @@ bool cppcoro::file_read_operation_impl::try_start(
 }
 
 void cppcoro::file_read_operation_impl::cancel(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+	cppcoro::detail::io_operation_base& operation) noexcept
 {
 	(void)::CancelIoEx(m_fileHandle, operation.get_overlapped());
 }
 
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
 
 bool cppcoro::file_read_operation_impl::try_start(
     cppcoro::detail::uring_operation_base& operation) noexcept
@@ -58,15 +58,7 @@ bool cppcoro::file_read_operation_impl::try_start(
     const size_t numberOfBytesToRead =
         m_byteCount <= std::numeric_limits<size_t>::max() ?
               m_byteCount : std::numeric_limits<size_t>::max();
-    m_message.m_ptr = operation.m_awaitingCoroutine.address();
-    auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
-    m_vec.iov_base = m_buffer;
-    m_vec.iov_len = numberOfBytesToRead;
-	iovec vec {m_buffer, numberOfBytesToRead};
-    io_uring_prep_readv(sqe, m_fileHandle, &m_vec, 1, 0);
-    io_uring_sqe_set_data(sqe, &m_message);
-    io_uring_submit(m_ioService.native_uring_handle());
-    return true;
+    return operation.try_start_read(m_fileHandle, m_buffer, numberOfBytesToRead);
 }
 
 void cppcoro::file_read_operation_impl::cancel(

@@ -522,7 +522,7 @@ void cppcoro::io_service::ensure_winsock_initialised()
 		}
 	}
 }
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
 io_uring *cppcoro::io_service::native_uring_handle() noexcept {
 	return m_uq.handle();
 }
@@ -1115,7 +1115,7 @@ void cppcoro::io_service::timed_schedule_operation::await_suspend(
 	{
 		timerState->wake_up_timer_thread();
 	}
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
     auto sqe = io_uring_get_sqe(service.native_uring_handle());
 	auto timout = m_resumeTime - std::chrono::high_resolution_clock::now();;
     auto ts = duration_to_timespec(timout);

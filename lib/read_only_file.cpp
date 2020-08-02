@@ -10,7 +10,7 @@
 #  define WIN32_LEAN_AND_MEAN
 # endif
 # include <Windows.h>
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
 #define GENERIC_READ (S_IRUSR | S_IRGRP | S_IROTH)
 #endif
 

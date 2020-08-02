@@ -11,6 +11,18 @@
 # include <cppcoro/detail/win32.hpp>
 struct sockaddr;
 struct sockaddr_storage;
+#else
+# include <netinet/in.h>
+# define SD_RECEIVE SHUT_RD
+# define SD_SEND SHUT_WR
+# define INVALID_SOCKET -1
+# define SOCKET_ERROR -1
+# define SOCKADDR_STORAGE struct sockaddr_storage
+# define SOCKADDR struct sockaddr
+# define SOCKADDR_IN struct sockaddr_in
+# define SOCKADDR_IN6 struct sockaddr_in6
+# define closesocket(__handle) close((__handle))
+# include <functional>
 #endif
 
 namespace cppcoro
@@ -21,7 +33,6 @@ namespace cppcoro
 
 		namespace detail
 		{
-#if CPPCORO_OS_WINNT
 			/// Convert a sockaddr to an IP endpoint.
 			ip_endpoint sockaddr_to_ip_endpoint(const sockaddr& address) noexcept;
 
@@ -38,8 +49,6 @@ namespace cppcoro
 			int ip_endpoint_to_sockaddr(
 				const ip_endpoint& endPoint,
 				std::reference_wrapper<sockaddr_storage> address) noexcept;
-
-#endif
 		}
 	}
 }

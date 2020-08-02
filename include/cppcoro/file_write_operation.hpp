@@ -32,8 +32,8 @@ namespace cppcoro
 			, m_byteCount(byteCount)
 		{}
 
-		bool try_start(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
-		void cancel(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+		bool try_start(cppcoro::detail::io_operation_base& operation) noexcept;
+		void cancel(cppcoro::detail::io_operation_base& operation) noexcept;
 
 	private:
 
@@ -44,7 +44,7 @@ namespace cppcoro
 	};
 
 	class file_write_operation
-		: public cppcoro::detail::win32_overlapped_operation<file_write_operation>
+		: public cppcoro::detail::io_operation<file_write_operation>
 	{
 	public:
 
@@ -53,13 +53,13 @@ namespace cppcoro
 			std::uint64_t fileOffset,
 			const void* buffer,
 			std::size_t byteCount) noexcept
-			: cppcoro::detail::win32_overlapped_operation<file_write_operation>(fileOffset)
+			: cppcoro::detail::io_operation<file_write_operation>(fileOffset)
 			, m_impl(fileHandle, buffer, byteCount)
 		{}
 
 	private:
 
-		friend class cppcoro::detail::win32_overlapped_operation<file_write_operation>;
+		friend class cppcoro::detail::io_operation<file_write_operation>;
 
 		bool try_start() noexcept { return m_impl.try_start(*this); }
 
@@ -68,7 +68,7 @@ namespace cppcoro
 	};
 
 	class file_write_operation_cancellable
-		: public cppcoro::detail::win32_overlapped_operation_cancellable<file_write_operation_cancellable>
+		: public cppcoro::detail::io_operation_cancellable<file_write_operation_cancellable>
 	{
 	public:
 
@@ -78,13 +78,13 @@ namespace cppcoro
 			const void* buffer,
 			std::size_t byteCount,
 			cancellation_token&& ct) noexcept
-			: cppcoro::detail::win32_overlapped_operation_cancellable<file_write_operation_cancellable>(fileOffset, std::move(ct))
+			: cppcoro::detail::io_operation_cancellable<file_write_operation_cancellable>(fileOffset, std::move(ct))
 			, m_impl(fileHandle, buffer, byteCount)
 		{}
 
 	private:
 
-		friend class cppcoro::detail::win32_overlapped_operation_cancellable<file_write_operation_cancellable>;
+		friend class cppcoro::detail::io_operation_cancellable<file_write_operation_cancellable>;
 
 		bool try_start() noexcept { return m_impl.try_start(*this); }
 		void cancel() noexcept { m_impl.cancel(*this); }
@@ -94,7 +94,7 @@ namespace cppcoro
 	};
 }
 
-#elif defined(CPPCORO_OS_LINUX)
+#elif CPPCORO_OS_LINUX
 
 #include <cppcoro/detail/linux.hpp>
 #include <cppcoro/detail/linux_uring_operation.hpp>
@@ -106,15 +106,12 @@ namespace cppcoro
     public:
 
         file_write_operation_impl(
-            io_service &ioService,
             detail::lnx::fd_t fileHandle,
             const void* buffer,
             std::size_t byteCount) noexcept
             : m_fileHandle(fileHandle)
             , m_buffer(buffer)
             , m_byteCount(byteCount)
-            , m_ioService(ioService)
-            , m_message {detail::lnx::message_type::RESUME_TYPE, nullptr}
         {}
 
         bool try_start(cppcoro::detail::uring_operation_base& operation) noexcept;
@@ -125,9 +122,6 @@ namespace cppcoro
         detail::lnx::fd_t m_fileHandle;
         const void* m_buffer;
         std::size_t m_byteCount;
-        io_service &m_ioService;
-        detail::lnx::message m_message;
-		iovec m_vec;
     };
 
     class file_write_operation
@@ -141,8 +135,8 @@ namespace cppcoro
             std::uint64_t fileOffset,
             const void* buffer,
             std::size_t byteCount) noexcept
-            : cppcoro::detail::uring_operation<file_write_operation>(fileOffset)
-            , m_impl(ioService, fileHandle, buffer, byteCount)
+            : cppcoro::detail::uring_operation<file_write_operation>(ioService, fileOffset)
+            , m_impl(fileHandle, buffer, byteCount)
         {}
 
     private:
@@ -168,8 +162,8 @@ namespace cppcoro
             std::size_t byteCount,
             cancellation_token&& cancellationToken) noexcept
             : cppcoro::detail::uring_operation_cancellable<file_write_operation_cancellable>(
-            fileOffset, std::move(cancellationToken))
-            , m_impl(ioService, fileHandle, buffer, byteCount)
+                ioService, fileOffset, std::move(cancellationToken))
+            , m_impl(fileHandle, buffer, byteCount)
         {}
 
     private:

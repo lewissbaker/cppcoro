@@ -3,19 +3,20 @@
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
 
-#include <cppcoro/net/socket_recv_from_operation.hpp>
 #include <cppcoro/net/socket.hpp>
+#include <cppcoro/net/socket_recv_from_operation.hpp>
+
+#include "socket_helpers.hpp"
 
 #if CPPCORO_OS_WINNT
-# include "socket_helpers.hpp"
 
-# include <WinSock2.h>
-# include <WS2tcpip.h>
-# include <MSWSock.h>
-# include <Windows.h>
+#include <MSWSock.h>
+#include <WS2tcpip.h>
+#include <WinSock2.h>
+#include <Windows.h>
 
 bool cppcoro::net::socket_recv_from_operation_impl::try_start(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+	cppcoro::detail::io_operation_base& operation) noexcept
 {
 	static_assert(
 		sizeof(m_sourceSockaddrStorage) >= sizeof(SOCKADDR_IN) &&
@@ -37,7 +38,7 @@ bool cppcoro::net::socket_recv_from_operation_impl::try_start(
 	int result = ::WSARecvFrom(
 		m_socket.native_handle(),
 		reinterpret_cast<WSABUF*>(&m_buffer),
-		1, // buffer count
+		1,  // buffer count
 		&numberOfBytesReceived,
 		&flags,
 		reinterpret_cast<sockaddr*>(&m_sourceSockaddrStorage),
@@ -68,16 +69,15 @@ bool cppcoro::net::socket_recv_from_operation_impl::try_start(
 }
 
 void cppcoro::net::socket_recv_from_operation_impl::cancel(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+	cppcoro::detail::io_operation_base& operation) noexcept
 {
 	(void)::CancelIoEx(
-		reinterpret_cast<HANDLE>(m_socket.native_handle()),
-		operation.get_overlapped());
+		reinterpret_cast<HANDLE>(m_socket.native_handle()), operation.get_overlapped());
 }
 
 std::tuple<std::size_t, cppcoro::net::ip_endpoint>
 cppcoro::net::socket_recv_from_operation_impl::get_result(
-	cppcoro::detail::win32_overlapped_operation_base& operation)
+	cppcoro::detail::io_operation_base& operation)
 {
 	if (operation.m_errorCode != ERROR_SUCCESS)
 	{
@@ -89,8 +89,29 @@ cppcoro::net::socket_recv_from_operation_impl::get_result(
 
 	return std::make_tuple(
 		static_cast<std::size_t>(operation.m_numberOfBytesTransferred),
-		detail::sockaddr_to_ip_endpoint(
-			*reinterpret_cast<SOCKADDR*>(&m_sourceSockaddrStorage)));
+		detail::sockaddr_to_ip_endpoint(*reinterpret_cast<SOCKADDR*>(&m_sourceSockaddrStorage)));
+}
+
+#elif CPPCORO_OS_LINUX
+
+bool cppcoro::net::socket_recv_from_operation_impl::try_start(
+	cppcoro::detail::io_operation_base& operation) noexcept
+{
+	return operation.try_start_recvfrom(
+		m_socket.native_handle(),
+		&m_sourceSockaddrStorage,
+		sizeof(m_sourceSockaddrStorage),
+		m_buffer.buffer,
+		m_buffer.size);
+}
+
+std::tuple<std::size_t, cppcoro::net::ip_endpoint>
+cppcoro::net::socket_recv_from_operation_impl::get_result(
+	cppcoro::detail::io_operation_base& operation)
+{
+	return std::make_tuple(
+		operation.m_message.m_result,
+		detail::sockaddr_to_ip_endpoint(*reinterpret_cast<SOCKADDR*>(&m_sourceSockaddrStorage)));
 }
 
 #endif

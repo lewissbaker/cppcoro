@@ -11,8 +11,11 @@
 #include <cstdint>
 
 #if CPPCORO_OS_WINNT
-# include <cppcoro/detail/win32.hpp>
-# include <cppcoro/detail/win32_overlapped_operation.hpp>
+#include <cppcoro/detail/win32.hpp>
+#include <cppcoro/detail/win32_overlapped_operation.hpp>
+#elif CPPCORO_OS_LINUX
+#include <cppcoro/detail/linux_uring_operation.hpp>
+#endif
 
 namespace cppcoro::net
 {
@@ -21,74 +24,77 @@ namespace cppcoro::net
 	class socket_recv_operation_impl
 	{
 	public:
-
-		socket_recv_operation_impl(
-			socket& s,
-			void* buffer,
-			std::size_t byteCount) noexcept
+		socket_recv_operation_impl(socket& s, void* buffer, std::size_t byteCount) noexcept
 			: m_socket(s)
 			, m_buffer(buffer, byteCount)
-		{}
+		{
+		}
 
-		bool try_start(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
-		void cancel(cppcoro::detail::win32_overlapped_operation_base& operation) noexcept;
+		bool try_start(cppcoro::detail::io_operation_base& operation) noexcept;
+		void cancel(cppcoro::detail::io_operation_base& operation) noexcept;
 
 	private:
-
 		socket& m_socket;
-		cppcoro::detail::win32::wsabuf m_buffer;
-
+		cppcoro::detail::sock_buf m_buffer;
 	};
 
-	class socket_recv_operation
-		: public cppcoro::detail::win32_overlapped_operation<socket_recv_operation>
+	class socket_recv_operation : public cppcoro::detail::io_operation<socket_recv_operation>
 	{
 	public:
-
 		socket_recv_operation(
+#if CPPCORO_OS_LINUX
+			io_service& ioService,
+#endif
 			socket& s,
 			void* buffer,
 			std::size_t byteCount) noexcept
-			: m_impl(s, buffer, byteCount)
-		{}
+			: cppcoro::detail::io_operation<socket_recv_operation>(
+#if CPPCORO_OS_LINUX
+				  ioService
+#endif
+				  )
+			, m_impl(s, buffer, byteCount)
+		{
+		}
 
 	private:
-
-		friend class cppcoro::detail::win32_overlapped_operation<socket_recv_operation>;
+		friend cppcoro::detail::io_operation<socket_recv_operation>;
 
 		bool try_start() noexcept { return m_impl.try_start(*this); }
 
 		socket_recv_operation_impl m_impl;
-
 	};
 
 	class socket_recv_operation_cancellable
-		: public cppcoro::detail::win32_overlapped_operation_cancellable<socket_recv_operation_cancellable>
+		: public cppcoro::detail::io_operation_cancellable<socket_recv_operation_cancellable>
 	{
 	public:
-
 		socket_recv_operation_cancellable(
+#if CPPCORO_OS_LINUX
+			io_service& ioService,
+#endif
 			socket& s,
 			void* buffer,
 			std::size_t byteCount,
 			cancellation_token&& ct) noexcept
-			: cppcoro::detail::win32_overlapped_operation_cancellable<socket_recv_operation_cancellable>(std::move(ct))
+			: cppcoro::detail::io_operation_cancellable<socket_recv_operation_cancellable>(
+#if CPPCORO_OS_LINUX
+				  ioService,
+#endif
+				  std::move(ct))
 			, m_impl(s, buffer, byteCount)
-		{}
+		{
+		}
 
 	private:
-
-		friend class cppcoro::detail::win32_overlapped_operation_cancellable<socket_recv_operation_cancellable>;
+		friend cppcoro::detail::io_operation_cancellable<socket_recv_operation_cancellable>;
 
 		bool try_start() noexcept { return m_impl.try_start(*this); }
 		void cancel() noexcept { m_impl.cancel(*this); }
 
 		socket_recv_operation_impl m_impl;
-
 	};
 
-}
-
-#endif // CPPCORO_OS_WINNT
+}  // namespace cppcoro::net
 
 #endif
