@@ -12,18 +12,17 @@
 #include <utility>
 
 #include <fcntl.h>
-#include <linux/limits.h>
 #include <mqueue.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#include <sys/timerfd.h>
 #include <unistd.h>
 #include <utility>
-#include <uuid/uuid.h>
 
 #include <liburing.h>
+
+#include <string_view>
 
 namespace cppcoro
 {
@@ -38,6 +37,8 @@ namespace cppcoro
 				CALLBACK_TYPE,
 				RESUME_TYPE
 			};
+
+			void check_required_kernel(int major, int minor, std::string_view message);
 
 			class safe_fd
 			{
@@ -99,22 +100,6 @@ namespace cppcoro
 			{
 				using callback_type = void(io_state* state);
 				callback_type* m_callback;
-			};
-
-			class message_queue
-			{
-			private:
-				mqd_t m_mqdt;
-				char m_qname[NAME_MAX];
-				safe_fd m_epollfd;
-				struct epoll_event m_ev;
-				message_queue();
-
-			public:
-				message_queue(size_t queue_length);
-				~message_queue();
-				bool enqueue_message(void* message, message_type type);
-				bool dequeue_message(void*& message, message_type& type, bool wait);
 			};
 
 			class uring_queue {

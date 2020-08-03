@@ -126,4 +126,41 @@ void cppcoro::net::socket_accept_operation_impl::get_result(
 	}
 }
 
+#else
+
+bool cppcoro::net::socket_accept_operation_impl::try_start(
+    cppcoro::detail::io_operation_base& operation) noexcept
+{
+	return operation.try_start_accept(m_listeningSocket.native_handle(), &m_addressBuffer[0], &m_addressBufferLength);
+}
+
+void cppcoro::net::socket_accept_operation_impl::cancel(
+    cppcoro::detail::io_operation_base& operation) noexcept
+{
+	operation.cancel_io();
+}
+
+void cppcoro::net::socket_accept_operation_impl::get_result(
+    cppcoro::detail::io_operation_base& operation)
+{
+    auto fd = operation.get_result();
+    m_acceptingSocket = socket(operation.m_ioService, fd);
+    m_addressBufferLength = sizeof(m_addressBuffer);
+    if(getpeername(fd, reinterpret_cast<sockaddr*>(&m_addressBuffer[0]), &m_addressBufferLength) < 0) {
+        throw std::system_error{
+            errno,
+            std::generic_category()
+        };
+    }
+    m_acceptingSocket.m_remoteEndPoint = detail::sockaddr_to_ip_endpoint(std::ref(*reinterpret_cast<sockaddr*>(&m_addressBuffer[0])));
+    m_addressBufferLength = sizeof(m_addressBuffer);
+    if(getsockname(fd, reinterpret_cast<sockaddr*>(&m_addressBuffer[0]), &m_addressBufferLength) < 0) {
+        throw std::system_error{
+            errno,
+            std::generic_category()
+        };
+    }
+    m_acceptingSocket.m_localEndPoint = detail::sockaddr_to_ip_endpoint(std::ref(*reinterpret_cast<sockaddr*>(&m_addressBuffer[0])));
+}
+
 #endif

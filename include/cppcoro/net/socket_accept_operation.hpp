@@ -33,6 +33,9 @@ namespace cppcoro
 				: m_listeningSocket(listeningSocket)
 				, m_acceptingSocket(acceptingSocket)
 			{
+#if CPPCORO_OS_LINUX
+                detail::lnx::check_required_kernel(5, 5, "socket accept operation");
+#endif
 			}
 
 			bool try_start(cppcoro::detail::io_operation_base& operation) noexcept;
@@ -48,6 +51,10 @@ namespace cppcoro
 			socket& m_listeningSocket;
 			socket& m_acceptingSocket;
 			alignas(8) std::uint8_t m_addressBuffer[88];
+
+#if CPPCORO_OS_LINUX
+			socklen_t m_addressBufferLength = sizeof(m_addressBuffer);
+#endif
 
 #if CPPCORO_COMPILER_MSVC
 #pragma warning(pop)

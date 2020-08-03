@@ -31,7 +31,11 @@ namespace cppcoro
 				const ip_endpoint& remoteEndPoint) noexcept
 				: m_socket(socket)
 				, m_remoteEndPoint(remoteEndPoint)
-			{}
+			{
+#if CPPCORO_OS_LINUX
+                detail::lnx::check_required_kernel(5, 5, "socket connect operation");
+#endif
+			}
 
 			bool try_start(cppcoro::detail::io_operation_base& operation) noexcept;
 			void cancel(cppcoro::detail::io_operation_base& operation) noexcept;
@@ -41,7 +45,6 @@ namespace cppcoro
 
 			socket& m_socket;
 			ip_endpoint m_remoteEndPoint;
-
 		};
 
 		class socket_connect_operation

@@ -64,8 +64,7 @@ bool cppcoro::file_read_operation_impl::try_start(
 void cppcoro::file_read_operation_impl::cancel(
     cppcoro::detail::uring_operation_base& operation) noexcept
 {
-	throw std::runtime_error("Not implemented");
-    //(void)::CancelIoEx(m_fileHandle, operation.get_overlapped());
+    operation.cancel_io();
 }
 
 #endif // CPPCORO_OS_WINNT

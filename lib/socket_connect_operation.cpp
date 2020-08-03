@@ -175,4 +175,34 @@ void cppcoro::net::socket_connect_operation_impl::get_result(
 	}
 }
 
+#else
+
+bool cppcoro::net::socket_connect_operation_impl::try_start(
+    cppcoro::detail::io_operation_base& operation) noexcept
+{
+    SOCKADDR_STORAGE remoteSockaddrStorage;
+	detail::ip_endpoint_to_sockaddr(m_remoteEndPoint, std::ref(remoteSockaddrStorage));
+	return operation.try_start_connect(m_socket.native_handle(), &remoteSockaddrStorage, sizeof(remoteSockaddrStorage));
+}
+
+void cppcoro::net::socket_connect_operation_impl::cancel(
+    cppcoro::detail::io_operation_base& operation) noexcept
+{
+	operation.cancel_io();
+}
+
+void cppcoro::net::socket_connect_operation_impl::get_result(
+    cppcoro::detail::io_operation_base& operation)
+{
+    SOCKADDR_STORAGE remoteSockaddrStorage;
+    socklen_t remoteSockaddrStorageLength = sizeof(remoteSockaddrStorage);
+    if(getpeername(m_socket.native_handle(), reinterpret_cast<sockaddr*>(&remoteSockaddrStorage), &remoteSockaddrStorageLength) < 0) {
+        throw std::system_error{
+            errno,
+            std::generic_category()
+        };
+    }
+    m_socket.m_remoteEndPoint = detail::sockaddr_to_ip_endpoint(std::ref(*reinterpret_cast<sockaddr*>(&remoteSockaddrStorage)));
+}
+
 #endif

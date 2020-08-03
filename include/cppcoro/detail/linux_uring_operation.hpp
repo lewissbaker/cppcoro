@@ -57,6 +57,14 @@ namespace cppcoro
                 return true;
             }
 
+            bool try_start_send(int fd, const void *buffer, size_t size) noexcept
+            {
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_send(sqe, fd, buffer, size, 0);
+                submitt(sqe);
+                return true;
+			}
+
             bool try_start_sendto(int fd, const void* to, size_t to_size, void *buffer, size_t size) noexcept
             {
                 m_vec.iov_base = buffer;
@@ -68,6 +76,14 @@ namespace cppcoro
 				m_msghdr.msg_iovlen = 1;
                 auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
                 io_uring_prep_sendmsg(sqe, fd, &m_msghdr, 0);
+                submitt(sqe);
+                return true;
+            }
+
+            bool try_start_recv(int fd, void *buffer, size_t size) noexcept
+            {
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_recv(sqe, fd, buffer, size, 0);
                 submitt(sqe);
                 return true;
             }
@@ -87,12 +103,42 @@ namespace cppcoro
                 return true;
             }
 
+            bool try_start_connect(int fd, const void* to, size_t to_size) noexcept
+            {
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_connect(sqe, fd, reinterpret_cast<sockaddr*>(const_cast<void*>(to)), to_size);
+                submitt(sqe);
+                return true;
+            }
+
+            bool try_start_disconnect(int fd) noexcept
+            {
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_close(sqe, fd);
+                submitt(sqe);
+                return true;
+            }
+
+            bool try_start_accept(int fd, const void *to, socklen_t *to_size) noexcept {
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                io_uring_prep_accept(sqe, fd, reinterpret_cast<sockaddr*>(const_cast<void*>(to)), to_size, 0);
+				submitt(sqe);
+				return true;
+			}
+
+			bool cancel_io() {
+                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+				io_uring_prep_cancel(sqe, &m_message, 0);
+                submitt(sqe);
+                return true;
+			}
+
             std::size_t get_result()
             {
                 if (m_message.m_result < 0)
                 {
                     throw std::system_error{
-                        static_cast<int>(-m_message.m_result),
+						-m_message.m_result,
                         std::system_category()
                     };
                 }

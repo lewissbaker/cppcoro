@@ -63,4 +63,18 @@ void cppcoro::net::socket_recv_operation_impl::cancel(
 		operation.get_overlapped());
 }
 
+#else
+
+bool cppcoro::net::socket_recv_operation_impl::try_start(
+    cppcoro::detail::io_operation_base& operation) noexcept
+{
+    operation.try_start_recv(m_socket.native_handle(), m_buffer.buffer, m_buffer.size);
+}
+
+void cppcoro::net::socket_recv_operation_impl::cancel(
+    cppcoro::detail::io_operation_base& operation) noexcept
+{
+    operation.cancel_io();
+}
+
 #endif
