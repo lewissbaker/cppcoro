@@ -1016,6 +1016,13 @@ cppcoro::io_service::timed_schedule_operation::timed_schedule_operation(
 	, m_cancellationToken(std::move(cancellationToken))
 	, m_refCount(2)
 {
+#if CPPCORO_OS_LINUX
+    m_cancellationRegistration.emplace(std::move(m_cancellationToken), [&service, this] {
+        auto sqe = io_uring_get_sqe(service.native_uring_handle());
+        io_uring_prep_cancel(sqe, &m_message, 0);
+        io_uring_submit(service.native_uring_handle());
+    });
+#endif
 }
 
 cppcoro::io_service::timed_schedule_operation::timed_schedule_operation(

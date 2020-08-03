@@ -17,37 +17,40 @@ int main(int argc, char **argv) {
     io_service ios;
     std::string check;
     std::string content{"Hello world"};
+
     cancellation_source canceller;
+
+    canceller.request_cancellation();
+
     (void) sync_wait(when_all(
-        [&]() -> task<> {
-            auto _ = on_scope_exit([&] { ios.stop(); });
+            [&]() -> task<> {
+                auto _ = on_scope_exit([&] { ios.stop(); });
 
-            std::string tmp;
-            auto this_file = read_only_file::open(ios, __FILE__);
-            tmp.resize(this_file.size());
-            try {
-                co_await this_file.read(0, tmp.data(), tmp.size(), canceller.token());
-                assert(false);
-            } catch (operation_cancelled &) {}
+                std::string tmp;
+                auto this_file = read_only_file::open(ios, __FILE__);
+                tmp.resize(this_file.size());
+                try {
+                    // first attempt will probably terminate successfully before cancel has been requested
+                    co_await this_file.read(0, tmp.data(), tmp.size(), canceller.token());
+                    assert(false);
+                } catch (operation_cancelled &) {
+                    std::cout << "Cancelled\n";
+                }
 
-            auto f = read_write_file::open(ios, "./test.txt", file_open_mode::create_always);
-            co_await f.write(0, content.data(), content.size());
-            check.resize(content.size());
-            co_await f.read(0, check.data(), check.size());
+                auto f = read_write_file::open(ios, "./test.txt", file_open_mode::create_always);
 
-            assert(check == content);
+                check.resize(content.size());
 
-            std::cout << "got: " << check << '\n';
+                co_await f.write(0, content.data(), content.size());
+                co_await f.read(0, check.data(), check.size());
 
-            co_return;
-        }(),
-        [&]() -> task<> {
-            canceller.request_cancellation();
-            co_return;
-        }(),
-        [&]() -> task<> {
-            ios.process_events();
-            co_return;
-        }()));
+                assert(check == content);
+
+                std::cout << "got: " << check << '\n';
+            }(),
+            [&]() -> task<> {
+                ios.process_events();
+                co_return;
+            }()));
     return 0;
 }

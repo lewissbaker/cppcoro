@@ -20,147 +20,146 @@
 // and socket_accept_operation_cancellable.
 
 bool cppcoro::net::socket_accept_operation_impl::try_start(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+    cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
 {
-	static_assert(
-		(sizeof(m_addressBuffer) / 2) >= (16 + sizeof(SOCKADDR_IN)) &&
-		(sizeof(m_addressBuffer) / 2) >= (16 + sizeof(SOCKADDR_IN6)),
-		"AcceptEx requires address buffer to be at least 16 bytes more than largest address.");
+    static_assert(
+        (sizeof(m_addressBuffer) / 2) >= (16 + sizeof(SOCKADDR_IN)) &&
+        (sizeof(m_addressBuffer) / 2) >= (16 + sizeof(SOCKADDR_IN6)),
+        "AcceptEx requires address buffer to be at least 16 bytes more than largest address.");
 
-	// Need to read this flag before starting the operation, otherwise
-	// it may be possible that the operation will complete immediately
-	// on another thread and then destroy the socket before we get a
-	// chance to read it.
-	const bool skipCompletionOnSuccess = m_listeningSocket.skip_completion_on_success();
+    // Need to read this flag before starting the operation, otherwise
+    // it may be possible that the operation will complete immediately
+    // on another thread and then destroy the socket before we get a
+    // chance to read it.
+    const bool skipCompletionOnSuccess = m_listeningSocket.skip_completion_on_success();
 
-	DWORD bytesReceived = 0;
-	BOOL ok = ::AcceptEx(
-		m_listeningSocket.native_handle(),
-		m_acceptingSocket.native_handle(),
-		m_addressBuffer,
-		0,
-		sizeof(m_addressBuffer) / 2,
-		sizeof(m_addressBuffer) / 2,
-		&bytesReceived,
-		operation.get_overlapped());
-	if (!ok)
-	{
-		int errorCode = ::WSAGetLastError();
-		if (errorCode != ERROR_IO_PENDING)
-		{
-			operation.m_errorCode = static_cast<DWORD>(errorCode);
-			return false;
-		}
-	}
-	else if (skipCompletionOnSuccess)
-	{
-		operation.m_errorCode = ERROR_SUCCESS;
-		return false;
-	}
+    DWORD bytesReceived = 0;
+    BOOL ok = ::AcceptEx(
+        m_listeningSocket.native_handle(),
+        m_acceptingSocket.native_handle(),
+        m_addressBuffer,
+        0,
+        sizeof(m_addressBuffer) / 2,
+        sizeof(m_addressBuffer) / 2,
+        &bytesReceived,
+        operation.get_overlapped());
+    if (!ok)
+    {
+        int errorCode = ::WSAGetLastError();
+        if (errorCode != ERROR_IO_PENDING)
+        {
+            operation.m_errorCode = static_cast<DWORD>(errorCode);
+            return false;
+        }
+    }
+    else if (skipCompletionOnSuccess)
+    {
+        operation.m_errorCode = ERROR_SUCCESS;
+        return false;
+    }
 
-	return true;
+    return true;
 }
 
 void cppcoro::net::socket_accept_operation_impl::cancel(
-	cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
+    cppcoro::detail::win32_overlapped_operation_base& operation) noexcept
 {
-	(void)::CancelIoEx(
-		reinterpret_cast<HANDLE>(m_listeningSocket.native_handle()),
-		operation.get_overlapped());
+    (void)::CancelIoEx(
+        reinterpret_cast<HANDLE>(m_listeningSocket.native_handle()),
+        operation.get_overlapped());
 }
 
 void cppcoro::net::socket_accept_operation_impl::get_result(
-	cppcoro::detail::win32_overlapped_operation_base& operation)
+    cppcoro::detail::win32_overlapped_operation_base& operation)
 {
-	if (operation.m_errorCode != ERROR_SUCCESS)
-	{
-		throw std::system_error{
-			static_cast<int>(operation.m_errorCode),
-			std::system_category(),
-			"Accepting a connection failed: AcceptEx"
-		};
-	}
+    if (operation.m_errorCode != ERROR_SUCCESS)
+    {
+        throw std::system_error{
+            static_cast<int>(operation.m_errorCode),
+            std::system_category(),
+            "Accepting a connection failed: AcceptEx"
+        };
+    }
 
-	sockaddr* localSockaddr = nullptr;
-	sockaddr* remoteSockaddr = nullptr;
+    sockaddr* localSockaddr = nullptr;
+    sockaddr* remoteSockaddr = nullptr;
 
-	INT localSockaddrLength;
-	INT remoteSockaddrLength;
+    INT localSockaddrLength;
+    INT remoteSockaddrLength;
 
-	::GetAcceptExSockaddrs(
-		m_addressBuffer,
-		0,
-		sizeof(m_addressBuffer) / 2,
-		sizeof(m_addressBuffer) / 2,
-		&localSockaddr,
-		&localSockaddrLength,
-		&remoteSockaddr,
-		&remoteSockaddrLength);
+    ::GetAcceptExSockaddrs(
+        m_addressBuffer,
+        0,
+        sizeof(m_addressBuffer) / 2,
+        sizeof(m_addressBuffer) / 2,
+        &localSockaddr,
+        &localSockaddrLength,
+        &remoteSockaddr,
+        &remoteSockaddrLength);
 
-	m_acceptingSocket.m_localEndPoint =
-		detail::sockaddr_to_ip_endpoint(*localSockaddr);
+    m_acceptingSocket.m_localEndPoint =
+        detail::sockaddr_to_ip_endpoint(*localSockaddr);
 
-	m_acceptingSocket.m_remoteEndPoint =
-		detail::sockaddr_to_ip_endpoint(*remoteSockaddr);
+    m_acceptingSocket.m_remoteEndPoint =
+        detail::sockaddr_to_ip_endpoint(*remoteSockaddr);
 
-	{
-		// Need to set SO_UPDATE_ACCEPT_CONTEXT after the accept completes
-		// to ensure that ::shutdown() and ::setsockopt() calls work on the
-		// accepted socket.
-		SOCKET listenSocket = m_listeningSocket.native_handle();
-		const int result = ::setsockopt(
-			m_acceptingSocket.native_handle(),
-			SOL_SOCKET,
-			SO_UPDATE_ACCEPT_CONTEXT,
-			(const char*)&listenSocket,
-			sizeof(SOCKET));
-		if (result == SOCKET_ERROR)
-		{
-			const int errorCode = ::WSAGetLastError();
-			throw std::system_error{
-				errorCode,
-				std::system_category(),
-				"Socket accept operation failed: setsockopt(SO_UPDATE_ACCEPT_CONTEXT)"
-			};
-		}
-	}
+    {
+        // Need to set SO_UPDATE_ACCEPT_CONTEXT after the accept completes
+        // to ensure that ::shutdown() and ::setsockopt() calls work on the
+        // accepted socket.
+        SOCKET listenSocket = m_listeningSocket.native_handle();
+        const int result = ::setsockopt(
+            m_acceptingSocket.native_handle(),
+            SOL_SOCKET,
+            SO_UPDATE_ACCEPT_CONTEXT,
+            (const char*)&listenSocket,
+            sizeof(SOCKET));
+        if (result == SOCKET_ERROR)
+        {
+            const int errorCode = ::WSAGetLastError();
+            throw std::system_error{
+                errorCode,
+                std::system_category(),
+                "Socket accept operation failed: setsockopt(SO_UPDATE_ACCEPT_CONTEXT)"
+            };
+        }
+    }
 }
 
 #else
 
 bool cppcoro::net::socket_accept_operation_impl::try_start(
-    cppcoro::detail::io_operation_base& operation) noexcept
-{
-	return operation.try_start_accept(m_listeningSocket.native_handle(), &m_addressBuffer[0], &m_addressBufferLength);
+    cppcoro::detail::io_operation_base &operation) noexcept {
+    return operation.try_start_accept(m_listeningSocket.native_handle(), &m_addressBuffer[0], &m_addressBufferLength);
 }
 
 void cppcoro::net::socket_accept_operation_impl::cancel(
-    cppcoro::detail::io_operation_base& operation) noexcept
-{
-	operation.cancel_io();
+    cppcoro::detail::io_operation_base &operation) noexcept {
+    operation.cancel_io();
 }
 
 void cppcoro::net::socket_accept_operation_impl::get_result(
-    cppcoro::detail::io_operation_base& operation)
-{
+    cppcoro::detail::io_operation_base &operation) {
     auto fd = operation.get_result();
     m_acceptingSocket = socket(operation.m_ioService, fd);
     m_addressBufferLength = sizeof(m_addressBuffer);
-    if(getpeername(fd, reinterpret_cast<sockaddr*>(&m_addressBuffer[0]), &m_addressBufferLength) < 0) {
+    if (getpeername(fd, reinterpret_cast<sockaddr *>(&m_addressBuffer[0]), &m_addressBufferLength) < 0) {
         throw std::system_error{
             errno,
             std::generic_category()
         };
     }
-    m_acceptingSocket.m_remoteEndPoint = detail::sockaddr_to_ip_endpoint(std::ref(*reinterpret_cast<sockaddr*>(&m_addressBuffer[0])));
+    m_acceptingSocket.m_remoteEndPoint = detail::sockaddr_to_ip_endpoint(
+        std::ref(*reinterpret_cast<sockaddr *>(&m_addressBuffer[0])));
     m_addressBufferLength = sizeof(m_addressBuffer);
-    if(getsockname(fd, reinterpret_cast<sockaddr*>(&m_addressBuffer[0]), &m_addressBufferLength) < 0) {
+    if (getsockname(fd, reinterpret_cast<sockaddr *>(&m_addressBuffer[0]), &m_addressBufferLength) < 0) {
         throw std::system_error{
             errno,
             std::generic_category()
         };
     }
-    m_acceptingSocket.m_localEndPoint = detail::sockaddr_to_ip_endpoint(std::ref(*reinterpret_cast<sockaddr*>(&m_addressBuffer[0])));
+    m_acceptingSocket.m_localEndPoint = detail::sockaddr_to_ip_endpoint(
+        std::ref(*reinterpret_cast<sockaddr *>(&m_addressBuffer[0])));
 }
 
 #endif

@@ -48,6 +48,9 @@ namespace cppcoro {
                     io_uring_cqe_seen(&ring_, cqe);
                     auto res = cqe->res;
                     message *msg_ptr = reinterpret_cast<message *>(io_uring_cqe_get_data(cqe));
+                    if (msg_ptr == nullptr) {
+                        return true; // cancelled
+                    }
                     msg = msg_ptr->m_ptr;
                     type = msg_ptr->m_type;
                     msg_ptr->m_result = res;

@@ -63,7 +63,9 @@ bool cppcoro::file_write_operation_impl::try_start(
 void cppcoro::file_write_operation_impl::cancel(
 	cppcoro::detail::uring_operation_base& operation) noexcept
 {
-    operation.cancel_io();
+    if (operation.m_awaitingCoroutine.address() != nullptr) {
+        operation.cancel_io();
+    }
 }
 
 #endif  // CPPCORO_OS_WINNT

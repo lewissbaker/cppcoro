@@ -24,7 +24,7 @@
 cppcoro::file::~file()
 {}
 
-std::uint64_t cppcoro::file::size() const
+std::size_t cppcoro::file::size() const
 {
 #if CPPCORO_OS_WINNT
 	LARGE_INTEGER size;

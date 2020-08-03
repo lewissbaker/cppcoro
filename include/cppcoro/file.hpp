@@ -31,11 +31,12 @@ namespace cppcoro
 		virtual ~file();
 
 		/// Get the size of the file in bytes.
-		std::uint64_t size() const;
+		[[nodiscard]]
+		std::size_t size() const;
 
 	protected:
 
-		file(detail::safe_handle&& fileHandle) noexcept;
+		explicit file(detail::safe_handle&& fileHandle) noexcept;
 
 		static detail::safe_handle open(
 			detail::dword_t fileAccess,

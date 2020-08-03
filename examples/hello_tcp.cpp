@@ -34,7 +34,6 @@ int main(int argc, char **argv)
 		{
 			std::cout << err.what() << '\n';
             canceller.request_cancellation();
-			throw err;
 		}
         co_return;
 	};
@@ -42,19 +41,22 @@ int main(int argc, char **argv)
         auto _ = on_scope_exit([&] { ios.stop(); });
 		auto sock = net::socket::create_tcpv4(ios);
 		std::string_view data = "Hello";
-		co_await sock.connect(*server_endpoint);
 		try
 		{
-			co_await sock.send(data.data(), data.size());
+            co_await sock.connect(*server_endpoint, canceller.token());
+			co_await sock.send(data.data(), data.size(), canceller.token());
 			std::string back;
 			back.resize(data.size());
-            co_await sock.recv(back.data(), back.size());
+            co_await sock.recv(back.data(), back.size(), canceller.token());
             assert(back == data);
 		}
 		catch (std::system_error &err)
 		{
 			std::cout << err.what() << '\n';
 		}
+        catch (operation_cancelled &) {
+            std::cout << "Client cancelled\n";
+        }
 		co_return;
 	};
 	(void)sync_wait(when_all(

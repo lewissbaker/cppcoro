@@ -4,7 +4,7 @@ externalproject_add(_fetch_uring
   GIT_REPOSITORY https://github.com/axboe/liburing.git
   GIT_TAG master
   CONFIGURE_COMMAND ./configure --prefix=${CMAKE_CURRENT_BINARY_DIR}
-  BUILD_COMMAND make -j4
+  BUILD_COMMAND $(MAKE)
   BUILD_IN_SOURCE ON
   ALWAYS OFF
   UPDATE_DISCONNECTED ON
