@@ -226,7 +226,7 @@ namespace cppcoro
 		stdcoro::coroutine_handle<> m_awaiter;
 		schedule_operation* m_next;
 
-#ifdef CPPCORO_OS_LINUX
+#if CPPCORO_OS_LINUX
 		detail::lnx::message m_message{detail::lnx::message_type::RESUME_TYPE};
 #endif
 	};
@@ -270,7 +270,7 @@ namespace cppcoro
 
 		std::atomic<std::uint32_t> m_refCount;
 
-#ifdef CPPCORO_OS_LINUX
+#if CPPCORO_OS_LINUX
         detail::lnx::message m_message{detail::lnx::message_type::RESUME_TYPE};
 #endif
 	};

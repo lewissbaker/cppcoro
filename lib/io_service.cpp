@@ -18,10 +18,10 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <Windows.h>
+#include <WinSock2.h>
 #include <MSWSock.h>
 #include <WS2tcpip.h>
-#include <WinSock2.h>
-#include <Windows.h>
 #endif
 
 
@@ -494,7 +494,7 @@ void cppcoro::io_service::notify_work_finished() noexcept
 }
 
 #if CPPCORO_OS_WINNT
-cppcoro::detail::handle_t cppcoro::io_service::native_iocp_handle() noexcept
+cppcoro::detail::win32::handle_t cppcoro::io_service::native_iocp_handle() noexcept
 {
 	return m_iocpHandle.handle();
 }
@@ -536,28 +536,26 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 		0,
 		reinterpret_cast<ULONG_PTR>(operation->m_awaiter.address()),
 		nullptr);
-#elif CPPCORO_OS_LINUX
-	const bool ok = true;
+    if (!ok)
+    {
+        // Failed to post to the I/O completion port.
+        //
+        // This is most-likely because the queue is currently full.
+        //
+        // We'll queue up the operation to a linked-list using a lock-free
+        // push and defer the dispatch to the completion port until some I/O
+        // thread next enters its event loop.
+        auto* head = m_scheduleOperations.load(std::memory_order_acquire);
+        do
+        {
+            operation->m_next = head;
+        } while (!m_scheduleOperations.compare_exchange_weak(
+                head,
+                operation,
+                std::memory_order_release,
+                std::memory_order_acquire));
+    }
 #endif
-	if (!ok)
-	{
-		// Failed to post to the I/O completion port.
-		//
-		// This is most-likely because the queue is currently full.
-		//
-		// We'll queue up the operation to a linked-list using a lock-free
-		// push and defer the dispatch to the completion port until some I/O
-		// thread next enters its event loop.
-		auto* head = m_scheduleOperations.load(std::memory_order_acquire);
-		do
-		{
-			operation->m_next = head;
-		} while (!m_scheduleOperations.compare_exchange_weak(
-			head,
-			operation,
-			std::memory_order_release,
-			std::memory_order_acquire));
-	}
 }
 
 void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
@@ -999,11 +997,13 @@ void cppcoro::io_service::schedule_operation::await_suspend(
 	stdcoro::coroutine_handle<> awaiter) noexcept
 {
 	m_awaiter = awaiter;
-	auto sqe = io_uring_get_sqe(m_service.native_uring_handle());
+#if CPPCORO_OS_LINUX
+    auto sqe = io_uring_get_sqe(m_service.native_uring_handle());
 	io_uring_prep_nop(sqe);
 	m_message.m_ptr = m_awaiter.address();
 	io_uring_sqe_set_data(sqe, &m_message);
 	io_uring_submit(m_service.native_uring_handle());
+#endif
 	m_service.schedule_impl(this);
 }
 

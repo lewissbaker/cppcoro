@@ -125,7 +125,7 @@ namespace cppcoro
 			void * buffer;
 			size_t size;
 		};
-
+		using handle_t = lnx::fd_t;
     }  // namespace detail
 }  // namespace cppcoro
 

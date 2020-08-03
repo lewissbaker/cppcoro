@@ -91,7 +91,7 @@ cppcoro::file::file(detail::safe_handle&& fileHandle) noexcept
 cppcoro::detail::safe_handle cppcoro::file::open(
 	detail::dword_t fileAccess,
 	io_service& ioService,
-	const stdcoro::filesystem::path& path,
+	const stdfs::path& path,
 	file_open_mode openMode,
 	file_share_mode shareMode,
 	file_buffering_mode bufferingMode)

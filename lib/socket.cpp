@@ -17,15 +17,16 @@
 #include "socket_helpers.hpp"
 
 #if CPPCORO_OS_WINNT
-#include <MSWSock.h>
-#include <WS2tcpip.h>
 #include <WinSock2.h>
 #include <Windows.h>
-#define errno WSAGetLastError()
+#include <MSWSock.h>
+#include <WS2tcpip.h>
+#define last_error WSAGetLastError()
 #elif CPPCORO_OS_LINUX
 #include <cstring>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#define last_error errno
 #endif
 
 namespace
@@ -196,8 +197,9 @@ namespace
 			if (sock < 0)
 			{
                 throw std::system_error(
-                    errno, std::system_category(), "Error creating socket: socket");
+                    last_error, std::system_category(), "Error creating socket: socket");
 			}
+			return sock;
 		}
 #endif
 	}  // namespace local
@@ -349,7 +351,7 @@ void cppcoro::net::socket::bind(const ip_endpoint& localEndPoint)
 		// WSAEINVAL: socket already bound
 		// WSAENOBUFS: system failed to allocate memory
 		// WSAENOTSOCK: socket was not a valid socket.
-		throw std::system_error(errno, std::system_category(), "Error binding to endpoint: bind()");
+		throw std::system_error(last_error, std::system_category(), "Error binding to endpoint: bind()");
 	}
 
 	socklen_t sockaddrLen = sizeof(sockaddrStorage);
@@ -370,7 +372,7 @@ void cppcoro::net::socket::listen()
 	if (result != 0)
 	{
 		throw std::system_error(
-			errno, std::system_category(), "Failed to start listening on bound endpoint: listen");
+			last_error, std::system_category(), "Failed to start listening on bound endpoint: listen");
 	}
 }
 
@@ -396,7 +398,7 @@ void cppcoro::net::socket::listen(std::uint32_t backlog)
 		// WSAEOPNOTSUPP: The socket does not support listening
 
 		throw std::system_error(
-			errno, std::system_category(), "Failed to start listening on bound endpoint: listen");
+			last_error, std::system_category(), "Failed to start listening on bound endpoint: listen");
 	}
 }
 
@@ -573,7 +575,7 @@ void cppcoro::net::socket::close_send()
 	if (result == SOCKET_ERROR)
 	{
 		throw std::system_error(
-			errno, std::system_category(), "failed to close socket send stream: shutdown(SD_SEND)");
+			last_error, std::system_category(), "failed to close socket send stream: shutdown(SD_SEND)");
 	}
 }
 
@@ -583,7 +585,7 @@ void cppcoro::net::socket::close_recv()
 	if (result == SOCKET_ERROR)
 	{
 		throw std::system_error(
-			errno,
+			last_error,
 			std::system_category(),
 			"failed to close socket receive stream: shutdown(SD_RECEIVE)");
 	}

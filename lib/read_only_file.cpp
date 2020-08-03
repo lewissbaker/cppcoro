@@ -16,7 +16,7 @@
 
 cppcoro::read_only_file cppcoro::read_only_file::open(
 	io_service& ioService,
-	const stdcoro::filesystem::path& path,
+	const stdfs::path& path,
 	file_share_mode shareMode,
 	file_buffering_mode bufferingMode)
 {

@@ -24,7 +24,7 @@
 
 TEST_SUITE_BEGIN("file");
 
-namespace fs = stdcoro::filesystem;
+namespace fs = stdfs;
 
 namespace
 {
@@ -60,14 +60,14 @@ namespace
 			fs::remove_all(m_path);
 		}
 
-		const stdcoro::filesystem::path& temp_dir()
+		const stdfs::path& temp_dir()
 		{
 			return m_path;
 		}
 
 	private:
 
-		stdcoro::filesystem::path m_path;
+		stdfs::path m_path;
 
 	};
 

@@ -7,137 +7,47 @@
 #include <cppcoro/on_scope_exit.hpp>
 #include <cppcoro/read_only_file.hpp>
 #include <cppcoro/read_write_file.hpp>
-
-#include <sys/ioctl.h>
+#include <cppcoro/cancellation_source.hpp>
 
 #include <iostream>
 
-namespace cppcoro
-{
-	struct test_file
-	{
-		io_service& m_ios;
-		detail::safe_handle m_fd;
-		test_file(cppcoro::io_service& ios, const std::filesystem::path& path)
-			: m_ios{ ios }
-			, m_fd{ open(path.c_str(), O_RDONLY) }
-		{
-			if (m_fd.fd() < 0)
-			{
-				throw std::system_error{ errno, std::system_category() };
-			}
-		}
-
-		ssize_t size()
-		{
-			struct stat st;
-
-			if (fstat(m_fd.fd(), &st) < 0)
-				return -1;
-			if (S_ISREG(st.st_mode))
-			{
-				return st.st_size;
-			}
-			else if (S_ISBLK(st.st_mode))
-			{
-				unsigned long long bytes;
-
-				if (ioctl(m_fd.fd(), BLKGETSIZE64, &bytes) != 0)
-					return -1;
-
-				return bytes;
-			}
-
-			return -1;
-		}
-
-		struct read_operation
-		{
-			iovec m_data;
-			size_t m_offset;
-			detail::safe_handle& m_fd;
-			cppcoro::io_service& m_ios;
-			cppcoro::detail::lnx::message m_message;
-			read_operation(
-				detail::safe_handle& fd,
-				cppcoro::io_service& ios,
-				std::size_t offset,
-				void* buffer,
-				std::size_t size)
-				: m_fd{ fd }
-				, m_data{ buffer, size }
-				, m_offset{ offset }
-				, m_ios{ ios }
-				, m_message{ cppcoro::detail::lnx::message_type::RESUME_TYPE, &m_awaitingCoroutine }
-			{
-			}
-
-			bool await_suspend(stdcoro::coroutine_handle<> awaitingCoroutine)
-			{
-				m_awaitingCoroutine = awaitingCoroutine;
-				auto sqe = io_uring_get_sqe(m_ios.native_uring_handle());
-				io_uring_prep_readv(sqe, m_fd.fd(), &m_data, 1, 0);
-				io_uring_sqe_set_data(sqe, &m_message);
-				io_uring_submit(m_ios.native_uring_handle());
-				return false;
-			}
-
-			bool await_ready() const noexcept { return false; }
-
-			decltype(auto) await_resume() { return true; }
-
-			stdcoro::coroutine_handle<> m_awaitingCoroutine;
-		};
-
-		read_operation read(std::uint64_t offset, void* buffer, std::size_t byteCount) noexcept
-		{
-			return read_operation{ m_fd, m_ios, offset, buffer, byteCount };
-		}
-	};
-}  // namespace cppcoro
-
-int main(int argc, char** argv)
-{
-	using namespace std::chrono_literals;
-	using namespace cppcoro;
-	io_service ios;
+int main(int argc, char **argv) {
+    using namespace std::chrono_literals;
+    using namespace cppcoro;
+    io_service ios;
     std::string check;
-	std::string content{"Hello world"};
-	(void)sync_wait(when_all(
-		[&]() -> task<> {
-			auto _ = on_scope_exit([&] { ios.stop(); });
-			//			auto tf = test_file{ios, __FILE__};
-			//            content.resize(tf.size());
-			//            co_await tf.read(0, content.data(), content.size());
-			//            std::cout << "got: " << content << '\n';
-			//
-			//			std::fill(begin(content), end(content), '\0');
+    std::string content{"Hello world"};
+    cancellation_source canceller;
+    (void) sync_wait(when_all(
+        [&]() -> task<> {
+            auto _ = on_scope_exit([&] { ios.stop(); });
 
-//          co_await ios.schedule();
-//          std::cout << "2\n";
-//          co_await ios.schedule_after(1s);
-//			std::cout << "1\n";
+            std::string tmp;
+            auto this_file = read_only_file::open(ios, __FILE__);
+            tmp.resize(this_file.size());
+            try {
+                co_await this_file.read(0, tmp.data(), tmp.size(), canceller.token());
+                assert(false);
+            } catch (operation_cancelled &) {}
 
-			std::string tmp;
-			auto this_file = read_only_file::open(ios, __FILE__);
-			tmp.resize(this_file.size());
-			co_await this_file.read(0, tmp.data(), tmp.size());
-          std::cout << "got: " << tmp << '\n';
+            auto f = read_write_file::open(ios, "./test.txt", file_open_mode::create_always);
+            co_await f.write(0, content.data(), content.size());
+            check.resize(content.size());
+            co_await f.read(0, check.data(), check.size());
 
-          auto f = read_write_file::open(ios, "./test.txt", file_open_mode::create_always);
-		  co_await f.write(0, content.data(), content.size());
-		  check.resize(content.size());
-		  co_await f.read(0, check.data(), check.size());
+            assert(check == content);
 
-		  assert(check == content);
+            std::cout << "got: " << check << '\n';
 
-		  std::cout << "got: " << check << '\n';
-
-		  co_return;
-		}(),
-		[&]() -> task<> {
-			ios.process_events();
-			co_return;
-		}()));
-	return 0;
+            co_return;
+        }(),
+        [&]() -> task<> {
+            canceller.request_cancellation();
+            co_return;
+        }(),
+        [&]() -> task<> {
+            ios.process_events();
+            co_return;
+        }()));
+    return 0;
 }

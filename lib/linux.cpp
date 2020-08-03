@@ -16,6 +16,7 @@ namespace cppcoro {
     namespace detail {
         namespace lnx {
             uring_queue::uring_queue(size_t queue_length, uint32_t flags) {
+                check_required_kernel(5, 4, "initializing uring library");
                 auto err = io_uring_queue_init(queue_length, &ring_, flags);
                 if (err < 0) {
                     throw std::system_error

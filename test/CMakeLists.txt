@@ -15,11 +15,14 @@ if(NOT doctest)
     FetchContent_MakeAvailable(doctest)
     link_libraries(doctest)
     include_directories(SYSTEM ${doctest_SOURCE_DIR})
-else()
-    link_libraries(doctest::doctest)
 endif()
+
+link_libraries(doctest::doctest)
 
 add_executable(async_generator_tests
     async_generator_tests.cpp
 )
-target_link_libraries(async_generator_tests doctest::doctest)
+
+add_executable(file_tests
+  file_tests.cpp
+  )

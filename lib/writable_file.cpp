@@ -66,7 +66,7 @@ cppcoro::file_write_operation cppcoro::writable_file::write(
 	std::size_t byteCount) noexcept
 {
 	return file_write_operation{
-#ifdef CPPCORO_OS_LINUX
+#if CPPCORO_OS_LINUX
 		*m_ioService,
 #endif
 		m_fileHandle.handle(),
@@ -83,7 +83,7 @@ cppcoro::file_write_operation_cancellable cppcoro::writable_file::write(
 	cancellation_token ct) noexcept
 {
 	return file_write_operation_cancellable{
-#ifdef CPPCORO_OS_LINUX
+#if CPPCORO_OS_LINUX
         *m_ioService,
 #endif
 		m_fileHandle.handle(),

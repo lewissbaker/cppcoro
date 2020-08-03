@@ -40,7 +40,7 @@ namespace cppcoro
 		static detail::safe_handle open(
 			detail::dword_t fileAccess,
 			io_service& ioService,
-			const stdcoro::filesystem::path& path,
+			const stdfs::path& path,
 			file_open_mode openMode,
 			file_share_mode shareMode,
 			file_buffering_mode bufferingMode);

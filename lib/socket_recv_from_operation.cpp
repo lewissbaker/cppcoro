@@ -10,10 +10,8 @@
 
 #if CPPCORO_OS_WINNT
 
-#include <MSWSock.h>
-#include <WS2tcpip.h>
 #include <WinSock2.h>
-#include <Windows.h>
+#include <WS2tcpip.h>
 
 bool cppcoro::net::socket_recv_from_operation_impl::try_start(
 	cppcoro::detail::io_operation_base& operation) noexcept

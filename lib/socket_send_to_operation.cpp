@@ -9,11 +9,8 @@
 #include "socket_helpers.hpp"
 
 #if CPPCORO_OS_WINNT
-
-#include <MSWSock.h>
-#include <WS2tcpip.h>
 #include <WinSock2.h>
-#include <Windows.h>
+#include <WS2tcpip.h>
 
 bool cppcoro::net::socket_send_to_operation_impl::try_start(
 	cppcoro::detail::io_operation_base& operation) noexcept
@@ -85,7 +82,7 @@ bool cppcoro::net::socket_send_to_operation_impl::try_start(
 void cppcoro::net::socket_send_to_operation_impl::cancel(
 	cppcoro::detail::io_operation_base& operation) noexcept
 {
-	throw std::runtime_error("Not implemented");
+    operation.cancel_io();
 }
 
 #endif

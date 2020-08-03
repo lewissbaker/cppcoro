@@ -194,6 +194,7 @@ namespace cppcoro
 
             uring_operation_cancellable(io_service &ioService, cancellation_token&& ct) noexcept
                 : uring_operation_base(ioService, 0)
+                , m_state(ct.is_cancellation_requested() ? state::completed : state::not_started)
 				, m_cancellationToken(std::move(ct))
             {
                 m_message.m_result = error_operation_aborted;
@@ -201,6 +202,7 @@ namespace cppcoro
 
             uring_operation_cancellable(io_service &ioService, size_t offset, cancellation_token&& ct) noexcept
                 : uring_operation_base(ioService, offset)
+                , m_state(ct.is_cancellation_requested() ? state::completed : state::not_started)
                 , m_cancellationToken(std::move(ct))
             {
                 m_message.m_result = error_operation_aborted;
@@ -280,8 +282,8 @@ namespace cppcoro
                         }
                         else
                         {
-                            assert(oldState == state::completed);
-                            return false;
+                            assert(oldState == state::started);
+                            return true;
                         }
                     }
                 }
