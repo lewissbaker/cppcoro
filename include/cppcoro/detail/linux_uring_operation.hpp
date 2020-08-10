@@ -14,7 +14,7 @@
 
 #include <optional>
 #include <system_error>
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <cassert>
 #include <cstring>
 #include <arpa/inet.h>

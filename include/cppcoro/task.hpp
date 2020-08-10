@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <cassert>
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 
 namespace cppcoro
 {

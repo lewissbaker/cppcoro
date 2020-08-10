@@ -5,7 +5,7 @@
 #ifndef CPPCORO_ASYNC_AUTO_RESET_EVENT_HPP_INCLUDED
 #define CPPCORO_ASYNC_AUTO_RESET_EVENT_HPP_INCLUDED
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 
 #include <atomic>
 #include <cstdint>

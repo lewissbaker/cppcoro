@@ -5,7 +5,7 @@
 #ifndef CPPCORO_GENERATOR_HPP_INCLUDED
 #define CPPCORO_GENERATOR_HPP_INCLUDED
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <type_traits>
 #include <utility>
 #include <exception>

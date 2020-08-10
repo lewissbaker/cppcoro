@@ -13,7 +13,7 @@
 
 #include <optional>
 #include <system_error>
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <cassert>
 
 namespace cppcoro

@@ -7,7 +7,7 @@
 
 #include <cppcoro/config.hpp>
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <cppcoro/file_open_mode.hpp>
 #include <cppcoro/file_share_mode.hpp>
 #include <cppcoro/file_buffering_mode.hpp>

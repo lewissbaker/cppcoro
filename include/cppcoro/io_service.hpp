@@ -22,7 +22,7 @@
 #include <atomic>
 #include <utility>
 #include <mutex>
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 
 namespace cppcoro
 {

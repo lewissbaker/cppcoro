@@ -7,7 +7,7 @@
 
 #include <cppcoro/detail/when_all_counter.hpp>
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <tuple>
 
 namespace cppcoro

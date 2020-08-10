@@ -8,7 +8,7 @@
 #include <cppcoro/on_scope_exit.hpp>
 
 #include <atomic>
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <type_traits>
 #include <cassert>
 

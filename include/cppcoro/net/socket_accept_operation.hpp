@@ -16,7 +16,7 @@
 #include <cppcoro/detail/linux_uring_operation.hpp>
 #endif
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <atomic>
 #include <optional>
 

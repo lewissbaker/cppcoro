@@ -5,7 +5,7 @@
 #ifndef CPPCORO_DETAIL_WHEN_ALL_COUNTER_HPP_INCLUDED
 #define CPPCORO_DETAIL_WHEN_ALL_COUNTER_HPP_INCLUDED
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <atomic>
 #include <cstdint>
 

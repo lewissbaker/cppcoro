@@ -15,7 +15,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 
 namespace cppcoro
 {

@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 #include <mutex>
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 
 namespace cppcoro
 {

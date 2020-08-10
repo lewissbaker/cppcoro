@@ -5,7 +5,7 @@
 #ifndef CPPCORO_ASYNC_MUTEX_HPP_INCLUDED
 #define CPPCORO_ASYNC_MUTEX_HPP_INCLUDED
 
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <atomic>
 #include <cstdint>
 #include <mutex> // for std::adopt_lock_t

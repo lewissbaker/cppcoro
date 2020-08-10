@@ -12,7 +12,7 @@
 #include <atomic>
 #include <iterator>
 #include <type_traits>
-#include <cppcoro/stdcoro.hpp>
+#include <cppcoro/detail/stdcoro.hpp>
 #include <functional>
 #include <cassert>
 

@@ -9,8 +9,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 project(cppcoro)
 
-set(${PROJECT_NAME}_SOURCES
-  # headers
+set(${PROJECT_NAME}_PUBLIC_HEADERS
   include/cppcoro/async_auto_reset_event.hpp
   include/cppcoro/async_generator.hpp
   include/cppcoro/async_latch.hpp
@@ -23,6 +22,7 @@ set(${PROJECT_NAME}_SOURCES
   include/cppcoro/cancellation_source.hpp
   include/cppcoro/cancellation_token.hpp
   include/cppcoro/config.hpp
+
   include/cppcoro/detail/any.hpp
   include/cppcoro/detail/get_awaiter.hpp
   include/cppcoro/detail/is_awaiter.hpp
@@ -35,6 +35,7 @@ set(${PROJECT_NAME}_SOURCES
   include/cppcoro/detail/when_all_counter.hpp
   include/cppcoro/detail/when_all_ready_awaitable.hpp
   include/cppcoro/detail/when_all_task.hpp
+
   include/cppcoro/file.hpp
   include/cppcoro/file_buffering_mode.hpp
   include/cppcoro/file_open_mode.hpp
@@ -91,8 +92,9 @@ set(${PROJECT_NAME}_SOURCES
   include/cppcoro/net/socket_recv_operation.hpp
   include/cppcoro/net/socket_send_operation.hpp
   include/cppcoro/net/socket_send_to_operation.hpp
+  )
 
-  # sources
+set(${PROJECT_NAME}_SOURCES
   lib/async_auto_reset_event.cpp
   lib/async_manual_reset_event.cpp
   lib/async_mutex.cpp
@@ -136,28 +138,25 @@ set(${PROJECT_NAME}_SOURCES
 
 if(WIN32)
   list(APPEND ${PROJECT_NAME}_SOURCES
-    # headers
-
-    # sources
     lib/win32.cpp
     )
 
-  list(APPEND ${PROJECT_NAME}_SOURCES
-    # headers
+  list(APPEND ${PROJECT_NAME}_PUBLIC_HEADERS
     include/cppcoro/detail/win32.hpp
     include/cppcoro/detail/win32_overlapped_operation.hpp
     )
 else()
   list(APPEND ${PROJECT_NAME}_SOURCES
-    # headers
-    include/cppcoro/detail/linux.hpp
-    # sources
     lib/linux.cpp
+    )
+  list(APPEND ${PROJECT_NAME}_PUBLIC_HEADERS
+    include/cppcoro/detail/linux.hpp
+    include/cppcoro/detail/linux_uring_operation.hpp
     )
 endif()
 
-add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES})
-target_include_directories(${PROJECT_NAME} PUBLIC include)
+add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_PUBLIC_HEADERS})
+target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 
 if(WIN32)
   set(CMAKE_REQUIRED_FLAGS /std:c++latest /await)
@@ -186,19 +185,22 @@ message(STATUS "HAS_STD_EXPERIMENTAL_COROUTINES_HEADER: ${HAS_STD_EXPERIMENTAL_C
 message(STATUS "HAS_STD_FILESYSTEM_HEADER: ${HAS_STD_FILESYSTEM_HEADER}")
 message(STATUS "HAS_STD_EXPERIMENTAL_FILESYSTEM_HEADER: ${HAS_STD_EXPERIMENTAL_FILESYSTEM_HEADER}")
 
-if(HAS_STD_COROUTINE_HEADER)
-  target_compile_options(${PROJECT_NAME} PUBLIC
-    -DHAS_STD_COROUTINE_HEADER=${HAS_STD_COROUTINE_HEADER}
-    )
-endif()
+target_compile_options(${PROJECT_NAME} PUBLIC
+  -DCPPCORO_HAS_STD_COROUTINE_HEADER=${HAS_STD_COROUTINE_HEADER}
+  )
+target_compile_options(${PROJECT_NAME} PUBLIC
+  -DCPPCORO_HAS_STD_EXPERIMENTAL_COROUTINES_HEADER=${HAS_STD_EXPERIMENTAL_COROUTINES_HEADER}
+  )
 
-if(HAS_STD_FILESYSTEM_HEADER)
-  target_compile_options(${PROJECT_NAME} PUBLIC
-    -DHAS_STD_FILESYSTEM_HEADER=${HAS_STD_FILESYSTEM_HEADER}
-    )
-endif()
+target_compile_options(${PROJECT_NAME} PUBLIC
+  -DCPPCORO_HAS_STD_FILESYSTEM_HEADER=${HAS_STD_FILESYSTEM_HEADER}
+  )
 
-add_library(cppcoro::coro ALIAS ${PROJECT_NAME})
+target_compile_options(${PROJECT_NAME} PUBLIC
+  -DCPPCORO_HAS_STD_EXPERIMENTAL_FILESYSTEM_HEADER=${HAS_STD_EXPERIMENTAL_FILESYSTEM_HEADER}
+  )
+
+add_library(cppcoro::cppcoro ALIAS ${PROJECT_NAME})
 
 option(ENABLE_EXAMPLES "Build examples" ON)
 if(ENABLE_EXAMPLES)
@@ -209,3 +211,31 @@ enable_testing()
 if(ENABLE_TESTING)
   add_subdirectory(test)
 endif()
+
+install(TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME}-targets
+  ARCHIVE DESTINATION lib
+  )
+install(DIRECTORY include/cppcoro DESTINATION include)
+
+configure_file(cmake/cppcoroConfig.cmake.in
+  "${CMAKE_CURRENT_BINARY_DIR}/cppcoroConfig.cmake"
+  @ONLY
+  )
+
+export(EXPORT ${PROJECT_NAME}-targets
+  FILE "${CMAKE_CURRENT_BINARY_DIR}/cppcoroTargets.cmake"
+  NAMESPACE cppcoro::
+  )
+
+set(CONFIG_PACKAGE_LOCATION lib/cmake/${PROJECT_NAME})
+install(EXPORT ${PROJECT_NAME}-targets
+  FILE cppcoroTargets.cmake
+  NAMESPACE cppcoro::
+  DESTINATION ${CONFIG_PACKAGE_LOCATION}
+  )
+install(
+  FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/cppcoroConfig.cmake"
+  DESTINATION ${CONFIG_PACKAGE_LOCATION}
+  )
