@@ -216,7 +216,7 @@ install(TARGETS ${PROJECT_NAME}
   EXPORT ${PROJECT_NAME}-targets
   ARCHIVE DESTINATION lib
   )
-install(DIRECTORY include/cppcoro DESTINATION include)
+install(DIRECTORY include/ DESTINATION include)
 
 configure_file(cmake/cppcoroConfig.cmake.in
   "${CMAKE_CURRENT_BINARY_DIR}/cppcoroConfig.cmake"
