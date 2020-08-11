@@ -4,6 +4,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 include(CheckIncludeFileCXX)
+macro(check_include_file_cxx _header _var)
+  _check_include_file_cxx(${_header} ${_var})
+  if(NOT ${_var})
+    set(${_var} 0)
+  endif()
+endmacro()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 

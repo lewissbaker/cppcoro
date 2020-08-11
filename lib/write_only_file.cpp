@@ -11,7 +11,7 @@
 # endif
 # include <Windows.h>
 #elif CPPCORO_OS_LINUX
-#define GENERIC_WRITE 0
+#define GENERIC_WRITE (S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH)
 #endif
 
 cppcoro::write_only_file cppcoro::write_only_file::open(

@@ -18,30 +18,32 @@
 using namespace cppcoro;
 using namespace cppcoro::net;
 
+using cosocket = cppcoro::net::socket;
+
 TEST_SUITE_BEGIN("socket");
 
 TEST_CASE("create TCP/IPv4")
 {
 	io_service ioSvc;
-	auto socket = socket::create_tcpv4(ioSvc);
+	auto socket = cosocket::create_tcpv4(ioSvc);
 }
 
 TEST_CASE("create TCP/IPv6")
 {
 	io_service ioSvc;
-	auto socket = socket::create_tcpv6(ioSvc);
+	auto socket = cosocket::create_tcpv6(ioSvc);
 }
 
 TEST_CASE("create UDP/IPv4")
 {
 	io_service ioSvc;
-	auto socket = socket::create_udpv4(ioSvc);
+	auto socket = cosocket::create_udpv4(ioSvc);
 }
 
 TEST_CASE("create UDP/IPv6")
 {
 	io_service ioSvc;
-	auto socket = socket::create_udpv6(ioSvc);
+	auto socket = cosocket::create_udpv6(ioSvc);
 }
 
 TEST_CASE("TCP/IPv4 connect/disconnect")
@@ -52,16 +54,16 @@ TEST_CASE("TCP/IPv4 connect/disconnect")
 
 	task<int> serverTask;
 
-	auto server = [&](socket listeningSocket) -> task<int>
+	auto server = [&](cosocket listeningSocket) -> task<int>
 	{
-		auto s = socket::create_tcpv4(ioSvc);
+		auto s = cosocket::create_tcpv4(ioSvc);
 		co_await listeningSocket.accept(s);
 		co_await s.disconnect();
 		co_return 0;
 	};
 
 	{
-		auto serverSocket = socket::create_tcpv4(ioSvc);
+		auto serverSocket = cosocket::create_tcpv4(ioSvc);
 		serverSocket.bind(ipv4_endpoint{ ipv4_address::loopback(), 0 });
 		serverSocket.listen(3);
 		serverAddress = serverSocket.local_endpoint();
@@ -70,7 +72,7 @@ TEST_CASE("TCP/IPv4 connect/disconnect")
 
 	auto client = [&]() -> task<int>
 	{
-		auto s = socket::create_tcpv4(ioSvc);
+		auto s = cosocket::create_tcpv4(ioSvc);
 		s.bind(ipv4_endpoint{ ipv4_address::loopback(), 0 });
 		co_await s.connect(serverAddress);
 		co_await s.disconnect();
@@ -97,14 +99,14 @@ TEST_CASE("send/recv TCP/IPv4")
 {
 	io_service ioSvc;
 
-	auto listeningSocket = socket::create_tcpv4(ioSvc);
+	auto listeningSocket = cosocket::create_tcpv4(ioSvc);
 
 	listeningSocket.bind(ipv4_endpoint{ ipv4_address::loopback(), 0 });
 	listeningSocket.listen(3);
 
 	auto echoServer = [&]() -> task<int>
 	{
-		auto acceptingSocket = socket::create_tcpv4(ioSvc);
+		auto acceptingSocket = cosocket::create_tcpv4(ioSvc);
 
 		co_await listeningSocket.accept(acceptingSocket);
 
@@ -134,7 +136,7 @@ TEST_CASE("send/recv TCP/IPv4")
 
 	auto echoClient = [&]() -> task<int>
 	{
-		auto connectingSocket = socket::create_tcpv4(ioSvc);
+		auto connectingSocket = cosocket::create_tcpv4(ioSvc);
 
 		connectingSocket.bind(ipv4_endpoint{});
 
@@ -214,14 +216,14 @@ TEST_CASE("send/recv TCP/IPv4 many connections")
 {
 	io_service ioSvc;
 
-	auto listeningSocket = socket::create_tcpv4(ioSvc);
+	auto listeningSocket = cosocket::create_tcpv4(ioSvc);
 
 	listeningSocket.bind(ipv4_endpoint{ ipv4_address::loopback(), 0 });
 	listeningSocket.listen(20);
 
 	cancellation_source canceller;
 
-	auto handleConnection = [](socket s) -> task<void>
+	auto handleConnection = [](cosocket s) -> task<void>
 	{
 		std::uint8_t buffer[64];
 		std::size_t bytesReceived;
@@ -253,7 +255,7 @@ TEST_CASE("send/recv TCP/IPv4 many connections")
 		try
 		{
 			while (true) {
-				auto acceptingSocket = socket::create_tcpv4(ioSvc);
+				auto acceptingSocket = cosocket::create_tcpv4(ioSvc);
 				co_await listeningSocket.accept(acceptingSocket, ct);
 				connectionScope.spawn(
 					handleConnection(std::move(acceptingSocket)));
@@ -277,7 +279,7 @@ TEST_CASE("send/recv TCP/IPv4 many connections")
 
 	auto echoClient = [&]() -> task<>
 	{
-		auto connectingSocket = socket::create_tcpv4(ioSvc);
+		auto connectingSocket = cosocket::create_tcpv4(ioSvc);
 
 		connectingSocket.bind(ipv4_endpoint{});
 
@@ -368,7 +370,7 @@ TEST_CASE("udp send_to/recv_from")
 {
 	io_service ioSvc;
 
-	auto server = [&](socket serverSocket) -> task<int>
+	auto server = [&](cosocket serverSocket) -> task<int>
 	{
 		std::uint8_t buffer[100];
 
@@ -412,7 +414,7 @@ TEST_CASE("udp send_to/recv_from")
 	task<int> serverTask;
 
 	{
-		auto serverSocket = socket::create_udpv4(ioSvc);
+		auto serverSocket = cosocket::create_udpv4(ioSvc);
 		serverSocket.bind(ipv4_endpoint{ ipv4_address::loopback(), 0 });
 		serverAddress = serverSocket.local_endpoint();
 		serverTask = server(std::move(serverSocket));
@@ -420,7 +422,7 @@ TEST_CASE("udp send_to/recv_from")
 
 	auto client = [&]() -> task<int>
 	{
-		auto socket = socket::create_udpv4(ioSvc);
+		auto socket = cosocket::create_udpv4(ioSvc);
 
 		// don't need to bind(), should be implicitly bound on first send_to().
 

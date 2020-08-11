@@ -87,9 +87,10 @@ TEST_CASE_FIXTURE(io_service_fixture, "schedule_on async_generator<> function")
 		auto seq = schedule_on(io_service(), makeSequence());
 
 		int expected = 1;
-		for co_await(int value : seq)
+		// for co_await(int value : seq) // sadly removed from C++20 and unhandled by GCC
+        for (auto value_it = co_await seq.begin(); value_it != seq.end(); value_it = co_await ++value_it)
 		{
-			CHECK(value == expected++);
+			CHECK(*value_it == expected++);
 
 			// Transfer exection back to main thread before
 			// awaiting next item in the loop to chck that
@@ -177,16 +178,17 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on async_generator<> function"
 		auto seq = resume_on(otherIoService, makeSequence());
 
 		int expected = 1;
-		for co_await(int value : seq)
+        // for co_await(int value : seq) // sadly removed from C++20 and unhandled by GCC
+        for (auto value_it = co_await seq.begin(); value_it != seq.end(); value_it = co_await ++value_it)
 		{
 			// Every time we receive a value it should be on our requested
 			// scheduler (ie. main thread)
 			CHECK(std::this_thread::get_id() == mainThreadId);
-			CHECK(value == expected++);
+			CHECK(*value_it == expected++);
 
 			// Occasionally transfer execution to a different thread before
 			// awaiting next element.
-			if (value == 2)
+			if (*value_it == 2)
 			{
 				co_await io_service().schedule();
 			}

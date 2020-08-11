@@ -16,11 +16,6 @@ int main(int argc, char **argv) {
     using namespace cppcoro;
     io_service ios;
     std::string check;
-    std::string content{"Hello world"};
-
-    cancellation_source canceller;
-
-    canceller.request_cancellation();
 
     (void) sync_wait(when_all(
             [&]() -> task<> {
@@ -29,22 +24,15 @@ int main(int argc, char **argv) {
                 std::string tmp;
                 auto this_file = read_only_file::open(ios, __FILE__);
                 tmp.resize(this_file.size());
-                try {
-                    // first attempt will probably terminate successfully before cancel has been requested
-                    co_await this_file.read(0, tmp.data(), tmp.size(), canceller.token());
-                    assert(false);
-                } catch (operation_cancelled &) {
-                    std::cout << "Cancelled\n";
-                }
 
                 auto f = read_write_file::open(ios, "./test.txt", file_open_mode::create_always);
 
-                check.resize(content.size());
-
-                co_await f.write(0, content.data(), content.size());
+                co_await f.write(0, "Hello ", 6);
+                co_await f.write(6, "World !", 7);
+                check.resize(13);
                 co_await f.read(0, check.data(), check.size());
 
-                assert(check == content);
+                assert(check == "Hello World !");
 
                 std::cout << "got: " << check << '\n';
             }(),

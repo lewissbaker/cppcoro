@@ -39,7 +39,7 @@ namespace cppcoro {
                 m_vec.iov_base = buffer;
                 m_vec.iov_len = size;
                 auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
-                io_uring_prep_readv(sqe, fd, &m_vec, 1, 0);
+                io_uring_prep_readv(sqe, fd, &m_vec, 1, m_offset);
                 submitt(sqe);
                 return true;
             }
@@ -48,7 +48,7 @@ namespace cppcoro {
                 m_vec.iov_base = const_cast<void *>(buffer);
                 m_vec.iov_len = size;
                 auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
-                io_uring_prep_writev(sqe, fd, &m_vec, 1, 0);
+                io_uring_prep_writev(sqe, fd, &m_vec, 1, m_offset);
                 submitt(sqe);
                 return true;
             }
