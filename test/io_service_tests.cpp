@@ -69,7 +69,10 @@ TEST_CASE("schedule coroutine")
 		}()));
 }
 
-TEST_CASE_FIXTURE(io_service_fixture_with_threads<2>, "multiple I/O threads servicing events")
+static constexpr int mio_task_count = 500;
+using mio_service_fixture_with_threads = io_service_fixture_with_threads<2, mio_task_count>;
+
+TEST_CASE_FIXTURE(mio_service_fixture_with_threads, "multiple I/O threads servicing events")
 {
 	std::atomic<int> completedCount = 0;
 
@@ -81,7 +84,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<2>, "multiple I/O threads serv
 
 	std::vector<cppcoro::task<>> tasks;
 	{
-		for (int i = 0; i < 1000; ++i)
+		for (int i = 0; i < mio_task_count; ++i)
 		{
 			tasks.emplace_back(runOnIoThread());
 		}
@@ -89,7 +92,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<2>, "multiple I/O threads serv
 
 	cppcoro::sync_wait(cppcoro::when_all(std::move(tasks)));
 
-	CHECK(completedCount == 1000);
+	CHECK(completedCount == mio_task_count);
 }
 
 TEST_CASE("Multiple concurrent timers")

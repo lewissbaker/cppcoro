@@ -23,6 +23,7 @@ int main(int argc, char **argv) {
 
             try {
                 co_await ios.schedule_after(1s, canceller.token());
+                assert(false);
             } catch (operation_cancelled &) {
                 std::cout << "cancelled\n";
             }

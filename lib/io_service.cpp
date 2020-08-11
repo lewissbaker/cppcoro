@@ -26,6 +26,7 @@
 
 
 #if CPPCORO_OS_LINUX
+#include <cppcoro/operation_cancelled.hpp>
 typedef int DWORD;
 #define INFINITE (DWORD)-1 //needed for timeout values in io_service::timer_thread_state::run()
 typedef long long int LONGLONG;
@@ -725,8 +726,13 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
         {
             if ((unsigned long long)message != 0)
             {
-                stdcoro::coroutine_handle<>::from_address(reinterpret_cast<void*>(message)).resume();
-                return true;
+                auto coroutine = stdcoro::coroutine_handle<>::from_address(reinterpret_cast<void*>(message));
+                if(!coroutine.done()) {
+                    coroutine.resume();
+                    return true;
+                } else {
+                    return false;
+                }
             }
 
             if (is_stop_requested())
@@ -1148,4 +1154,9 @@ void cppcoro::io_service::timed_schedule_operation::await_resume()
 {
 	m_cancellationRegistration.reset();
 	m_cancellationToken.throw_if_cancellation_requested();
+#if CPPCORO_OS_LINUX
+	if (m_message.m_result == -ECANCELED) {
+        throw operation_cancelled{};
+	}
+#endif
 }
