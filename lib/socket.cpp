@@ -17,15 +17,17 @@
 #include "socket_helpers.hpp"
 
 #if CPPCORO_OS_WINNT
-#include <WinSock2.h>
-#include <Windows.h>
 #include <MSWSock.h>
 #include <WS2tcpip.h>
+#include <WinSock2.h>
+#include <Windows.h>
 #define last_error WSAGetLastError()
 #elif CPPCORO_OS_LINUX
 #include <cstring>
 #include <netinet/in.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
+
 #define last_error errno
 #endif
 
@@ -254,7 +256,10 @@ cppcoro::net::socket cppcoro::net::socket::create_udpv4(io_service& ioSvc)
 
 #elif CPPCORO_OS_LINUX
 	auto socketHandle = local::create_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    socket result(ioSvc, socketHandle);
+	socket result(ioSvc, socketHandle);
+	// we use MSG_TRUNC flag to detect whatever the incoming datagram
+	// fits within size, linux does not a MORE_DATA like error code.
+	result.m_recvFlags = MSG_TRUNC;
 #endif
 
 	result.m_localEndPoint = ipv4_endpoint();
@@ -273,7 +278,10 @@ cppcoro::net::socket cppcoro::net::socket::create_udpv6(io_service& ioSvc)
 
 #elif CPPCORO_OS_LINUX
 	auto socketHandle = local::create_socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-    socket result(ioSvc, socketHandle);
+	socket result(ioSvc, socketHandle);
+	// we use MSG_TRUNC flag to detect whatever the incoming datagram
+	// fits within size, linux does not a MORE_DATA like error code.
+	result.m_recvFlags = MSG_TRUNC;
 #endif
 
 	result.m_localEndPoint = ipv6_endpoint();
@@ -287,6 +295,7 @@ cppcoro::net::socket::socket(socket&& other) noexcept
 	, m_skipCompletionOnSuccess(other.m_skipCompletionOnSuccess)
 #elif CPPCORO_OS_LINUX
 	, m_ioService(other.m_ioService)
+	, m_recvFlags(other.m_recvFlags)
 #endif
 	, m_localEndPoint(std::move(other.m_localEndPoint))
 	, m_remoteEndPoint(std::move(other.m_remoteEndPoint))
@@ -312,6 +321,8 @@ cppcoro::net::socket& cppcoro::net::socket::operator=(socket&& other) noexcept
 	m_handle = handle;
 #if CPPCORO_OS_WINNT
 	m_skipCompletionOnSuccess = other.m_skipCompletionOnSuccess;
+#elif CPPCORO_OS_LINUX
+	m_recvFlags = other.m_recvFlags;
 #endif
 	m_localEndPoint = other.m_localEndPoint;
 	m_remoteEndPoint = other.m_remoteEndPoint;

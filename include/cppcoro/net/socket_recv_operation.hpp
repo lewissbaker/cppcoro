@@ -33,6 +33,10 @@ namespace cppcoro::net
 		bool try_start(cppcoro::detail::io_operation_base& operation) noexcept;
 		void cancel(cppcoro::detail::io_operation_base& operation) noexcept;
 
+#ifdef CPPCORO_OS_LINUX
+		std::size_t get_result(cppcoro::detail::io_operation_base& operation);
+#endif
+
 	private:
 		socket& m_socket;
 		cppcoro::detail::sock_buf m_buffer;
@@ -61,6 +65,9 @@ namespace cppcoro::net
 		friend cppcoro::detail::io_operation<socket_recv_operation>;
 
 		bool try_start() noexcept { return m_impl.try_start(*this); }
+#ifdef CPPCORO_OS_LINUX
+		std::size_t get_result() { return m_impl.get_result(*this); }
+#endif
 
 		socket_recv_operation_impl m_impl;
 	};

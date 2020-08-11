@@ -242,31 +242,29 @@ namespace cppcoro
 			void close_recv();
 
 		private:
-
 			friend class socket_accept_operation_impl;
 			friend class socket_connect_operation_impl;
+			friend class socket_recv_operation_impl;
+			friend class socket_recv_from_operation_impl;
 
 #if CPPCORO_OS_WINNT
 			explicit socket(
-				cppcoro::detail::win32::socket_t handle,
-				bool skipCompletionOnSuccess) noexcept;
+				cppcoro::detail::win32::socket_t handle, bool skipCompletionOnSuccess) noexcept;
 #elif CPPCORO_OS_LINUX
-            explicit socket(
-				io_service &ioService,
-                cppcoro::detail::lnx::fd_t fd) noexcept;
+			explicit socket(io_service& ioService, cppcoro::detail::lnx::fd_t fd) noexcept;
 #endif
 
 #if CPPCORO_OS_WINNT
-            cppcoro::detail::win32::socket_t m_handle;
+			cppcoro::detail::win32::socket_t m_handle;
 			bool m_skipCompletionOnSuccess;
 #elif CPPCORO_OS_LINUX
-            cppcoro::detail::lnx::fd_t m_handle = -1;
-			io_service &m_ioService;
+			cppcoro::detail::lnx::fd_t m_handle = -1;
+			io_service& m_ioService;
+			int m_recvFlags = 0;
 #endif
 
 			ip_endpoint m_localEndPoint;
 			ip_endpoint m_remoteEndPoint;
-
 		};
 	}
 }

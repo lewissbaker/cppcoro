@@ -94,12 +94,13 @@ cppcoro::net::socket_recv_from_operation_impl::get_result(
 
 bool cppcoro::net::socket_recv_from_operation_impl::try_start(
     cppcoro::detail::io_operation_base &operation) noexcept {
-    return operation.try_start_recvfrom(
-        m_socket.native_handle(),
-        &m_sourceSockaddrStorage,
-        sizeof(m_sourceSockaddrStorage),
-        m_buffer.buffer,
-        m_buffer.size);
+	return operation.try_start_recvfrom(
+		m_socket.native_handle(),
+		&m_sourceSockaddrStorage,
+		sizeof(m_sourceSockaddrStorage),
+		m_buffer.buffer,
+		m_buffer.size,
+		m_socket.m_recvFlags);
 }
 
 void cppcoro::net::socket_recv_from_operation_impl::cancel(
@@ -109,10 +110,18 @@ void cppcoro::net::socket_recv_from_operation_impl::cancel(
 
 std::tuple<std::size_t, cppcoro::net::ip_endpoint>
 cppcoro::net::socket_recv_from_operation_impl::get_result(
-    cppcoro::detail::io_operation_base &operation) {
-    return std::make_tuple(
-        operation.m_message.m_result,
-        detail::sockaddr_to_ip_endpoint(*reinterpret_cast<SOCKADDR *>(&m_sourceSockaddrStorage)));
+    cppcoro::detail::io_operation_base &operation)
+{
+	auto size = operation.get_result();  // may throw errors
+	if (size > m_buffer.size)
+	{
+		throw std::system_error{
+			EAGAIN, std::generic_category()  // TODO is EAGAIN the good choice here ?
+		};
+	}
+	return std::make_tuple(
+		size,
+		detail::sockaddr_to_ip_endpoint(*reinterpret_cast<SOCKADDR*>(&m_sourceSockaddrStorage)));
 }
 
 #endif

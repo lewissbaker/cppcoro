@@ -3,15 +3,17 @@
 // Licenced under MIT license. See LICENSE.txt for details.
 ///////////////////////////////////////////////////////////////////////////////
 
-#include <cppcoro/io_service.hpp>
-#include <cppcoro/net/socket.hpp>
-#include <cppcoro/task.hpp>
-#include <cppcoro/when_all.hpp>
-#include <cppcoro/sync_wait.hpp>
-#include <cppcoro/on_scope_exit.hpp>
+#include <cppcoro/async_scope.hpp>
 #include <cppcoro/cancellation_source.hpp>
 #include <cppcoro/cancellation_token.hpp>
-#include <cppcoro/async_scope.hpp>
+#include <cppcoro/io_service.hpp>
+#include <cppcoro/net/socket.hpp>
+#include <cppcoro/on_scope_exit.hpp>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/task.hpp>
+#include <cppcoro/when_all.hpp>
+
+#include <iostream>
 
 #include "doctest/doctest.h"
 
@@ -389,15 +391,20 @@ TEST_CASE("udp send_to/recv_from")
 			std::tie(bytesReceived, remoteEndPoint) = co_await serverSocket.recv_from(buffer, 100);
 			FAIL("Should have thrown");
 		}
-		catch (const std::system_error&)
+		catch (const std::system_error& ex)
 		{
+#if CPPCORO_OS_LINUX
+			CHECK(ex.code() == std::errc::resource_unavailable_try_again);
+#elif CPPCORO_OS_WINNT
 			// TODO: Map this situation to some kind of error_condition value.
-			// The win32 ERROR_MORE_DATA error code doesn't seem to map to any of the standard std::errc values.
+			// The win32 ERROR_MORE_DATA error code doesn't seem to map to any of the standard
+			// std::errc values.
 			//
 			// CHECK(ex.code() == ???);
 			//
 			// Possibly also need to switch to returning a std::error_code directly rather than
 			// throwing a std::system_error for this case.
+#endif
 		}
 
 		// Send an NACK response.

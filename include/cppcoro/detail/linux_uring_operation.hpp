@@ -74,25 +74,28 @@ namespace cppcoro {
                 return true;
             }
 
-            bool try_start_recv(int fd, void *buffer, size_t size) noexcept {
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
-                io_uring_prep_recv(sqe, fd, buffer, size, 0);
-                submitt(sqe);
-                return true;
-            }
+			bool try_start_recv(int fd, void* buffer, size_t size, int flags) noexcept
+			{
+				auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+				io_uring_prep_recv(sqe, fd, buffer, size, flags);
+				submitt(sqe);
+				return true;
+			}
 
-            bool try_start_recvfrom(int fd, void *from, size_t from_size, void *buffer, size_t size) noexcept {
-                m_vec.iov_base = buffer;
-                m_vec.iov_len = size;
-                std::memset(&m_msghdr, 0, sizeof(m_msghdr));
-                m_msghdr.msg_name = from;
-                m_msghdr.msg_namelen = from_size;
-                m_msghdr.msg_iov = &m_vec;
-                m_msghdr.msg_iovlen = 1;
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
-                io_uring_prep_recvmsg(sqe, fd, &m_msghdr, 0);
-                submitt(sqe);
-                return true;
+			bool try_start_recvfrom(
+				int fd, void* from, size_t from_size, void* buffer, size_t size, int flags) noexcept
+			{
+				m_vec.iov_base = buffer;
+				m_vec.iov_len = size;
+				std::memset(&m_msghdr, 0, sizeof(m_msghdr));
+				m_msghdr.msg_name = from;
+				m_msghdr.msg_namelen = from_size;
+				m_msghdr.msg_iov = &m_vec;
+				m_msghdr.msg_iovlen = 1;
+				auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+				io_uring_prep_recvmsg(sqe, fd, &m_msghdr, flags);
+				submitt(sqe);
+				return true;
             }
 
             bool try_start_connect(int fd, const void *to, size_t to_size) noexcept {
@@ -263,9 +266,10 @@ namespace cppcoro {
                             m_cancellationRegistration.emplace(
                                 std::move(m_cancellationToken),
                                 [this] {
-                                    static_cast<OPERATION *>(this)->cancel();
-                                }
-                            );
+									m_state.store(
+										state::cancellation_requested, std::memory_order_acquire);
+									static_cast<OPERATION*>(this)->cancel();
+								});
                             assert(oldState == state::started);
                             return true;
                         }
@@ -278,14 +282,17 @@ namespace cppcoro {
             decltype(auto) await_resume() {
                 if (m_message.m_result == error_operation_aborted) {
                     throw operation_cancelled{};
-                } else if (m_message.m_result < 0) {
-                    throw std::system_error{
-                        -m_message.m_result,
-                        std::system_category()
-                    };
-                }
+                } else if (m_message.m_result < 0)
+				{
+					if (m_message.m_result == -EINTR &&
+						m_state.load(std::memory_order_acquire) == state::cancellation_requested)
+					{
+						throw operation_cancelled{};
+					}
+					throw std::system_error{ -m_message.m_result, std::system_category() };
+				}
 
-                return static_cast<OPERATION *>(this)->get_result();
+				return static_cast<OPERATION *>(this)->get_result();
             }
 
         private:
