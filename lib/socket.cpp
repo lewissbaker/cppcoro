@@ -17,10 +17,8 @@
 #include "socket_helpers.hpp"
 
 #if CPPCORO_OS_WINNT
-#include <MSWSock.h>
 #include <WS2tcpip.h>
 #include <WinSock2.h>
-#include <Windows.h>
 #define last_error WSAGetLastError()
 #elif CPPCORO_OS_LINUX
 #include <cstring>
