@@ -112,10 +112,6 @@ namespace cppcoro
 			private:
                 struct io_uring ring_{};
 			};
-
-			safe_fd create_event_fd();
-			safe_fd create_timer_fd();
-			safe_fd create_epoll_fd();
 		}  // namespace linux
 
 		using safe_handle = lnx::safe_fd;

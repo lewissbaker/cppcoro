@@ -537,26 +537,29 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 		0,
 		reinterpret_cast<ULONG_PTR>(operation->m_awaiter.address()),
 		nullptr);
-    if (!ok)
-    {
-        // Failed to post to the I/O completion port.
-        //
-        // This is most-likely because the queue is currently full.
-        //
-        // We'll queue up the operation to a linked-list using a lock-free
-        // push and defer the dispatch to the completion port until some I/O
-        // thread next enters its event loop.
-        auto* head = m_scheduleOperations.load(std::memory_order_acquire);
-        do
-        {
-            operation->m_next = head;
-        } while (!m_scheduleOperations.compare_exchange_weak(
-                head,
-                operation,
-                std::memory_order_release,
-                std::memory_order_acquire));
-    }
+#elif CPPCORO_OS_LINUX
+	auto sqe = io_uring_get_sqe(native_uring_handle());
+	io_uring_prep_nop(sqe);
+	operation->m_message.m_ptr = operation->m_awaiter.address();
+	io_uring_sqe_set_data(sqe, &operation->m_message);
+	bool ok = io_uring_submit(native_uring_handle()) == 1;
 #endif
+	if (!ok)
+	{
+		// Failed to post to the I/O completion port.
+		//
+		// This is most-likely because the queue is currently full.
+		//
+		// We'll queue up the operation to a linked-list using a lock-free
+		// push and defer the dispatch to the completion port until some I/O
+		// thread next enters its event loop.
+		auto* head = m_scheduleOperations.load(std::memory_order_acquire);
+		do
+		{
+			operation->m_next = head;
+		} while (!m_scheduleOperations.compare_exchange_weak(
+			head, operation, std::memory_order_release, std::memory_order_acquire));
+	}
 }
 
 void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
@@ -699,48 +702,60 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 		}
 	}
 #else
-    while (true)
-    {
-        try_reschedule_overflow_operations();
-        void* message = NULL;
-        detail::lnx::message_type type = detail::lnx::RESUME_TYPE;
+	while (true)
+	{
+		try_reschedule_overflow_operations();
+		void* message = nullptr;
+		detail::lnx::message_type type = detail::lnx::RESUME_TYPE;
 
-        bool status = m_uq.dequeue(message, type, waitForEvent);
+		bool status = false;
+		try
+		{
+			std::lock_guard guard{ m_uq_mux };
+			status = m_uq.dequeue(message, type, waitForEvent);
+		}
+		catch (std::system_error& err)
+		{
+			if (err.code() == std::errc::interrupted &&
+				(m_threadState.load(std::memory_order_relaxed) & stop_requested_flag) == 0)
+			{
+				return false;
+			}
+			else
+			{
+				throw err;
+			}
+		}
 
-        if (!status)
-        {
-            return false;
-        }
+		if (!status)
+		{
+			return false;
+		}
 
-        if (type == detail::lnx::CALLBACK_TYPE)
-        {
-            auto* state =
-                static_cast<detail::lnx
-            ::io_state*>(reinterpret_cast<detail::lnx::io_state*>(message));
+		if (type == detail::lnx::CALLBACK_TYPE)
+		{
+			auto* state = static_cast<detail::lnx ::io_state*>(
+				reinterpret_cast<detail::lnx::io_state*>(message));
 
-            state->m_callback(state);
+			state->m_callback(state);
 
-            return true;
-        }
-        else
-        {
-            if ((unsigned long long)message != 0)
-            {
-                auto coroutine = stdcoro::coroutine_handle<>::from_address(reinterpret_cast<void*>(message));
-                if(!coroutine.done()) {
-                    coroutine.resume();
-                    return true;
-                } else {
-                    return false;
-                }
-            }
+			return true;
+		}
+		else
+		{
+			if ((unsigned long long)message != 0)
+			{
+				stdcoro::coroutine_handle<>::from_address(reinterpret_cast<void*>(message))
+					.resume();
+			}
 
-            if (is_stop_requested())
-            {
-                return false;
-            }
-        }
-    }
+			if (is_stop_requested())
+			{
+				return false;
+			}
+			return true;
+		}
+	}
 #endif
 }
 
@@ -1003,13 +1018,6 @@ void cppcoro::io_service::schedule_operation::await_suspend(
 	stdcoro::coroutine_handle<> awaiter) noexcept
 {
 	m_awaiter = awaiter;
-#if CPPCORO_OS_LINUX
-    auto sqe = io_uring_get_sqe(m_service.native_uring_handle());
-	io_uring_prep_nop(sqe);
-	m_message.m_ptr = m_awaiter.address();
-	io_uring_sqe_set_data(sqe, &m_message);
-	io_uring_submit(m_service.native_uring_handle());
-#endif
 	m_service.schedule_impl(this);
 }
 

@@ -189,6 +189,7 @@ namespace cppcoro
 #endif
 
 #if CPPCORO_OS_LINUX
+		std::mutex m_uq_mux;
 		detail::lnx::uring_queue m_uq;
 		detail::lnx::message m_nopMessage{ detail::lnx::message_type::RESUME_TYPE, nullptr };
 #endif
@@ -197,7 +198,6 @@ namespace cppcoro
 		// ready to run but that failed to be queued to the I/O
 		// completion port (eg. due to low memory).
 		std::atomic<schedule_operation*> m_scheduleOperations;
-
 
 #if CPPCORO_OS_WINNT
 		std::atomic<timer_thread_state*> m_timerState;

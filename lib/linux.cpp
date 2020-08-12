@@ -44,34 +44,20 @@ namespace cppcoro {
                     throw std::system_error{-ret,
                                             std::system_category(),
                                             std::string{"io_uring_peek_cqe failed"}};
-                } else {
-                    io_uring_cqe_seen(&ring_, cqe);
-                    auto res = cqe->res;
-                    message *msg_ptr = reinterpret_cast<message *>(io_uring_cqe_get_data(cqe));
-                    if (msg_ptr == nullptr) {
-                        return true; // cancelled
-                    }
-                    msg = msg_ptr->m_ptr;
-                    type = msg_ptr->m_type;
-                    msg_ptr->m_result = res;
-                    return true;  // completed
-                }
-            }
-
-            safe_fd create_event_fd() {
-                int fd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK | EFD_CLOEXEC);
-
-                if (fd == -1) {
-                    throw std::system_error
-                        {
-                            static_cast<int>(errno),
-                            std::system_category(),
-                            "Error creating io_service: event fd create"
-                        };
-                }
-
-                return safe_fd{fd};
-            }
+                } else
+				{
+					auto res = cqe->res;
+					auto msg_ptr = reinterpret_cast<message*>(io_uring_cqe_get_data(cqe));
+					if (msg_ptr != nullptr)
+					{
+						msg = msg_ptr->m_ptr;
+						type = msg_ptr->m_type;
+						msg_ptr->m_result = res;
+					}
+					io_uring_cqe_seen(&ring_, cqe);
+					return true;  // completed
+				}
+			}
 
             void safe_fd::close() noexcept {
                 if (m_fd != -1) {
