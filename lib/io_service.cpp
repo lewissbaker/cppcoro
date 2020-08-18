@@ -1163,8 +1163,14 @@ void cppcoro::io_service::timed_schedule_operation::await_resume()
 	m_cancellationRegistration.reset();
 	m_cancellationToken.throw_if_cancellation_requested();
 #if CPPCORO_OS_LINUX
-	if (m_message.m_result == -ECANCELED) {
+    if (m_message.m_result == -ETIME) {
+    } else if (m_message.m_result == -ECANCELED) {
         throw operation_cancelled{};
+    } else if (m_message.m_result < 0) {
+        throw std::system_error {
+            -m_message.m_result,
+            std::generic_category()
+        };
 	}
 #endif
 }
