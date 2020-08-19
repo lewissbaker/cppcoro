@@ -177,7 +177,7 @@ target_compile_options(${PROJECT_NAME} PUBLIC ${CMAKE_REQUIRED_FLAGS})
 if(UNIX)
   find_package(Threads REQUIRED)
   include(geturing)
-  target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads uring::uring)
+  target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads liburing::liburing)
 endif()
 
 check_include_file_cxx(coroutine HAS_STD_COROUTINE_HEADER)
@@ -242,6 +242,7 @@ install(EXPORT ${PROJECT_NAME}-targets
   )
 install(
   FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/cppcoroConfig.cmake"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Findliburing.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cppcoroConfig.cmake"
   DESTINATION ${CONFIG_PACKAGE_LOCATION}
-  )
+)

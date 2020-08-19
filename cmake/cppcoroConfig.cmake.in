@@ -1,10 +1,15 @@
 find_package(Threads REQUIRED)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
 get_filename_component(CPPCORO_INSTALL_PATH "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 
-add_library(liburing INTERFACE IMPORTED GLOBAL)
-target_link_libraries(liburing INTERFACE ${CPPCORO_INSTALL_PATH}/lib/liburing.a)
-target_include_directories(liburing INTERFACE ${CPPCORO_INSTALL_PATH}/include)
-add_library(uring::uring ALIAS liburing)
+find_package(liburing)
+if(NOT liburing_FOUND)
+    add_library(liburing INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(liburing INTERFACE ${CPPCORO_INSTALL_PATH}/lib/liburing.a)
+    target_include_directories(liburing INTERFACE ${CPPCORO_INSTALL_PATH}/include)
+    add_library(liburing::liburing ALIAS liburing)
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/cppcoroTargets.cmake")
+target_include_directories(cppcoro::cppcoro INTERFACE ${CPPCORO_INSTALL_PATH}/include)
