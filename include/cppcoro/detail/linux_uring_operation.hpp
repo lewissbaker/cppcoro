@@ -26,7 +26,7 @@ namespace cppcoro {
             void submitt(io_uring_sqe *sqe) {
                 m_message.m_ptr = m_awaitingCoroutine.address();
                 io_uring_sqe_set_data(sqe, &m_message);
-                io_uring_submit(m_ioService.native_uring_handle());
+                m_ioService.submit();
             }
 
         public:
@@ -38,7 +38,7 @@ namespace cppcoro {
             bool try_start_read(int fd, void *buffer, size_t size) noexcept {
                 m_vec.iov_base = buffer;
                 m_vec.iov_len = size;
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_readv(sqe, fd, &m_vec, 1, m_offset);
                 submitt(sqe);
                 return true;
@@ -47,14 +47,14 @@ namespace cppcoro {
             bool try_start_write(int fd, const void *buffer, size_t size) noexcept {
                 m_vec.iov_base = const_cast<void *>(buffer);
                 m_vec.iov_len = size;
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_writev(sqe, fd, &m_vec, 1, m_offset);
                 submitt(sqe);
                 return true;
             }
 
             bool try_start_send(int fd, const void *buffer, size_t size) noexcept {
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_send(sqe, fd, buffer, size, 0);
                 submitt(sqe);
                 return true;
@@ -68,7 +68,7 @@ namespace cppcoro {
                 m_msghdr.msg_namelen = to_size;
                 m_msghdr.msg_iov = &m_vec;
                 m_msghdr.msg_iovlen = 1;
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_sendmsg(sqe, fd, &m_msghdr, 0);
                 submitt(sqe);
                 return true;
@@ -76,7 +76,7 @@ namespace cppcoro {
 
 			bool try_start_recv(int fd, void* buffer, size_t size, int flags) noexcept
 			{
-				auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+				auto sqe = m_ioService.get_sqe();
 				io_uring_prep_recv(sqe, fd, buffer, size, flags);
 				submitt(sqe);
 				return true;
@@ -92,37 +92,37 @@ namespace cppcoro {
 				m_msghdr.msg_namelen = from_size;
 				m_msghdr.msg_iov = &m_vec;
 				m_msghdr.msg_iovlen = 1;
-				auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+				auto sqe = m_ioService.get_sqe();
 				io_uring_prep_recvmsg(sqe, fd, &m_msghdr, flags);
 				submitt(sqe);
 				return true;
             }
 
             bool try_start_connect(int fd, const void *to, size_t to_size) noexcept {
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_connect(sqe, fd, reinterpret_cast<sockaddr *>(const_cast<void *>(to)), to_size);
                 submitt(sqe);
                 return true;
             }
 
             bool try_start_disconnect(int fd) noexcept {
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_close(sqe, fd);
                 submitt(sqe);
                 return true;
             }
 
             bool try_start_accept(int fd, const void *to, socklen_t *to_size) noexcept {
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_accept(sqe, fd, reinterpret_cast<sockaddr *>(const_cast<void *>(to)), to_size, 0);
                 submitt(sqe);
                 return true;
             }
 
             bool cancel_io() {
-                auto sqe = io_uring_get_sqe(m_ioService.native_uring_handle());
+                auto sqe = m_ioService.get_sqe();
                 io_uring_prep_cancel(sqe, &m_message, 0);
-                io_uring_submit(m_ioService.native_uring_handle());
+                m_ioService.submit();
                 return true;
             }
 

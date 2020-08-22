@@ -524,8 +524,11 @@ void cppcoro::io_service::ensure_winsock_initialised()
 	}
 }
 #elif CPPCORO_OS_LINUX
-io_uring *cppcoro::io_service::native_uring_handle() noexcept {
-	return m_uq.handle();
+int cppcoro::io_service::submit() noexcept {
+    return m_uq.submit();
+}
+io_uring_sqe *cppcoro::io_service::get_sqe() noexcept {
+    return m_uq.get_sqe();
 }
 #endif  // CPPCORO_OS_WINNT
 
@@ -538,11 +541,12 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 		reinterpret_cast<ULONG_PTR>(operation->m_awaiter.address()),
 		nullptr);
 #elif CPPCORO_OS_LINUX
-	auto sqe = io_uring_get_sqe(native_uring_handle());
+	auto sqe = get_sqe();
 	io_uring_prep_nop(sqe);
 	operation->m_message.m_ptr = operation->m_awaiter.address();
 	io_uring_sqe_set_data(sqe, &operation->m_message);
-	bool ok = io_uring_submit(native_uring_handle()) == 1;
+    int res = submit();
+	bool ok = res == 1;
 #endif
 	if (!ok)
 	{
@@ -564,16 +568,24 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 
 void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
 {
+    auto* operation = m_scheduleOperations.exchange(nullptr, std::memory_order_acquire);
+    while (operation != nullptr)
+    {
+        auto* next = operation->m_next;
 #if CPPCORO_OS_WINNT
-	auto* operation = m_scheduleOperations.exchange(nullptr, std::memory_order_acquire);
-	while (operation != nullptr)
-	{
-		auto* next = operation->m_next;
 		BOOL ok = ::PostQueuedCompletionStatus(
 			m_iocpHandle.handle(),
 			0,
 			reinterpret_cast<ULONG_PTR>(operation->m_awaiter.address()),
 			nullptr);
+#else
+        auto sqe = get_sqe();
+        io_uring_prep_nop(sqe);
+        operation->m_message.m_ptr = operation->m_awaiter.address();
+        io_uring_sqe_set_data(sqe, &operation->m_message);
+        int res = submit();
+        bool ok = res == 1;
+#endif
 		if (!ok)
 		{
 			// Still unable to queue these operations.
@@ -599,7 +611,6 @@ void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
 
 		operation = next;
 	}
-#endif
 }
 
 bool cppcoro::io_service::try_enter_event_loop() noexcept
@@ -709,9 +720,10 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 		detail::lnx::message_type type = detail::lnx::RESUME_TYPE;
 
 		bool status = false;
+
 		try
 		{
-			std::lock_guard guard{ m_uq_mux };
+		    // std::lock_guard guard{ m_uq_mux };
 			status = m_uq.dequeue(message, type, waitForEvent);
 		}
 		catch (std::system_error& err)
@@ -745,8 +757,9 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 		{
 			if ((unsigned long long)message != 0)
 			{
-				stdcoro::coroutine_handle<>::from_address(reinterpret_cast<void*>(message))
-					.resume();
+				auto coro = stdcoro::coroutine_handle<>::from_address(reinterpret_cast<void*>(message));
+				if (!coro.done())
+                    coro.resume();
 			}
 
 			if (is_stop_requested())
@@ -1032,9 +1045,9 @@ cppcoro::io_service::timed_schedule_operation::timed_schedule_operation(
 {
 #if CPPCORO_OS_LINUX
     m_cancellationRegistration.emplace(std::move(m_cancellationToken), [&service, this] {
-        auto sqe = io_uring_get_sqe(service.native_uring_handle());
+        auto sqe = service.get_sqe();
         io_uring_prep_cancel(sqe, &m_message, 0);
-        io_uring_submit(service.native_uring_handle());
+        service.submit();
     });
 #endif
 }
@@ -1137,13 +1150,13 @@ void cppcoro::io_service::timed_schedule_operation::await_suspend(
 		timerState->wake_up_timer_thread();
 	}
 #elif CPPCORO_OS_LINUX
-    auto sqe = io_uring_get_sqe(service.native_uring_handle());
+    auto sqe = service.get_sqe();
 	auto timout = m_resumeTime - std::chrono::high_resolution_clock::now();;
     auto ts = duration_to_timespec(timout);
     io_uring_prep_timeout(sqe, &ts, 1, 0);
     m_message.m_ptr = m_scheduleOperation.m_awaiter.address();
     io_uring_sqe_set_data(sqe, &m_message);
-    io_uring_submit(service.native_uring_handle());
+    service.submit();
 #endif
 
 	// Use 'acquire' semantics here to synchronise with the 'release'

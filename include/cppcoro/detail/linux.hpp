@@ -23,6 +23,7 @@
 #include <liburing.h>
 
 #include <string_view>
+#include <mutex>
 
 namespace cppcoro
 {
@@ -106,11 +107,19 @@ namespace cppcoro
 			public:
                 explicit uring_queue(size_t queue_length = 32, uint32_t flags = 0);
                 ~uring_queue() noexcept;
+                uring_queue(uring_queue&&) = delete;
+                uring_queue& operator=(uring_queue&&) = delete;
+                uring_queue(uring_queue const&) = delete;
+                uring_queue& operator=(uring_queue const&) = delete;
 				bool dequeue(void*& message, message_type& type, bool wait);
-				io_uring *handle() { return &ring_; }
+                struct io_uring *handle() { return &ring_; }
+                int submit() noexcept;
+                io_uring_sqe *get_sqe() noexcept;
 
 			private:
-                struct io_uring ring_{};
+			    std::mutex m_inMux;
+                std::mutex m_outMux;
+                io_uring ring_{};
 			};
 		}  // namespace linux
 

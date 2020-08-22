@@ -32,7 +32,21 @@ namespace cppcoro {
                 io_uring_queue_exit(&ring_);
             }
 
+            io_uring_sqe *uring_queue::get_sqe() noexcept {
+                m_inMux.lock();
+                return io_uring_get_sqe(&ring_);
+            }
+
+            int uring_queue::submit() noexcept {
+//                std::lock_guard guard(m_mux);
+                int res = io_uring_submit(&ring_);
+                m_inMux.unlock();
+                return res;
+
+            }
+
             bool uring_queue::dequeue(void *&msg, message_type &type, bool wait) {
+                std::lock_guard guard(m_outMux);
                 io_uring_cqe *cqe;
                 int ret;
                 if (wait)

@@ -143,7 +143,8 @@ namespace cppcoro
 		detail::win32::handle_t native_iocp_handle() noexcept;
 		void ensure_winsock_initialised();
 #elif CPPCORO_OS_LINUX
-		io_uring *native_uring_handle() noexcept;
+		int submit() noexcept;
+        io_uring_sqe *get_sqe() noexcept;
 #endif
 
 	private:
@@ -189,7 +190,6 @@ namespace cppcoro
 #endif
 
 #if CPPCORO_OS_LINUX
-		std::mutex m_uq_mux;
 		detail::lnx::uring_queue m_uq;
 		detail::lnx::message m_nopMessage{ detail::lnx::message_type::RESUME_TYPE, nullptr };
 #endif

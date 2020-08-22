@@ -70,7 +70,7 @@ TEST_CASE("schedule coroutine")
 }
 
 static constexpr int mio_task_count = 500;
-using mio_service_fixture_with_threads = io_service_fixture_with_threads<2, mio_task_count>;
+using mio_service_fixture_with_threads = io_service_fixture_with_threads<100, mio_task_count>;
 
 TEST_CASE_FIXTURE(mio_service_fixture_with_threads, "multiple I/O threads servicing events")
 {
@@ -79,6 +79,7 @@ TEST_CASE_FIXTURE(mio_service_fixture_with_threads, "multiple I/O threads servic
 	auto runOnIoThread = [&]() -> cppcoro::task<>
 	{
 		co_await io_service().schedule();
+        co_await io_service().schedule();
 		++completedCount;
 	};
 
