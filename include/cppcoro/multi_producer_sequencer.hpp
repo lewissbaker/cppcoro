@@ -511,7 +511,11 @@ namespace cppcoro
 		SEQUENCE seq = initialSequence - (bufferSize - 1);
 		do
 		{
+#ifdef __cpp_lib_atomic_value_initialization
+			m_published[seq & m_sequenceMask].store(seq, std::memory_order_relaxed);
+#else // ^^^ __cpp_lib_atomic_value_initialization // !__cpp_lib_atomic_value_initialization vvv
 			std::atomic_init(&m_published[seq & m_sequenceMask], seq);
+#endif // !__cpp_lib_atomic_value_initialization
 		} while (seq++ != initialSequence);
 	}
 
