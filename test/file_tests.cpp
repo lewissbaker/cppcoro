@@ -16,6 +16,7 @@
 #include <random>
 #include <thread>
 #include <cassert>
+#include <cstring>
 
 #include "io_service_fixture.hpp"
 
@@ -60,14 +61,14 @@ namespace
 			fs::remove_all(m_path);
 		}
 
-		const std::experimental::filesystem::path& temp_dir()
+		const fs::path& temp_dir()
 		{
 			return m_path;
 		}
 
 	private:
 
-		std::experimental::filesystem::path m_path;
+		fs::path m_path;
 
 	};
 

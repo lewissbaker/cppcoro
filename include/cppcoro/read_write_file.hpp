@@ -58,6 +58,8 @@ namespace cppcoro
 
 #if CPPCORO_OS_WINNT
 		read_write_file(detail::win32::safe_handle&& fileHandle) noexcept;
+#elif CPPCORO_OS_LINUX
+		read_write_file(detail::linux::safe_file_data&& fileData) noexcept;
 #endif
 
 	};

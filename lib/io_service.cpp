@@ -530,10 +530,9 @@ void cppcoro::io_service::ensure_winsock_initialised()
 
 #if CPPCORO_OS_LINUX
 
-cppcoro::detail::linux::io_uring_context&
-cppcoro::io_service::io_uring_context() noexcept
+cppcoro::detail::linux::io_uring_context *cppcoro::io_service::io_uring_context() noexcept
 {
-	return m_aioContext;
+	return &m_aioContext;
 }
 
 #endif // CPPCORO_OS_LINUX
@@ -765,11 +764,8 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 				return true;
 			}
 
-			// auto* state = reinterpret_cast<detail::linux::io_state*>(cqe.user_data);
-
-			// state->m_callback(
-			// 	state,
-			// 	cqe.res);
+			auto* state = reinterpret_cast<detail::linux::io_state*>(cqe.user_data);
+			state->m_callback(state, cqe.res);
 
 			return true;
 		}

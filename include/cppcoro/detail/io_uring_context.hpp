@@ -27,8 +27,6 @@ namespace cppcoro
 				~io_uring_context();
 
 				bool submit_one(const io_uring_sqe& sqe);
-				//bool cancel(std::uint64_t userData);
-
 				bool get_single_event(io_uring_cqe& cqe, bool waitForEvent);
 
 			private:
@@ -62,6 +60,12 @@ namespace cppcoro
 					io_uring_cqe* cqes;
 				} m_cqRing;
 
+			};
+
+			struct safe_file_data
+			{
+				safe_file_descriptor fd;
+				io_uring_context* aioContext;
 			};
 		}
 	}

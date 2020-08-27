@@ -14,6 +14,9 @@
 #  define WIN32_LEAN_AND_MEAN
 # endif
 # include <Windows.h>
+#elif CPPCORO_OS_LINUX
+# include <fcntl.h>
+# include <sys/stat.h>
 #endif
 
 cppcoro::file::~file()
@@ -36,8 +39,22 @@ std::uint64_t cppcoro::file::size() const
 	}
 
 	return size.QuadPart;
+#elif CPPCORO_OS_LINUX
+	struct stat sb;
+	if (fstat(m_fileData.fd.get(), &sb) < 0)
+	{
+		throw std::system_error
+		{
+			errno,
+			std::system_category(),
+			"error getting file size: fstat"
+		};
+	}
+
+	return sb.st_size;
 #endif
 }
+#if CPPCORO_OS_WINNT
 
 cppcoro::file::file(detail::win32::safe_handle&& fileHandle) noexcept
 	: m_fileHandle(std::move(fileHandle))
@@ -166,3 +183,84 @@ cppcoro::detail::win32::safe_handle cppcoro::file::open(
 
 	return std::move(fileHandle);
 }
+
+#endif // CPPCORO_OS_WINNT
+
+#if CPPCORO_OS_LINUX
+
+cppcoro::file::file(detail::linux::safe_file_data &&fileData) noexcept
+	: m_fileData(std::move(fileData))
+{
+}
+
+cppcoro::detail::linux::safe_file_data cppcoro::file::open(
+	io_service &ioService,
+	const std::filesystem::path &path,
+	cppcoro::file_open_mode openMode,
+	cppcoro::file_share_mode shareMode,
+	cppcoro::file_buffering_mode bufferingMode)
+{
+	int flags = 0;
+
+	if ((bufferingMode & file_buffering_mode::temporary) == file_buffering_mode::temporary)
+	{
+		// TODO
+	}
+	if ((bufferingMode & file_buffering_mode::unbuffered) == file_buffering_mode::unbuffered)
+	{
+		// TODO
+	}
+
+	if ((shareMode & file_share_mode::read_write) == file_share_mode::read_write)
+	{
+		flags |= O_RDWR;
+	}
+	else if ((shareMode & file_share_mode::read) == file_share_mode::read)
+	{
+		flags |= O_RDONLY;
+	}
+	else if ((shareMode & file_share_mode::write) == file_share_mode::write)
+	{
+		flags |= O_WRONLY;
+	}
+	if ((shareMode & file_share_mode::delete_) == file_share_mode::delete_)
+	{
+		// TODO
+	}
+
+	switch (openMode)
+	{
+	case file_open_mode::create_or_open:
+		flags |= O_CREAT;
+		break;
+	case file_open_mode::create_always:
+		flags |= O_CREAT | O_TRUNC;
+		break;
+	case file_open_mode::create_new:
+		flags |= O_EXCL;
+		break;
+	case file_open_mode::open_existing:
+		// This is default.
+		break;
+	case file_open_mode::truncate_existing:
+		flags |= O_TRUNC;
+		break;
+	}
+
+	cppcoro::detail::linux::safe_file_descriptor fd(::open(path.c_str(), flags));
+	if (fd.get() < 0)
+	{
+		throw std::system_error
+		{
+			errno,
+			std::system_category(),
+			"error opening file: open"
+		};
+	}
+
+	//posix_fadvise(fd.get(), 0, 0, advice);
+
+	return { std::move(fd), ioService.io_uring_context() };
+}
+
+#endif // CPPCORO_OS_LINUX

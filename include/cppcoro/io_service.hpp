@@ -138,7 +138,7 @@ namespace cppcoro
 		detail::win32::handle_t native_iocp_handle() noexcept;
 		void ensure_winsock_initialised();
 #elif CPPCORO_OS_LINUX
-		detail::linux::io_uring_context& io_uring_context() noexcept;
+		detail::linux::io_uring_context* io_uring_context() noexcept;
 #endif
 
 	private:
