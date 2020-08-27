@@ -94,8 +94,8 @@ namespace
 
 	io_uring_sqe io_uring_message_sqe(std::uint64_t userData)
 	{
-		const static __kernel_timespec ZERO_TIMEOUT{};
-		io_uring_sqe sqe = io_uring_timeout_sqe(ZERO_TIMEOUT);
+		const static __kernel_timespec zero_timeout{};
+		io_uring_sqe sqe = io_uring_timeout_sqe(zero_timeout);
 		sqe.user_data = userData;
 		return sqe;
 	}
@@ -771,7 +771,7 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 		}
 		else
 		{
-			return true;
+			return false;
 		}
 	}
 #endif
