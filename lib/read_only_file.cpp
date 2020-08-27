@@ -36,6 +36,7 @@ cppcoro::read_only_file::read_only_file(
 #endif // CPPCORO_OS_WINNT
 
 #if CPPCORO_OS_LINUX
+#include <fcntl.h>
 
 cppcoro::read_only_file cppcoro::read_only_file::open(
 	io_service& ioService,
@@ -44,6 +45,7 @@ cppcoro::read_only_file cppcoro::read_only_file::open(
 	file_buffering_mode bufferingMode)
 {
 	return read_only_file(file::open(
+		O_RDONLY,
 		ioService,
 		path,
 		file_open_mode::open_existing,

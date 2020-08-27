@@ -52,6 +52,7 @@ namespace cppcoro
 		file(detail::linux::safe_file_data&& fileData) noexcept;
 
 		static detail::linux::safe_file_data open(
+			int fileAccess,
 			io_service& ioService,
 			const std::filesystem::path& path,
 			file_open_mode openMode,

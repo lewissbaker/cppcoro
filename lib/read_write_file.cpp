@@ -38,6 +38,7 @@ cppcoro::read_write_file::read_write_file(
 #endif
 
 #if CPPCORO_OS_LINUX
+#include <fcntl.h>
 
 cppcoro::read_write_file cppcoro::read_write_file::open(
 	io_service& ioService,
@@ -47,6 +48,7 @@ cppcoro::read_write_file cppcoro::read_write_file::open(
 	file_buffering_mode bufferingMode)
 {
 	return read_write_file(file::open(
+		O_RDWR,
 		ioService,
 		path,
 		openMode,

@@ -150,10 +150,17 @@ bool cppcoro::detail::linux::io_uring_context::get_single_event(
 	if (head == atomic_load_acquire(m_cqRing.tail))
 	{
 		if (!waitForEvent)
-			return false;
-
-		if (io_uring_enter(m_ringFd.get(), 0, 1, IORING_ENTER_GETEVENTS, nullptr) < 0)
 		{
+			return false;
+		}
+
+		while (io_uring_enter(m_ringFd.get(), 0, 1, IORING_ENTER_GETEVENTS, nullptr) < 0)
+		{
+			if (errno == EINTR)
+			{
+				continue;
+			}
+
 			throw std::system_error
 			{
 				errno,

@@ -194,13 +194,14 @@ cppcoro::file::file(detail::linux::safe_file_data &&fileData) noexcept
 }
 
 cppcoro::detail::linux::safe_file_data cppcoro::file::open(
+	int fileAccess,
 	io_service &ioService,
 	const std::filesystem::path &path,
 	cppcoro::file_open_mode openMode,
 	cppcoro::file_share_mode shareMode,
 	cppcoro::file_buffering_mode bufferingMode)
 {
-	int flags = 0;
+	int flags = fileAccess;
 
 	if ((bufferingMode & file_buffering_mode::temporary) == file_buffering_mode::temporary)
 	{
@@ -211,17 +212,13 @@ cppcoro::detail::linux::safe_file_data cppcoro::file::open(
 		// TODO
 	}
 
-	if ((shareMode & file_share_mode::read_write) == file_share_mode::read_write)
+	if ((shareMode & file_share_mode::read) == file_share_mode::read)
 	{
-		flags |= O_RDWR;
+		// TODO
 	}
-	else if ((shareMode & file_share_mode::read) == file_share_mode::read)
+	if ((shareMode & file_share_mode::write) == file_share_mode::write)
 	{
-		flags |= O_RDONLY;
-	}
-	else if ((shareMode & file_share_mode::write) == file_share_mode::write)
-	{
-		flags |= O_WRONLY;
+		// TODO
 	}
 	if ((shareMode & file_share_mode::delete_) == file_share_mode::delete_)
 	{
@@ -240,14 +237,15 @@ cppcoro::detail::linux::safe_file_data cppcoro::file::open(
 		flags |= O_EXCL;
 		break;
 	case file_open_mode::open_existing:
-		// This is default.
+		// Default.
 		break;
 	case file_open_mode::truncate_existing:
 		flags |= O_TRUNC;
 		break;
 	}
 
-	cppcoro::detail::linux::safe_file_descriptor fd(::open(path.c_str(), flags));
+	cppcoro::detail::linux::safe_file_descriptor fd(
+		::open(path.c_str(), flags, S_IRWXU | S_IRWXG));
 	if (fd.get() < 0)
 	{
 		throw std::system_error
