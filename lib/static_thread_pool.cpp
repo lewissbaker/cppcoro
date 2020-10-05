@@ -32,7 +32,7 @@ namespace cppcoro
 	{
 	public:
 
-		explicit thread_state()
+		thread_state()
 			: m_localQueue(
 				std::make_unique<std::atomic<schedule_operation*>[]>(
 					local::initial_local_queue_size))
