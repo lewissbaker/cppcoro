@@ -164,21 +164,18 @@ namespace cppcoro
 
 				bool operator!=(handle_t handle) const
 				{
-					return m_handle != handle;
-				}
+					return m_handle != handle; }
 
 			private:
-
 				handle_t m_handle;
-
 			};
-		}
+		}  // namespace win32
 
 		using dword_t = win32::dword_t;
-        using handle_t = win32::handle_t;
+		using handle_t = win32::handle_t;
 		using sock_buf = win32::wsabuf;
-        using safe_handle = win32::safe_handle;
-	}
+		using safe_handle = win32::safe_handle;
+	}  // namespace detail
 }
 
 #endif

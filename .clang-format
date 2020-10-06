@@ -37,7 +37,7 @@ BraceWrapping: {
   BeforeCatch: true,
   BeforeElse: true,
   IndentBraces: false,
-  #SplitEmptyFunctionBody: false
+  SplitEmptyFunction: false
 }
 BreakBeforeInheritanceComma: true
 BreakBeforeTernaryOperators: true

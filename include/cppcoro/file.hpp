@@ -31,7 +31,6 @@ namespace cppcoro
 		virtual ~file();
 
 		/// Get the size of the file in bytes.
-		[[nodiscard]]
 		std::size_t size() const;
 
 	protected:

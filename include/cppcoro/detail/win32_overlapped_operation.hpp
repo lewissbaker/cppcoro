@@ -368,17 +368,16 @@ namespace cppcoro
 			cppcoro::cancellation_token m_cancellationToken;
 			std::optional<cppcoro::cancellation_registration> m_cancellationCallback;
 			stdcoro::coroutine_handle<> m_awaitingCoroutine;
-
 		};
 
-        using io_operation_base = win32_overlapped_operation_base;
+		using io_operation_base = win32_overlapped_operation_base;
 
-        template<typename OPERATION>
+		template<typename OPERATION>
 		using io_operation = win32_overlapped_operation<OPERATION>;
 
-        template<typename OPERATION>
-        using io_operation_cancellable = win32_overlapped_operation_cancellable<OPERATION>;
-	}
+		template<typename OPERATION>
+		using io_operation_cancellable = win32_overlapped_operation_cancellable<OPERATION>;
+	}  // namespace detail
 }
 
 #endif
