@@ -208,11 +208,6 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 
 add_library(cppcoro::cppcoro ALIAS ${PROJECT_NAME})
 
-option(ENABLE_EXAMPLES "Build examples" ON)
-if(ENABLE_EXAMPLES)
-  add_subdirectory(examples)
-endif()
-
 enable_testing()
 if(ENABLE_TESTING)
   add_subdirectory(test)
