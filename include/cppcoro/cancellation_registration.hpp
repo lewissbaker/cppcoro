@@ -11,6 +11,7 @@
 #include <utility>
 #include <type_traits>
 #include <atomic>
+#include <cstdint>
 
 namespace cppcoro
 {
