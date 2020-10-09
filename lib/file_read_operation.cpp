@@ -51,3 +51,51 @@ void cppcoro::file_read_operation_impl::cancel(
 }
 
 #endif // CPPCORO_OS_WINNT
+
+#if CPPCORO_OS_LINUX
+#include "io_uring.hpp"
+
+bool cppcoro::file_read_operation_impl::try_start(
+	cppcoro::detail::linux_async_operation_base& operation) noexcept
+{
+	io_uring_sqe sqe{};
+	sqe.opcode = IORING_OP_READ;
+	sqe.fd = m_fd;
+	sqe.off = m_offset;
+	sqe.addr = reinterpret_cast<std::uint64_t>(m_buffer);
+	sqe.len = m_byteCount;
+	sqe.user_data = reinterpret_cast<std::uint64_t>(&operation);
+
+	bool ok;
+
+	try
+	{
+		ok = operation.m_aioContext->submit_one(sqe);
+	}
+	catch (std::system_error& ex)
+	{
+		operation.m_res = -ex.code().value();
+
+		return false;
+	}
+
+	return ok;
+}
+
+void cppcoro::file_read_operation_impl::cancel(
+	cppcoro::detail::linux_async_operation_base& operation) noexcept
+{
+	io_uring_sqe sqe{};
+	sqe.opcode = IORING_OP_ASYNC_CANCEL;
+
+	try
+	{
+		operation.m_aioContext->submit_one(sqe);
+	}
+	catch (...)
+	{
+	}
+}
+
+#endif // CPPCORO_OS_LINUX
+

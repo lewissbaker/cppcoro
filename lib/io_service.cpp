@@ -10,6 +10,7 @@
 #include <cassert>
 #include <algorithm>
 #include <thread>
+#include <vector>
 
 #if CPPCORO_OS_WINNT
 # ifndef WIN32_LEAN_AND_MEAN
@@ -22,6 +23,9 @@
 # include <WS2tcpip.h>
 # include <MSWSock.h>
 # include <Windows.h>
+#elif CPPCORO_OS_LINUX
+# include "io_uring.hpp"
+# include <linux/time_types.h>
 #endif
 
 namespace
@@ -76,6 +80,24 @@ namespace
 		}
 
 		return cppcoro::detail::win32::safe_handle{ handle };
+	}
+#elif CPPCORO_OS_LINUX
+	io_uring_sqe io_uring_timeout_sqe(const __kernel_timespec& ts)
+	{
+		io_uring_sqe sqe{};
+		sqe.opcode = IORING_OP_TIMEOUT;
+		sqe.fd = -1;
+		sqe.addr = reinterpret_cast<std::uint64_t>(&ts);
+		sqe.len = 1;
+		return sqe;
+	}
+
+	io_uring_sqe io_uring_message_sqe(std::uint64_t userData)
+	{
+		const static __kernel_timespec zero_timeout{};
+		io_uring_sqe sqe = io_uring_timeout_sqe(zero_timeout);
+		sqe.user_data = userData;
+		return sqe;
 	}
 #endif
 }
@@ -335,6 +357,8 @@ cppcoro::io_service::io_service(std::uint32_t concurrencyHint)
 	, m_iocpHandle(create_io_completion_port(concurrencyHint))
 	, m_winsockInitialised(false)
 	, m_winsockInitialisationMutex()
+#elif CPPCORO_OS_LINUX
+	, m_aioContext(concurrencyHint)
 #endif
 	, m_scheduleOperations(nullptr)
 	, m_timerState(nullptr)
@@ -471,12 +495,12 @@ void cppcoro::io_service::notify_work_finished() noexcept
 	}
 }
 
+#if CPPCORO_OS_WINNT
+
 cppcoro::detail::win32::handle_t cppcoro::io_service::native_iocp_handle() noexcept
 {
 	return m_iocpHandle.handle();
 }
-
-#if CPPCORO_OS_WINNT
 
 void cppcoro::io_service::ensure_winsock_initialised()
 {
@@ -504,6 +528,15 @@ void cppcoro::io_service::ensure_winsock_initialised()
 
 #endif // CPPCORO_OS_WINNT
 
+#if CPPCORO_OS_LINUX
+
+cppcoro::detail::linux::io_uring_context *cppcoro::io_service::io_uring_context() noexcept
+{
+	return &m_aioContext;
+}
+
+#endif // CPPCORO_OS_LINUX
+
 void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 {
 #if CPPCORO_OS_WINNT
@@ -512,6 +545,22 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 		0,
 		reinterpret_cast<ULONG_PTR>(operation->m_awaiter.address()),
 		nullptr);
+#elif CPPCORO_OS_LINUX
+	io_uring_sqe sqe = io_uring_message_sqe(
+		reinterpret_cast<std::uint64_t>(operation->m_awaiter.address()));
+
+	bool ok;
+
+	try
+	{
+		ok = m_aioContext.submit_one(sqe);
+	}
+	catch (...)
+	{
+		ok = true;
+	}
+#endif
+
 	if (!ok)
 	{
 		// Failed to post to the I/O completion port.
@@ -531,21 +580,37 @@ void cppcoro::io_service::schedule_impl(schedule_operation* operation) noexcept
 			std::memory_order_release,
 			std::memory_order_acquire));
 	}
-#endif
 }
 
 void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
 {
-#if CPPCORO_OS_WINNT
 	auto* operation = m_scheduleOperations.exchange(nullptr, std::memory_order_acquire);
 	while (operation != nullptr)
 	{
 		auto* next = operation->m_next;
+
+#if CPPCORO_OS_WINNT
 		BOOL ok = ::PostQueuedCompletionStatus(
 			m_iocpHandle.handle(),
 			0,
 			reinterpret_cast<ULONG_PTR>(operation->m_awaiter.address()),
 			nullptr);
+#elif CPPCORO_OS_LINUX
+		io_uring_sqe sqe = io_uring_message_sqe(
+			reinterpret_cast<std::uint64_t>(operation->m_awaiter.address()));
+
+		bool ok;
+
+		try
+		{
+			ok = m_aioContext.submit_one(sqe);
+		}
+		catch (...)
+		{
+			ok = true;
+		}
+#endif
+
 		if (!ok)
 		{
 			// Still unable to queue these operations.
@@ -571,7 +636,6 @@ void cppcoro::io_service::try_reschedule_overflow_operations() noexcept
 
 		operation = next;
 	}
-#endif
 }
 
 bool cppcoro::io_service::try_enter_event_loop() noexcept
@@ -598,12 +662,12 @@ void cppcoro::io_service::exit_event_loop() noexcept
 
 bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 {
-#if CPPCORO_OS_WINNT
 	if (is_stop_requested())
 	{
 		return false;
 	}
 
+#if CPPCORO_OS_WINNT
 	const DWORD timeout = waitForEvent ? INFINITE : 0;
 
 	while (true)
@@ -673,6 +737,43 @@ bool cppcoro::io_service::try_process_one_event(bool waitForEvent)
 			};
 		}
 	}
+#elif CPPCORO_OS_LINUX
+	while (true)
+	{
+		// Check for any schedule_operation objects that were unable to be
+		// queued to the I/O completion port and try to requeue them now.
+		try_reschedule_overflow_operations();
+
+		io_uring_cqe cqe;
+		if (m_aioContext.get_single_event(cqe, waitForEvent))
+		{
+			if (cqe.user_data == 0)
+			{
+				if (is_stop_requested())
+				{
+					return false;
+				}
+				continue;
+			}
+			else if (cqe.res == -ETIME)
+			{
+				// This was a coroutine scheduled via a call to
+				// io_service::schedule().
+				std::experimental::coroutine_handle<>::from_address(
+					reinterpret_cast<void*>(cqe.user_data)).resume();
+				return true;
+			}
+
+			auto* state = reinterpret_cast<detail::linux::io_state*>(cqe.user_data);
+			state->m_callback(state, cqe.res);
+
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
 #endif
 }
 
@@ -685,6 +786,18 @@ void cppcoro::io_service::post_wake_up_event() noexcept
 	// and the system is out of memory. In this case threads should find other events
 	// in the queue next time they check anyway and thus wake-up.
 	(void)::PostQueuedCompletionStatus(m_iocpHandle.handle(), 0, 0, nullptr);
+#elif CPPCORO_OS_LINUX
+	__kernel_timespec ts{};
+	io_uring_sqe sqe = io_uring_timeout_sqe(ts);
+
+	try
+	{
+		// See comment for Windows implementation above.
+		m_aioContext.submit_one(sqe);
+	}
+	catch (...)
+	{
+	}
 #endif
 }
 
@@ -712,11 +825,13 @@ cppcoro::io_service::ensure_timer_thread_started()
 }
 
 cppcoro::io_service::timer_thread_state::timer_thread_state()
+	:
 #if CPPCORO_OS_WINNT
-	: m_wakeUpEvent(create_auto_reset_event())
+	  m_wakeUpEvent(create_auto_reset_event())
 	, m_waitableTimerEvent(create_waitable_timer_event())
+	,
 #endif
-	, m_newlyQueuedTimers(nullptr)
+	  m_newlyQueuedTimers(nullptr)
 	, m_timerCancellationRequested(false)
 	, m_shutDownRequested(false)
 	, m_thread([this] { this->run(); })

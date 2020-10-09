@@ -104,6 +104,15 @@ sources = script.cwd([
   'auto_reset_event.cpp',
   'spin_wait.cpp',
   'spin_mutex.cpp',
+  'io_service.cpp',
+  'file.cpp',
+  'readable_file.cpp',
+  'writable_file.cpp',
+  'read_only_file.cpp',
+  'write_only_file.cpp',
+  'read_write_file.cpp',
+  'file_read_operation.cpp',
+  'file_write_operation.cpp',
   ])
 
 extras = script.cwd([
@@ -128,15 +137,6 @@ if variant.platform == "windows":
   ]))
   sources.extend(script.cwd([
     'win32.cpp',
-    'io_service.cpp',
-    'file.cpp',
-    'readable_file.cpp',
-    'writable_file.cpp',
-    'read_only_file.cpp',
-    'write_only_file.cpp',
-    'read_write_file.cpp',
-    'file_read_operation.cpp',
-    'file_write_operation.cpp',
     'socket_helpers.cpp',
     'socket.cpp',
     'socket_accept_operation.cpp',
@@ -146,6 +146,19 @@ if variant.platform == "windows":
     'socket_send_to_operation.cpp',
     'socket_recv_operation.cpp',
     'socket_recv_from_operation.cpp',
+    ]))
+elif variant.platform == "linux":
+  detailIncludes.extend(cake.path.join(env.expand('${CPPCORO}'), 'include', 'cppcoro', 'detail', [
+    'linux.hpp',
+    'linux_async_operation.hpp',
+    'io_uring_context.hpp',
+    ]))
+  privateHeaders = script.cwd([
+    'io_uring.hpp',
+    ])
+  sources.extend(script.cwd([
+    'linux.cpp',
+    'io_uring_context.cpp',
     ]))
 
 buildDir = env.expand('${CPPCORO_BUILD}')
