@@ -87,8 +87,9 @@ TEST_CASE_FIXTURE(io_service_fixture, "schedule_on async_generator<> function")
 		auto seq = schedule_on(io_service(), makeSequence());
 
 		int expected = 1;
-		for co_await(int value : seq)
+		for (auto iter = co_await seq.begin(); iter != seq.end(); co_await ++iter)
 		{
+			int value = *iter;
 			CHECK(value == expected++);
 
 			// Transfer exection back to main thread before
@@ -177,8 +178,9 @@ TEST_CASE_FIXTURE(io_service_fixture, "resume_on async_generator<> function"
 		auto seq = resume_on(otherIoService, makeSequence());
 
 		int expected = 1;
-		for co_await(int value : seq)
+		for (auto iter = co_await seq.begin(); iter != seq.end(); co_await ++iter)
 		{
+			int value = *iter;
 			// Every time we receive a value it should be on our requested
 			// scheduler (ie. main thread)
 			CHECK(std::this_thread::get_id() == mainThreadId);
