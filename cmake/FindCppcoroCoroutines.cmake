@@ -15,6 +15,21 @@ if(Coroutines_SUPPORTS_MS_FLAG)
 elseif(Coroutines_ts_SUPPORTS_GNU_FLAG)
     check_include_file_cxx("coroutine" Coroutines_STANDARD_LIBRARY_SUPPORT "-fcoroutines-ts")
     check_include_file_cxx("experimental/coroutine" Coroutines_EXPERIMENTAL_LIBRARY_SUPPORT "-fcoroutines-ts")
+    # workaround:
+    #  clang not find stdlibc++ headers when on ubuntu 20.04
+    #  So, we retry with libc++ enforcement
+    if(NOT Coroutines_STANDARD_LIBRARY_SUPPORT
+      AND NOT Coroutines_EXPERIMENTAL_LIBRARY_SUPPORT
+      AND CMAKE_CXX_COMPILER_ID MATCHES Clang)
+        set(CMAKE_REQUIRED_FLAGS "-stdlib=libc++")
+        check_include_file_cxx("coroutine" Coroutines_STANDARD_LIBRARY_SUPPORT_LIBCPP "-fcoroutines-ts")
+        check_include_file_cxx("experimental/coroutine" Coroutines_EXPERIMENTAL_LIBRARY_SUPPORT_LIBCPP "-fcoroutines-ts")
+        if(Coroutines_STANDARD_LIBRARY_SUPPORT_LIBCPP OR Coroutines_EXPERIMENTAL_LIBRARY_SUPPORT_LIBCPP)
+          list(APPEND Coroutines_EXTRA_FLAGS "-stdlib=libc++")
+          set(Coroutines_STANDARD_LIBRARY_SUPPORT ${Coroutines_STANDARD_LIBRARY_SUPPORT_LIBCPP})
+          set(Coroutines_EXPERIMENTAL_LIBRARY_SUPPORT ${Coroutines_EXPERIMENTAL_LIBRARY_SUPPORT_LIBCPP})
+        endif()
+    endif()
 elseif(Coroutines_SUPPORTS_GNU_FLAG)
     check_include_file_cxx("coroutine" Coroutines_STANDARD_LIBRARY_SUPPORT "-fcoroutines")
     check_include_file_cxx("experimental/coroutine" Coroutines_EXPERIMENTAL_LIBRARY_SUPPORT "-fcoroutines")
@@ -40,3 +55,5 @@ elseif(Coroutines_ts_SUPPORTS_GNU_FLAG)
 elseif(Coroutines_SUPPORTS_GNU_FLAG)
     target_compile_options(cppcoro::coroutines INTERFACE -fcoroutines)
 endif()
+
+target_compile_options(cppcoro::coroutines INTERFACE ${Coroutines_EXTRA_FLAGS})
