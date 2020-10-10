@@ -271,8 +271,9 @@ TEST_CASE("large number of synchronous completions doesn't result in stack-overf
 	auto consumer = [](cppcoro::async_generator<std::uint32_t> sequence) -> cppcoro::task<>
 	{
 		std::uint32_t expected = 0;
-		for co_await(std::uint32_t i : sequence)
+		for (auto iter = co_await sequence.begin(); iter != sequence.end(); co_await ++iter)
 		{
+			std::uint32_t i = *iter;
 			CHECK(i == expected++);
 		}
 
