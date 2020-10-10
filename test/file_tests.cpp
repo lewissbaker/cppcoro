@@ -16,6 +16,7 @@
 #include <random>
 #include <thread>
 #include <cassert>
+#include <string>
 
 #include "io_service_fixture.hpp"
 

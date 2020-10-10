@@ -4404,7 +4404,7 @@ namespace doctest
 		void addToContexts(IContextScope* ptr) { contextState->contexts.push_back(ptr); }
 		void                              popFromContexts() { contextState->contexts.pop_back(); }
 		void useContextIfExceptionOccurred(IContextScope* ptr) {
-			if (std::uncaught_exception()) {
+			if (std::uncaught_exceptions()) {
 				std::ostringstream stream;
 				ptr->build(&stream);
 				contextState->exceptionalContexts.push_back(stream.str());
