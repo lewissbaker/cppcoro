@@ -9,7 +9,7 @@
 #include <cppcoro/file_share_mode.hpp>
 #include <cppcoro/file_buffering_mode.hpp>
 
-#include <experimental/filesystem>
+#include <cppcoro/filesystem.hpp>
 
 namespace cppcoro
 {

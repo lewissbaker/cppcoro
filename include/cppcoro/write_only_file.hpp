@@ -10,7 +10,7 @@
 #include <cppcoro/file_buffering_mode.hpp>
 #include <cppcoro/file_open_mode.hpp>
 
-#include <experimental/filesystem>
+#include <cppcoro/filesystem.hpp>
 
 namespace cppcoro
 {
