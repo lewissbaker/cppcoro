@@ -191,6 +191,10 @@ TEST_CASE("Timer cancellation"
 		}()));
 }
 
+// Disable this test under VS 2019.3
+// Results in ICE compiling the 'startTimer' lambda below.
+#if CPPCORO_COMPILER_MSVC != 192328105
+
 TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "Many concurrent timers")
 {
 	auto startTimer = [&]() -> cppcoro::task<>
@@ -226,5 +230,7 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "Many concurrent timers")
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 		<< "ms");
 }
+
+#endif
 
 TEST_SUITE_END();

@@ -19,12 +19,16 @@
 
 #include "io_service_fixture.hpp"
 
-#include <ostream>
+#include <string>
 #include "doctest/doctest.h"
 
 TEST_SUITE_BEGIN("file");
 
+#if __cpp_lib_filesystem >= 201703L
+namespace fs = std::filesystem;
+#else
 namespace fs = std::experimental::filesystem;
+#endif
 
 namespace
 {
@@ -60,14 +64,14 @@ namespace
 			fs::remove_all(m_path);
 		}
 
-		const std::experimental::filesystem::path& temp_dir()
+		const fs::path& temp_dir()
 		{
 			return m_path;
 		}
 
 	private:
 
-		std::experimental::filesystem::path m_path;
+		fs::path m_path;
 
 	};
 
@@ -167,6 +171,10 @@ TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "read write file")
 	cppcoro::sync_wait(run());
 }
 
+// Disable under MSVC 2019.3
+// Results in an ICE under debug x64 builds
+#if CPPCORO_COMPILER_MSVC != 192328105
+
 TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "cancel read")
 {
 	cppcoro::sync_wait([&]() -> cppcoro::task<>
@@ -210,5 +218,7 @@ TEST_CASE_FIXTURE(temp_dir_with_io_service_fixture, "cancel read")
 		}
 	}());
 }
+
+#endif
 
 TEST_SUITE_END();

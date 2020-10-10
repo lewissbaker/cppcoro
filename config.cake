@@ -67,12 +67,12 @@ if cake.system.isWindows() or cake.system.isCygwin():
 
   for arch in ("x64", "x86"):
     try:
-      from cake.library.compilers.msvc import getVisualStudio2017Compiler, findMsvc2017InstallDir
+      from cake.library.compilers.msvc import getVisualStudioCompiler, findMsvcInstallDir
       if nugetPath:
         vcInstallDir = cake.path.join(nugetPath, 'lib', 'native')
       else:
-        vcInstallDir = str(findMsvc2017InstallDir(targetArchitecture=arch, allowPreRelease=True))
-      compiler = getVisualStudio2017Compiler(
+        vcInstallDir = str(findMsvcInstallDir(targetArchitecture=arch, allowPreRelease=True))
+      compiler = getVisualStudioCompiler(
         configuration,
         targetArchitecture=arch,
         vcInstallDir=vcInstallDir,
@@ -116,6 +116,7 @@ if cake.system.isWindows() or cake.system.isCygwin():
 
       # Enable C++17 features like std::optional<>
       compiler.addCppFlag('/std:c++latest')
+      compiler.addCppFlag('/permissive-')
 
       compiler.addDefine('_SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING')
 
