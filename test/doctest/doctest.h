@@ -410,32 +410,7 @@ extern "C" __declspec(dllimport) void __stdcall DebugBreak();
 #define DOCTEST_BREAK_INTO_DEBUGGER() ((void)0)
 #endif // linux
 
-#ifdef __clang__
-// to detect if libc++ is being used with clang (the _LIBCPP_VERSION identifier)
-#include <ciso646>
-#endif // __clang__
-
-#ifdef _LIBCPP_VERSION
-// not forward declaring ostream for libc++ because I had some problems (inline namespaces vs c++98)
-// so the <iosfwd> header is used - also it is very light and doesn't drag a ton of stuff
-//#include <iosfwd>
 #include <ostream>
-#else // _LIBCPP_VERSION
-#ifndef DOCTEST_CONFIG_USE_IOSFWD
-namespace std
-{
-	template <class charT>
-	struct char_traits;
-	template <>
-	struct char_traits<char>;
-	template <class charT, class traits>
-	class basic_ostream;
-	typedef basic_ostream<char, char_traits<char> > ostream;
-} // namespace std
-#else // DOCTEST_CONFIG_USE_IOSFWD
-#include <iosfwd>
-#endif // DOCTEST_CONFIG_USE_IOSFWD
-#endif // _LIBCPP_VERSION
 
 // static assert macro - because of the c++98 support requires that the message is an
 // identifier (no spaces and not a C string) - example without quotes: I_am_a_message
