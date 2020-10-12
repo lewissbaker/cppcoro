@@ -20,6 +20,8 @@ namespace cppcoro
 		class fmap_awaiter
 		{
 			using awaiter_t = typename awaitable_traits<AWAITABLE&&>::awaiter_t;
+            FUNC&& m_func;
+            awaiter_t m_awaiter;
 
 		public:
 
@@ -64,12 +66,6 @@ namespace cppcoro
 					static_cast<FUNC&&>(m_func),
 					static_cast<awaiter_t&&>(m_awaiter).await_resume());
 			}
-
-		private:
-
-			FUNC&& m_func;
-			awaiter_t m_awaiter;
-
 		};
 
 		template<typename FUNC, typename AWAITABLE>

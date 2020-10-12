@@ -117,8 +117,9 @@ namespace cppcoro
 	template<typename SCHEDULER, typename T>
 	async_generator<T> resume_on(SCHEDULER& scheduler, async_generator<T> source)
 	{
-		for co_await(auto& value : source)
+		for (auto iter = co_await source.begin(); iter != source.end(); co_await ++iter)
 		{
+			auto& value = *iter;
 			co_await scheduler.schedule();
 			co_yield value;
 		}
