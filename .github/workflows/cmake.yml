@@ -12,28 +12,66 @@ jobs:
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
     # See: https://docs.github.com/en/actions/configuring-and-managing-workflows/configuring-a-workflow#configuring-a-build-matrix
-    runs-on: ubuntu-20.04
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        compiler: [g++-10, clang]
-        include:
-          - compiler: clang
-            cxx_flags: -stdlib=libc++
-            # TODO figure out why this is not set automatically
-            exe_linker_flags: -lc++
-          - compiler: g++-10
-            install: 'g++-10'
+        config:
+          - {
+            name: "Linux g++ 10.2",
+            os: ubuntu-20.04,
+            cxx: "g++-10",
+          }
+          - {
+            name: "Linux clang-10",
+            os: ubuntu-20.04,
+            cxx: "clang++-10",
+            cxx_flags: -stdlib=libc++,
+            exe_linker_flags: -lc++,
+          }
+          - {
+            name: "Linux clang-11",
+            os: ubuntu-20.04,
+            cxx: "clang++-11",
+            cxx_flags: -stdlib=libc++,
+            exe_linker_flags: -lc++,
+          }
 
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install ppa
-      run: sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
+    - name: Install Clang 10
+      id: install_clang_10
+      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-10' )
+      shell: bash
+      working-directory: ${{ env.HOME }}
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 10
+        sudo apt-get install libc++-10-dev libc++abi-10-dev
 
-    - name: Install dependencies
-      run: sudo apt-get install ${{ matrix.install }}
+    - name: Install Clang 11
+      id: install_clang_11
+      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-11' )
+      shell: bash
+      working-directory: ${{ env.HOME }}
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 11
+        sudo apt-get install libc++-11-dev libc++abi-11-dev
+
+    - name: Install g++ 10
+      id: install_gcc_10
+      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'g++-10' )
+      shell: bash
+      working-directory: ${{ env.HOME }}
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
+        sudo apt-get install g++-10
 
     - name: Create Build Environment
       # Some projects don't allow in-source building, so create a separate build directory
@@ -45,16 +83,16 @@ jobs:
       # access regardless of the host operating system
       shell: bash
       working-directory: ${{runner.workspace}}/build
-      env:
-        CXX: ${{ matrix.compiler }}
-      # Note the current convention is to use the -S and -B options here to specify source
-      # and build directories, but this is only available with CMake 3.13 and higher.
+      env: 
+        CXX: ${{ matrix.config.cxx }}
+      # Note the current convention is to use the -S and -B options here to specify source 
+      # and build directories, but this is only available with CMake 3.13 and higher.  
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
       run: |
-        cmake ${{runner.workspace}} \
+        cmake $GITHUB_WORKSPACE \
           -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-          -DCMAKE_CXX_FLAGS=${{ matrix.cxx_flags }} \
-          -DCMAKE_EXE_LINKER_FLAGS=${{ matrix.exe_linker_flags }} \
+          -DCMAKE_CXX_FLAGS=${{ matrix.config.cxx_flags }} \
+          -DCMAKE_EXE_LINKER_FLAGS=${{ matrix.config.exe_linker_flags }} \
           -DCMAKE_VERBOSE_MAKEFILE=ON
 
     - name: Build
