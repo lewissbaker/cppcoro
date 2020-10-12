@@ -32,8 +32,8 @@ namespace cppcoro
 
 			generator<T> get_return_object() noexcept;
 
-			constexpr cppcoro::suspend_always initial_suspend() const { return {}; }
-			constexpr cppcoro::suspend_always final_suspend() const { return {}; }
+			constexpr cppcoro::suspend_always initial_suspend() const noexcept { return {}; }
+			constexpr cppcoro::suspend_always final_suspend() const noexcept { return {}; }
 
 			template<
 				typename U = T,
