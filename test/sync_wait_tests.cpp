@@ -14,7 +14,7 @@
 #include <string>
 #include <type_traits>
 
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("sync_wait");
 

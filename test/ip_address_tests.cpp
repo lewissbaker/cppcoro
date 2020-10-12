@@ -5,7 +5,7 @@
 
 #include <cppcoro/net/ip_address.hpp>
 
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("ip_address");
 

@@ -21,7 +21,7 @@
 #include "io_service_fixture.hpp"
 
 #include <ostream>
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("file");
 

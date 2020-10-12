@@ -18,7 +18,7 @@
 #include <chrono>
 
 #include <ostream>
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 DOCTEST_TEST_SUITE_BEGIN("multi_producer_sequencer");
 

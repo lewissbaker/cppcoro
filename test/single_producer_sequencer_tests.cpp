@@ -17,7 +17,7 @@
 #include <thread>
 
 #include <ostream>
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 DOCTEST_TEST_SUITE_BEGIN("single_producer_sequencer");
 

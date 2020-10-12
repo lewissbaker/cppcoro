@@ -10,7 +10,7 @@
 #include <cppcoro/when_all.hpp>
 
 #include <ostream>
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("async_generator");
 
