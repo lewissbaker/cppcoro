@@ -13,7 +13,7 @@
 #include <cppcoro/cancellation_token.hpp>
 #include <cppcoro/async_scope.hpp>
 
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 using namespace cppcoro;
 using namespace cppcoro::net;

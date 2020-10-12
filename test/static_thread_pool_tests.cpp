@@ -15,7 +15,7 @@
 #include <iostream>
 #include <numeric>
 
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("static_thread_pool");
 
