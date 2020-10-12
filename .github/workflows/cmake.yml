@@ -1,6 +1,6 @@
 name: CMake
 
-on: [push]
+on: [push, pull_request]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -18,6 +18,13 @@ jobs:
       fail-fast: false
       matrix:
         compiler: [g++-10, clang]
+        include:
+          - compiler: clang
+            cxx_flags: -stdlib=libc++
+            # TODO figure out why this is not set automatically
+            exe_linker_flags: -lc++
+          - compiler: g++-10
+            install: 'g++-10'
 
     steps:
     - uses: actions/checkout@v2
@@ -26,7 +33,7 @@ jobs:
       run: sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
 
     - name: Install dependencies
-      run: sudo apt-get install g++-10
+      run: sudo apt-get install ${{ matrix.install }}
 
     - name: Create Build Environment
       # Some projects don't allow in-source building, so create a separate build directory
@@ -38,12 +45,17 @@ jobs:
       # access regardless of the host operating system
       shell: bash
       working-directory: ${{runner.workspace}}/build
-      env: 
+      env:
         CXX: ${{ matrix.compiler }}
-      # Note the current convention is to use the -S and -B options here to specify source 
-      # and build directories, but this is only available with CMake 3.13 and higher.  
+      # Note the current convention is to use the -S and -B options here to specify source
+      # and build directories, but this is only available with CMake 3.13 and higher.
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      run: |
+        cmake ${{runner.workspace}} \
+          -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+          -DCMAKE_CXX_FLAGS=${{ matrix.cxx_flags }} \
+          -DCMAKE_EXE_LINKER_FLAGS=${{ matrix.exe_linker_flags }} \
+          -DCMAKE_VERBOSE_MAKEFILE=ON
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
@@ -56,4 +68,4 @@ jobs:
       shell: bash
       # Execute tests defined by the CMake configuration.  
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest -C $BUILD_TYPE
+      run: ctest --output-on-failure -C $BUILD_TYPE
