@@ -1,6 +1,6 @@
 # CppCoro - A coroutine library for C++
 
-The 'cppcoro' library provides a set of general-purpose primitives for making use of the coroutines TS proposal described in [N4680](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4680.pdf).
+The 'cppcoro' library provides a large set of general-purpose primitives for making use of the coroutines TS proposal described in [N4680](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4680.pdf).
 
 These include:
 * Coroutine Types
@@ -168,7 +168,7 @@ namespace cppcoro
 }
 ```
 
-You create a `task<T>` object by calling a coroutine function that returns
+You can create a `task<T>` object by calling a coroutine function that returns
 a `task<T>`.
 
 The coroutine must contain a usage of either `co_await` or `co_return`.
