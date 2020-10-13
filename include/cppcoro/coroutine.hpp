@@ -6,12 +6,10 @@
 #include <coroutine>
 
 namespace cppcoro {
-  template<typename Promise=void>
-  using coroutine_handle = std::coroutine_handle<Promise>;
-
-  using suspend_always = std::suspend_always;
-  using suspend_never = std::suspend_never;
-  static inline auto noop_coroutine() { return std::noop_coroutine(); }
+  using std::coroutine_handle;
+  using std::suspend_always;
+  using std::noop_coroutine;
+  using std::suspend_never;
 }
 
 #elif __has_include(<experimental/coroutine>)
@@ -19,12 +17,10 @@ namespace cppcoro {
 #include <experimental/coroutine>
 
 namespace cppcoro {
-  template<typename Promise=void>
-  using coroutine_handle = std::experimental::coroutine_handle<Promise>;
-
-  using suspend_always = std::experimental::suspend_always;
-  using suspend_never = std::experimental::suspend_never;
-  static inline auto noop_coroutine() { return std::experimental::noop_coroutine(); }
+  using std::experimental::coroutine_handle;
+  using std::experimental::suspend_always;
+  using std::experimental::suspend_never;
+  using std::experimental::noop_coroutine;
 }
 
 #else
