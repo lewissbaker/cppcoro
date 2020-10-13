@@ -11,7 +11,6 @@
 
 #include <atomic>
 #include <optional>
-#include <cppcoro/coroutine.hpp>
 
 #if CPPCORO_OS_WINNT
 # include <cppcoro/detail/win32.hpp>
