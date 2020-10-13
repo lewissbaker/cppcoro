@@ -2954,8 +2954,8 @@ $ cmake . -Dcppcoro_ROOT=$HOME/.local
 # ...
 -- Performing Test Coroutines_SUPPORTS_MS_FLAG
 -- Performing Test Coroutines_SUPPORTS_MS_FLAG - Failed
--- Performing Test Coroutines_SUPPORTS_GNU_FLAG
--- Performing Test Coroutines_SUPPORTS_GNU_FLAG - Success
+-- Performing Test Coroutines_SUPPORTS_COROUTINES_FLAG
+-- Performing Test Coroutines_SUPPORTS_COROUTINES_FLAG - Success
 -- Looking for C++ include coroutine
 -- Looking for C++ include coroutine - not found
 -- Looking for C++ include experimental/coroutine
