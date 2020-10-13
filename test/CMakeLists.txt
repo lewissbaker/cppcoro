@@ -1,14 +1,17 @@
 add_library(doctest::doctest INTERFACE IMPORTED)
 target_include_directories(doctest::doctest INTERFACE doctest)
 
+include(${CMAKE_CURRENT_LIST_DIR}/doctest/doctest.cmake)
+
 find_package(Threads REQUIRED)
 
-add_executable(run
-	counted.hpp
-	io_service_fixture.hpp
-
+add_library(tests-main SHARED
 	main.cpp
 	counted.cpp
+)
+target_link_libraries(tests-main PUBLIC cppcoro doctest::doctest Threads::Threads)
+
+set(tests
 	generator_tests.cpp
 	recursive_generator_tests.cpp
 	async_generator_tests.cpp
@@ -36,7 +39,7 @@ add_executable(run
 )
 
 if(WIN32)
-    target_sources(run PRIVATE
+    list(APPEND tests
         scheduling_operator_tests.cpp
         io_service_tests.cpp
         file_tests.cpp
@@ -44,6 +47,9 @@ if(WIN32)
     )
 endif()
 
-target_link_libraries(run PRIVATE cppcoro Threads::Threads)
-
-add_test(NAME test COMMAND run)
+foreach(test ${tests})
+	get_filename_component(test_name ${test} NAME_WE)
+	add_executable(${test_name} ${test})
+	target_link_libraries(${test_name} PRIVATE tests-main)
+	doctest_discover_tests(${test_name} PROPERTIES TIMEOUT 30)
+endforeach()
