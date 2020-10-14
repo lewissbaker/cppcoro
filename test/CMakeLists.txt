@@ -45,6 +45,9 @@ if(WIN32)
         file_tests.cpp
         socket_tests.cpp
     )
+else()
+	# let more time for some tests
+	set(async_auto_reset_event_tests_TIMEOUT 60)
 endif()
 
 foreach(test ${tests})
@@ -52,5 +55,8 @@ foreach(test ${tests})
 	add_executable(${test_name} ${test})
 	target_link_libraries(${test_name} PRIVATE tests-main)
 	string(REPLACE "_" " " test_prefix ${test_name})
-	doctest_discover_tests(${test_name} TEST_PREFIX ${test_prefix}- PROPERTIES TIMEOUT 30)
+	if (NOT DEFINED ${test_name}_TIMEOUT)
+		set(${test_name}_TIMEOUT 30)
+	endif()
+	doctest_discover_tests(${test_name} TEST_PREFIX ${test_prefix}- PROPERTIES TIMEOUT ${${test_name}_TIMEOUT})
 endforeach()
