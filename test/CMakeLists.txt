@@ -1,14 +1,17 @@
 add_library(doctest::doctest INTERFACE IMPORTED)
 target_include_directories(doctest::doctest INTERFACE doctest)
 
+include(${CMAKE_CURRENT_LIST_DIR}/doctest/doctest.cmake)
+
 find_package(Threads REQUIRED)
 
-add_executable(run
-	counted.hpp
-	io_service_fixture.hpp
-
+add_library(tests-main SHARED
 	main.cpp
 	counted.cpp
+)
+target_link_libraries(tests-main PUBLIC cppcoro doctest::doctest Threads::Threads)
+
+set(tests
 	generator_tests.cpp
 	recursive_generator_tests.cpp
 	async_generator_tests.cpp
@@ -36,14 +39,24 @@ add_executable(run
 )
 
 if(WIN32)
-    target_sources(run PRIVATE
+    list(APPEND tests
         scheduling_operator_tests.cpp
         io_service_tests.cpp
         file_tests.cpp
         socket_tests.cpp
     )
+else()
+	# let more time for some tests
+	set(async_auto_reset_event_tests_TIMEOUT 60)
 endif()
 
-target_link_libraries(run PRIVATE cppcoro Threads::Threads)
-
-add_test(NAME test COMMAND run)
+foreach(test ${tests})
+	get_filename_component(test_name ${test} NAME_WE)
+	add_executable(${test_name} ${test})
+	target_link_libraries(${test_name} PRIVATE tests-main)
+	string(REPLACE "_" " " test_prefix ${test_name})
+	if (NOT DEFINED ${test_name}_TIMEOUT)
+		set(${test_name}_TIMEOUT 30)
+	endif()
+	doctest_discover_tests(${test_name} TEST_PREFIX ${test_prefix}- PROPERTIES TIMEOUT ${${test_name}_TIMEOUT})
+endforeach()
