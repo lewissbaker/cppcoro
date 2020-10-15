@@ -5,9 +5,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-include(CTest)
 
 add_subdirectory(lib)
+
+enable_testing()
 if(BUILD_TESTING)
     add_subdirectory(test)
 endif()
