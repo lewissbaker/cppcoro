@@ -159,8 +159,8 @@ target_include_directories(cppcoro PUBLIC
 	$<INSTALL_INTERFACE:include>)
 target_compile_features(cppcoro PUBLIC cxx_std_20)
 
-find_package(CppcoroCoroutines REQUIRED)
-target_link_libraries(cppcoro PUBLIC cppcoro::coroutines)
+find_package(Coroutines REQUIRED)
+target_link_libraries(cppcoro PUBLIC std::coroutines)
 
 install(TARGETS cppcoro EXPORT cppcoroTargets
 	LIBRARY DESTINATION lib
