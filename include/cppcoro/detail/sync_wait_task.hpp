@@ -68,7 +68,7 @@ namespace cppcoro
 				return completion_notifier{};
 			}
 
-#if CPPCORO_COMPILER_MSVC
+#if CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC < 19'00'00000
 			// HACK: This is needed to work around a bug in MSVC 2017.7/2017.8.
 			// See comment in make_sync_wait_task below.
 			template<typename Awaitable>
@@ -245,7 +245,7 @@ namespace cppcoro
 
 		};
 
-#if CPPCORO_COMPILER_MSVC
+#if CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC < 19'00'00000
 		// HACK: Work around bug in MSVC where passing a parameter by universal reference
 		// results in an error when passed a move-only type, complaining that the copy-constructor
 		// has been deleted. The parameter should be passed by reference and the compiler should

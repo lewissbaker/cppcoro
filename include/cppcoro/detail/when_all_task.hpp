@@ -76,7 +76,7 @@ namespace cppcoro
 				assert(false);
 			}
 
-#if CPPCORO_COMPILER_MSVC
+#if CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC < 19'00'00000
 			// HACK: This is needed to work around a bug in MSVC 2017.7/2017.8.
 			// See comment in make_when_all_task below.
 			template<typename Awaitable>
@@ -301,7 +301,7 @@ namespace cppcoro
 			std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
 		when_all_task<RESULT> make_when_all_task(AWAITABLE awaitable)
 		{
-#if CPPCORO_COMPILER_MSVC
+#if CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC < 19'00'00000
 			// HACK: Workaround another bug in MSVC where the expression 'co_yield co_await x' seems
 			// to completely ignore the co_yield an never calls promise.yield_value().
 			// The coroutine seems to be resuming the 'co_await' after the 'co_yield'
@@ -329,7 +329,7 @@ namespace cppcoro
 			std::enable_if_t<!std::is_void_v<RESULT>, int> = 0>
 		when_all_task<RESULT> make_when_all_task(std::reference_wrapper<AWAITABLE> awaitable)
 		{
-#if CPPCORO_COMPILER_MSVC
+#if CPPCORO_COMPILER_MSVC && CPPCORO_COMPILER_MSVC < 19'00'00000
 			// HACK: Workaround another bug in MSVC where the expression 'co_yield co_await x' seems
 			// to completely ignore the co_yield and never calls promise.yield_value().
 			// The coroutine seems to be resuming the 'co_await' after the 'co_yield'
