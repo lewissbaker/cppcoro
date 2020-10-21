@@ -159,7 +159,7 @@ target_include_directories(cppcoro PUBLIC
 	$<INSTALL_INTERFACE:include>)
 target_compile_features(cppcoro PUBLIC cxx_std_20)
 
-find_package(Coroutines REQUIRED)
+find_package(Coroutines COMPONENTS Experimental Final REQUIRED)
 target_link_libraries(cppcoro PUBLIC std::coroutines)
 
 install(TARGETS cppcoro EXPORT cppcoroTargets
