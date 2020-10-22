@@ -38,6 +38,12 @@ jobs:
             cxx_flags: -stdlib=libc++,
             exe_linker_flags: -lc++,
           }
+          - {
+            name: "Windows MSVC 2019 (x64)",
+            os: windows-latest,
+            cxx: "cl",
+            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
+          }
 
     steps:
     - uses: actions/checkout@v2
@@ -89,6 +95,9 @@ jobs:
       # and build directories, but this is only available with CMake 3.13 and higher.  
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
       run: |
+        # run environment setup script if any
+        [ -n "${{ matrix.config.environment_script }}" ] && "${{ matrix.config.environment_script }}"
+
         cmake $GITHUB_WORKSPACE \
           -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
           -DCMAKE_CXX_STANDARD=20 \
