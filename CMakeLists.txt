@@ -24,7 +24,7 @@ set(config_package_location lib/cmake/cppcoro)
 install(DIRECTORY include
 	    DESTINATION .
 	    COMPONENT Devel)
-install(FILES cmake/FindCppcoroCoroutines.cmake
+install(FILES cmake/FindCoroutines.cmake
 	DESTINATION ${config_package_location}
 	COMPONENT Devel)
 install(EXPORT cppcoroTargets
