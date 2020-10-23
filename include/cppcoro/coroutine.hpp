@@ -20,7 +20,10 @@ namespace cppcoro {
   using std::experimental::coroutine_handle;
   using std::experimental::suspend_always;
   using std::experimental::suspend_never;
-  using std::experimental::noop_coroutine;
+
+#if CPPCORO_COMPILER_SUPPORTS_SYMMETRIC_TRANSFER
+    using std::experimental::noop_coroutine;
+#endif
 }
 
 #else
