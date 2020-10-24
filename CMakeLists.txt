@@ -5,9 +5,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-include(CTest)
 
 add_subdirectory(lib)
+
+enable_testing()
 if(BUILD_TESTING)
     add_subdirectory(test)
 endif()
@@ -20,10 +21,10 @@ configure_file(cmake/cppcoroConfig.cmake
     COPYONLY)
 
 set(config_package_location lib/cmake/cppcoro)
-install(DIRECTORY include
-	    DESTINATION .
+install(DIRECTORY include/cppcoro
+	    DESTINATION include
 	    COMPONENT Devel)
-install(FILES cmake/FindCppcoroCoroutines.cmake
+install(FILES cmake/FindCoroutines.cmake
 	DESTINATION ${config_package_location}
 	COMPONENT Devel)
 install(EXPORT cppcoroTargets

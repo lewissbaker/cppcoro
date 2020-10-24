@@ -5,7 +5,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/doctest/doctest.cmake)
 
 find_package(Threads REQUIRED)
 
-add_library(tests-main SHARED
+add_library(tests-main STATIC
 	main.cpp
 	counted.cpp
 )
