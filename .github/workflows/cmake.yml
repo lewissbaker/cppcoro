@@ -39,6 +39,12 @@ jobs:
             exe_linker_flags: -lc++,
           }
           - {
+            name: "Windows MSVC 2017 (x64)",
+            os: windows-2016,
+            cxx: "cl",
+            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
+          }
+          - {
             name: "Windows MSVC 2019 (x64)",
             os: windows-latest,
             cxx: "cl",
