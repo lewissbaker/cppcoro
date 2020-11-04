@@ -12,7 +12,7 @@
 #include <atomic>
 #include <iterator>
 #include <type_traits>
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 #include <functional>
 #include <cassert>
 
@@ -45,7 +45,7 @@ namespace cppcoro
 			async_generator_promise_base(const async_generator_promise_base& other) = delete;
 			async_generator_promise_base& operator=(const async_generator_promise_base& other) = delete;
 
-			std::experimental::suspend_always initial_suspend() const noexcept
+			cppcoro::suspend_always initial_suspend() const noexcept
 			{
 				return {};
 			}
@@ -89,7 +89,7 @@ namespace cppcoro
 
 			std::exception_ptr m_exception;
 
-			std::experimental::coroutine_handle<> m_consumerCoroutine;
+			cppcoro::coroutine_handle<> m_consumerCoroutine;
 
 		protected:
 
@@ -100,7 +100,7 @@ namespace cppcoro
 		{
 		public:
 
-			async_generator_yield_operation(std::experimental::coroutine_handle<> consumer) noexcept
+			async_generator_yield_operation(cppcoro::coroutine_handle<> consumer) noexcept
 				: m_consumer(consumer)
 			{}
 
@@ -109,8 +109,8 @@ namespace cppcoro
 				return false;
 			}
 
-			std::experimental::coroutine_handle<>
-			await_suspend([[maybe_unused]] std::experimental::coroutine_handle<> producer) noexcept
+			cppcoro::coroutine_handle<>
+			await_suspend([[maybe_unused]] cppcoro::coroutine_handle<> producer) noexcept
 			{
 				return m_consumer;
 			}
@@ -119,7 +119,7 @@ namespace cppcoro
 
 		private:
 
-			std::experimental::coroutine_handle<> m_consumer;
+			cppcoro::coroutine_handle<> m_consumer;
 
 		};
 
@@ -145,7 +145,7 @@ namespace cppcoro
 
 			async_generator_advance_operation(
 				async_generator_promise_base& promise,
-				std::experimental::coroutine_handle<> producerCoroutine) noexcept
+				cppcoro::coroutine_handle<> producerCoroutine) noexcept
 				: m_promise(std::addressof(promise))
 				, m_producerCoroutine(producerCoroutine)
 			{
@@ -155,8 +155,8 @@ namespace cppcoro
 
 			bool await_ready() const noexcept { return false; }
 
-			std::experimental::coroutine_handle<>
-				await_suspend(std::experimental::coroutine_handle<> consumerCoroutine) noexcept
+			cppcoro::coroutine_handle<>
+				await_suspend(cppcoro::coroutine_handle<> consumerCoroutine) noexcept
 			{
 				m_promise->m_consumerCoroutine = consumerCoroutine;
 				return m_producerCoroutine;
@@ -165,7 +165,7 @@ namespace cppcoro
 		protected:
 
 			async_generator_promise_base* m_promise;
-			std::experimental::coroutine_handle<> m_producerCoroutine;
+			cppcoro::coroutine_handle<> m_producerCoroutine;
 
 		};
 
@@ -242,7 +242,7 @@ namespace cppcoro
 		class async_generator_iterator final
 		{
 			using promise_type = async_generator_promise<T>;
-			using handle_type = std::experimental::coroutine_handle<promise_type>;
+			using handle_type = cppcoro::coroutine_handle<promise_type>;
 
 		public:
 
@@ -307,7 +307,7 @@ namespace cppcoro
 		class async_generator_begin_operation final : public async_generator_advance_operation
 		{
 			using promise_type = async_generator_promise<T>;
-			using handle_type = std::experimental::coroutine_handle<promise_type>;
+			using handle_type = cppcoro::coroutine_handle<promise_type>;
 
 		public:
 
@@ -358,7 +358,7 @@ namespace cppcoro
 		{}
 
 		explicit async_generator(promise_type& promise) noexcept
-			: m_coroutine(std::experimental::coroutine_handle<promise_type>::from_promise(promise))
+			: m_coroutine(cppcoro::coroutine_handle<promise_type>::from_promise(promise))
 		{}
 
 		async_generator(async_generator&& other) noexcept
@@ -408,7 +408,7 @@ namespace cppcoro
 
 	private:
 
-		std::experimental::coroutine_handle<promise_type> m_coroutine;
+		cppcoro::coroutine_handle<promise_type> m_coroutine;
 
 	};
 
@@ -451,7 +451,7 @@ namespace cppcoro
 			async_generator_promise_base(const async_generator_promise_base& other) = delete;
 			async_generator_promise_base& operator=(const async_generator_promise_base& other) = delete;
 
-			std::experimental::suspend_always initial_suspend() const noexcept
+			cppcoro::suspend_always initial_suspend() const noexcept
 			{
 				return {};
 			}
@@ -556,7 +556,7 @@ namespace cppcoro
 
 			std::exception_ptr m_exception;
 
-			std::experimental::coroutine_handle<> m_consumerCoroutine;
+			cppcoro::coroutine_handle<> m_consumerCoroutine;
 
 		protected:
 
@@ -579,7 +579,7 @@ namespace cppcoro
 				return m_initialState == state::value_not_ready_consumer_suspended;
 			}
 
-			bool await_suspend(std::experimental::coroutine_handle<> producer) noexcept;
+			bool await_suspend(cppcoro::coroutine_handle<> producer) noexcept;
 
 			void await_resume() noexcept {}
 
@@ -625,7 +625,7 @@ namespace cppcoro
 		}
 
 		inline bool async_generator_yield_operation::await_suspend(
-			std::experimental::coroutine_handle<> producer) noexcept
+			cppcoro::coroutine_handle<> producer) noexcept
 		{
 			state currentState = m_initialState;
 			if (currentState == state::value_not_ready_consumer_active)
@@ -711,7 +711,7 @@ namespace cppcoro
 
 			async_generator_advance_operation(
 				async_generator_promise_base& promise,
-				std::experimental::coroutine_handle<> producerCoroutine) noexcept
+				cppcoro::coroutine_handle<> producerCoroutine) noexcept
 				: m_promise(std::addressof(promise))
 				, m_producerCoroutine(producerCoroutine)
 			{
@@ -740,7 +740,7 @@ namespace cppcoro
 				return m_initialState == state::value_ready_producer_suspended;
 			}
 
-			bool await_suspend(std::experimental::coroutine_handle<> consumerCoroutine) noexcept
+			bool await_suspend(cppcoro::coroutine_handle<> consumerCoroutine) noexcept
 			{
 				m_promise->m_consumerCoroutine = consumerCoroutine;
 
@@ -791,7 +791,7 @@ namespace cppcoro
 		protected:
 
 			async_generator_promise_base* m_promise;
-			std::experimental::coroutine_handle<> m_producerCoroutine;
+			cppcoro::coroutine_handle<> m_producerCoroutine;
 
 		private:
 
@@ -872,7 +872,7 @@ namespace cppcoro
 		class async_generator_iterator final
 		{
 			using promise_type = async_generator_promise<T>;
-			using handle_type = std::experimental::coroutine_handle<promise_type>;
+			using handle_type = cppcoro::coroutine_handle<promise_type>;
 
 		public:
 
@@ -937,7 +937,7 @@ namespace cppcoro
 		class async_generator_begin_operation final : public async_generator_advance_operation
 		{
 			using promise_type = async_generator_promise<T>;
-			using handle_type = std::experimental::coroutine_handle<promise_type>;
+			using handle_type = cppcoro::coroutine_handle<promise_type>;
 
 		public:
 
@@ -988,7 +988,7 @@ namespace cppcoro
 		{}
 
 		explicit async_generator(promise_type& promise) noexcept
-			: m_coroutine(std::experimental::coroutine_handle<promise_type>::from_promise(promise))
+			: m_coroutine(cppcoro::coroutine_handle<promise_type>::from_promise(promise))
 		{}
 
 		async_generator(async_generator&& other) noexcept
@@ -1041,7 +1041,7 @@ namespace cppcoro
 
 	private:
 
-		std::experimental::coroutine_handle<promise_type> m_coroutine;
+		cppcoro::coroutine_handle<promise_type> m_coroutine;
 
 	};
 

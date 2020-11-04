@@ -5,7 +5,7 @@
 #ifndef CPPCORO_SINGLE_CONSUMER_ASYNC_AUTO_RESET_EVENT_HPP_INCLUDED
 #define CPPCORO_SINGLE_CONSUMER_ASYNC_AUTO_RESET_EVENT_HPP_INCLUDED
 
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 #include <atomic>
 #include <cstdint>
 #include <cassert>
@@ -26,7 +26,7 @@ namespace cppcoro
 			if (oldValue != nullptr && oldValue != this)
 			{
 				// There was a waiting coroutine that we now need to resume.
-				auto handle = *static_cast<std::experimental::coroutine_handle<>*>(oldValue);
+				auto handle = *static_cast<cppcoro::coroutine_handle<>*>(oldValue);
 
 				// We also need to transition the state back to 'not set' before
 				// resuming the coroutine. This operation needs to be 'acquire'
@@ -54,7 +54,7 @@ namespace cppcoro
 
 				bool await_ready() const noexcept { return false; }
 				
-				bool await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+				bool await_suspend(cppcoro::coroutine_handle<> awaitingCoroutine) noexcept
 				{
 					m_awaitingCoroutine = awaitingCoroutine;
 
@@ -82,7 +82,7 @@ namespace cppcoro
 
 			private:
 				const single_consumer_async_auto_reset_event& m_event;
-				std::experimental::coroutine_handle<> m_awaitingCoroutine;
+				cppcoro::coroutine_handle<> m_awaitingCoroutine;
 			};
 
 			return awaiter{ *this };

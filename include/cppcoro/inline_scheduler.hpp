@@ -5,7 +5,7 @@
 #ifndef CPPCORO_INLINE_SCHEDULER_HPP_INCLUDED
 #define CPPCORO_INLINE_SCHEDULER_HPP_INCLUDED
 
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 
 namespace cppcoro
 {
@@ -15,7 +15,7 @@ namespace cppcoro
 
 		inline_scheduler() noexcept = default;
 
-		std::experimental::suspend_never schedule() const noexcept
+		cppcoro::suspend_never schedule() const noexcept
 		{
 			return {};
 		}

@@ -5,7 +5,7 @@
 #ifndef CPPCORO_ASYNC_MUTEX_HPP_INCLUDED
 #define CPPCORO_ASYNC_MUTEX_HPP_INCLUDED
 
-#include <experimental/coroutine>
+#include <cppcoro/coroutine.hpp>
 #include <atomic>
 #include <cstdint>
 #include <mutex> // for std::adopt_lock_t
@@ -166,7 +166,7 @@ namespace cppcoro
 		{}
 
 		bool await_ready() const noexcept { return false; }
-		bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+		bool await_suspend(cppcoro::coroutine_handle<> awaiter) noexcept;
 		void await_resume() const noexcept {}
 
 	protected:
@@ -178,7 +178,7 @@ namespace cppcoro
 	private:
 
 		async_mutex_lock_operation* m_next;
-		std::experimental::coroutine_handle<> m_awaiter;
+		cppcoro::coroutine_handle<> m_awaiter;
 
 	};
 
