@@ -89,9 +89,9 @@ bool cppcoro::async_mutex_lock_operation::await_suspend(std::experimental::corou
 {
 	m_awaiter = awaiter;
 
-	std::uintptr_t oldState = m_mutex.m_state.load(std::memory_order_acquire);
 	while (true)
 	{
+    std::uintptr_t oldState = m_mutex.m_state.load(std::memory_order_acquire);
 		if (oldState == async_mutex::not_locked)
 		{
 			if (m_mutex.m_state.compare_exchange_weak(
