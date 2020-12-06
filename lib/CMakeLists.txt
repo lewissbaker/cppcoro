@@ -165,7 +165,7 @@ add_library(cppcoro
 target_include_directories(cppcoro PUBLIC
 	$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
 	$<INSTALL_INTERFACE:include>)
-target_compile_features(cppcoro PUBLIC cxx_std_20)
+
 target_compile_definitions(cppcoro PUBLIC ${compile_definition})
 target_compile_options(cppcoro PUBLIC ${compile_options})
 
