@@ -2859,7 +2859,7 @@ Given a type, `S`, that implements the `DelayedScheduler` and an instance, `s` o
 
 The cppcoro library supports building under Windows with Visual Studio 2017 and Linux with Clang 5.0+.
 
-This library makes use of the [Cake build system](https://github.com/lewissbaker/cake) (no, not the [C# one](http://cakebuild.net/)).
+This library makes use of either the [Cake build system](https://github.com/lewissbaker/cake) (no, not the [C# one](http://cakebuild.net/)) or CMake.
 
 The cake build system is checked out automatically as a git submodule so you don't need to download or install it separately.
 
@@ -2867,9 +2867,11 @@ The cake build system is checked out automatically as a git submodule so you don
 
 This library currently requires Visual Studio 2017 or later and the Windows 10 SDK.
 
-Support for Clang ([#3](https://github.com/lewissbaker/cppcoro/issues/3)) and Linux ([#15](https://github.com/lewissbaker/cppcoro/issues/15)) is planned.
+Support for Linux ([#15](https://github.com/lewissbaker/cppcoro/issues/15)) is planned.
 
 ### Prerequisites
+
+The CMakeLists requires version 3.13 or later.
 
 The Cake build-system is implemented in Python and requires Python 2.7 to be installed.
 
@@ -2902,6 +2904,68 @@ c:\Code\cppcoro> git submodule update --init --recursive
 ```
 
 ### Building from the command-line
+
+#### With CMake
+
+Cppcoro follows the usual CMake workflow with no custom options added. Notable [standard CMake options](https://cmake.org/cmake/help/latest/manual/cmake-variables.7.html):
+
+| Flag                 | Description                  | Default Value          |
+|----------------------|------------------------------|------------------------|
+| BUILD_TESTING        | Build the unit tests         | ON                     |
+| BUILD_SHARED_LIBS    | Build as a shared library    | OFF                    |
+| CMAKE_BUILD_TYPE     | Build as `Debug`/`Release`   | <empty>                |
+| CMAKE_INSTALL_PREFIX | Where to install the library | `/usr/local` (on Unix) |
+
+CMake also respects the [conventional environment variables](https://cmake.org/cmake/help/latest/manual/cmake-env-variables.7.html):
+
+| Environment Variable | Description                   |
+|----------------------|-------------------------------|
+| CXX                  | Path to the C++ compiler      |
+| CXXFLAGS             | C++ compiler flags to prepend |
+| LDFLAGS              | Linker flags to prepend       |
+
+Example:
+
+```bash
+cd <this/repo>
+mkdir build
+cd build
+export CXX=clang++
+export CXXFLAGS="-stdlib=libc++ -march=native"
+export LDFLAGS="-stdlib=libc++ -fuse-ld=lld -Wl,--gdb-index"
+cmake .. [-GNinja] -DCMAKE_INSTALL_PREFIX=$HOME/.local -DBUILD_SHARED_LIBS=ON
+ninja # or make -jN
+ninja test # Run the tests
+ninja install
+```
+
+The CMake build scripts will also install a `cppcoroConfig.cmake` file for consumers to use.
+It will check at the consumer site that coroutines are indeed supported by the system and enable the appropriate compiler flag for Clang or MSVC, respectively.
+Assuming cppcoro has been installed to `$HOME/.local` like in the example above it can be consumed like this:
+
+```cmake
+find_package(cppcoro REQUIRED)
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE cppcoro::cppcoro)
+```
+
+```bash
+$ cmake . -Dcppcoro_ROOT=$HOME/.local
+# ...
+-- Performing Test _CXX_COROUTINES_SUPPORTS_MS_FLAG
+-- Performing Test _CXX_COROUTINES_SUPPORTS_MS_FLAG - Failed
+-- Performing Test _CXX_COROUTINES_SUPPORTS_CORO_FLAG
+-- Performing Test _CXX_COROUTINES_SUPPORTS_CORO_FLAG - Success
+-- Looking for C++ include coroutine
+-- Looking for C++ include coroutine - not found
+-- Looking for C++ include experimental/coroutine
+-- Looking for C++ include experimental/coroutine - found
+-- Configuring done
+-- Generating done
+# ...
+```
+
+#### With Cake
 
 To build from the command-line just run 'cake.bat' in the workspace root.
 
