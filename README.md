@@ -3112,7 +3112,7 @@ cmake -GNinja \
       -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
       -DCMAKE_C_COMPILER=/usr/bin/clang \
       -DCMAKE_BUILD_TYPE=MinSizeRel \
-      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install"
+      -DCMAKE_INSTALL_PREFIX="/path/to/clang/install" \
       -DCMAKE_BUILD_WITH_INSTALL_RPATH="yes" \
       -DLLVM_TARGETS_TO_BUILD=X86 \
       -DLLVM_ENABLE_PROJECTS="lld;clang" \
