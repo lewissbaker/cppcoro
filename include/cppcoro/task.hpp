@@ -49,7 +49,7 @@ namespace cppcoro
 				// were crashing under x86 optimised builds.
 				template<typename PROMISE>
 				CPPCORO_NOINLINE
-				void await_suspend(std::experimental::coroutine_handle<PROMISE> coroutine)
+				void await_suspend(std::experimental::coroutine_handle<PROMISE> coroutine) noexcept
 				{
 					task_promise_base& promise = coroutine.promise();
 
