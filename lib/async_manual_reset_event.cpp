@@ -72,7 +72,7 @@ bool cppcoro::async_manual_reset_event_operation::await_ready() const noexcept
 }
 
 bool cppcoro::async_manual_reset_event_operation::await_suspend(
-	std::experimental::coroutine_handle<> awaiter) noexcept
+	std::coroutine_handle<> awaiter) noexcept
 {
 	m_awaiter = awaiter;
 

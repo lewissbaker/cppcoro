@@ -48,7 +48,7 @@ namespace cppcoro
 		[[nodiscard]]
 		static write_only_file open(
 			io_service& ioService,
-			const std::experimental::filesystem::path& path,
+			const std::filesystem::path& path,
 			file_open_mode openMode = file_open_mode::create_or_open,
 			file_share_mode shareMode = file_share_mode::none,
 			file_buffering_mode bufferingMode = file_buffering_mode::default_);

@@ -84,7 +84,7 @@ namespace cppcoro
 					return m_event.is_set();
 				}
 
-				bool await_suspend(std::experimental::coroutine_handle<> awaiter)
+				bool await_suspend(std::coroutine_handle<> awaiter)
 				{
 					m_event.m_awaiter = awaiter;
 
@@ -120,7 +120,7 @@ namespace cppcoro
 		// by encoding 'not_set' as 0 (nullptr), 'set' as 1 and
 		// 'not_set_consumer_waiting' as a coroutine handle pointer.
 		std::atomic<state> m_state;
-		std::experimental::coroutine_handle<> m_awaiter;
+		std::coroutine_handle<> m_awaiter;
 
 	};
 }

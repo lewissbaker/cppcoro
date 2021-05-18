@@ -160,7 +160,7 @@ namespace cppcoro
 			return m_consumerWaitOperation.await_ready();
 		}
 
-		auto await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+		auto await_suspend(std::coroutine_handle<> awaitingCoroutine) noexcept
 		{
 			return m_consumerWaitOperation.await_suspend(awaitingCoroutine);
 		}
@@ -199,7 +199,7 @@ namespace cppcoro
 			return m_consumerWaitOperation.await_ready();
 		}
 
-		auto await_suspend(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+		auto await_suspend(std::coroutine_handle<> awaitingCoroutine) noexcept
 		{
 			return m_consumerWaitOperation.await_suspend(awaitingCoroutine);
 		}

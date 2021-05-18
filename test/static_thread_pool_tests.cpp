@@ -132,7 +132,7 @@ TEST_CASE("launch sub-task with many sub-tasks")
 struct fork_join_operation
 {
 	std::atomic<std::size_t> m_count;
-	std::experimental::coroutine_handle<> m_coro;
+	std::coroutine_handle<> m_coro;
 
 	fork_join_operation() : m_count(1) {}
 
@@ -151,7 +151,7 @@ struct fork_join_operation
 
 	bool await_ready() noexcept { return m_count.load(std::memory_order_acquire) == 1; }
 
-	bool await_suspend(std::experimental::coroutine_handle<> coro) noexcept
+	bool await_suspend(std::coroutine_handle<> coro) noexcept
 	{
 		m_coro = coro;
 		return m_count.fetch_sub(1, std::memory_order_acq_rel) != 1;
@@ -187,7 +187,7 @@ cppcoro::task<void> for_each_async(SCHEDULER& scheduler, RANGE& range, FUNC func
 		bool await_ready() noexcept { return false; }
 
 		CPPCORO_NOINLINE
-		void await_suspend(std::experimental::coroutine_handle<> coro) noexcept
+		void await_suspend(std::coroutine_handle<> coro) noexcept
 		{
 			fork_join_operation& forkJoin = m_forkJoin;
 			FUNC& func = m_func;
