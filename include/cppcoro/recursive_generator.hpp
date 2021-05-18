@@ -39,12 +39,12 @@ namespace cppcoro
 				return recursive_generator<T>{ *this };
 			}
 
-			std::experimental::suspend_always initial_suspend() noexcept
+			std::suspend_always initial_suspend() noexcept
 			{
 				return {};
 			}
 
-			std::experimental::suspend_always final_suspend() noexcept
+			std::suspend_always final_suspend() noexcept
 			{
 				return {};
 			}
@@ -56,13 +56,13 @@ namespace cppcoro
 
 			void return_void() noexcept {}
 
-			std::experimental::suspend_always yield_value(T& value) noexcept
+			std::suspend_always yield_value(T& value) noexcept
 			{
 				m_value = std::addressof(value);
 				return {};
 			}
 
-			std::experimental::suspend_always yield_value(T&& value) noexcept
+			std::suspend_always yield_value(T&& value) noexcept
 			{
 				m_value = std::addressof(value);
 				return {};
@@ -87,7 +87,7 @@ namespace cppcoro
 						return this->m_childPromise == nullptr;
 					}
 
-					void await_suspend(std::experimental::coroutine_handle<promise_type>) noexcept
+					void await_suspend(std::coroutine_handle<promise_type>) noexcept
 					{}
 
 					void await_resume()
@@ -122,11 +122,11 @@ namespace cppcoro
 
 			// Don't allow any use of 'co_await' inside the recursive_generator coroutine.
 			template<typename U>
-			std::experimental::suspend_never await_transform(U&& value) = delete;
+			std::suspend_never await_transform(U&& value) = delete;
 
 			void destroy() noexcept
 			{
-				std::experimental::coroutine_handle<promise_type>::from_promise(*this).destroy();
+				std::coroutine_handle<promise_type>::from_promise(*this).destroy();
 			}
 
 			void throw_if_exception()
@@ -139,7 +139,7 @@ namespace cppcoro
 
 			bool is_complete() noexcept
 			{
-				return std::experimental::coroutine_handle<promise_type>::from_promise(*this).done();
+				return std::coroutine_handle<promise_type>::from_promise(*this).done();
 			}
 
 			T& value() noexcept
@@ -167,7 +167,7 @@ namespace cppcoro
 
 			void resume() noexcept
 			{
-				std::experimental::coroutine_handle<promise_type>::from_promise(*this).resume();
+				std::coroutine_handle<promise_type>::from_promise(*this).resume();
 			}
 
 			std::add_pointer_t<T> m_value;

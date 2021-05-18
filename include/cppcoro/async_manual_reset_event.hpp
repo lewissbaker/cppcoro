@@ -87,7 +87,7 @@ namespace cppcoro
 		explicit async_manual_reset_event_operation(const async_manual_reset_event& event) noexcept;
 
 		bool await_ready() const noexcept;
-		bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+		bool await_suspend(std::coroutine_handle<> awaiter) noexcept;
 		void await_resume() const noexcept {}
 
 	private:
@@ -96,7 +96,7 @@ namespace cppcoro
 
 		const async_manual_reset_event& m_event;
 		async_manual_reset_event_operation* m_next;
-		std::experimental::coroutine_handle<> m_awaiter;
+		std::coroutine_handle<> m_awaiter;
 
 	};
 }

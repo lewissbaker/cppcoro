@@ -166,7 +166,7 @@ namespace cppcoro
 		{}
 
 		bool await_ready() const noexcept { return false; }
-		bool await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept;
+		bool await_suspend(std::coroutine_handle<> awaiter) noexcept;
 		void await_resume() const noexcept {}
 
 	protected:
@@ -178,7 +178,7 @@ namespace cppcoro
 	private:
 
 		async_mutex_lock_operation* m_next;
-		std::experimental::coroutine_handle<> m_awaiter;
+		std::coroutine_handle<> m_awaiter;
 
 	};
 

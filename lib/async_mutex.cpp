@@ -70,7 +70,7 @@ void cppcoro::async_mutex::unlock()
 		do
 		{
 			auto* temp = next->m_next;
-			next->m_next = waitersHead; 
+			next->m_next = waitersHead;
 			waitersHead = next;
 			next = temp;
 		} while (next != nullptr);
@@ -85,7 +85,7 @@ void cppcoro::async_mutex::unlock()
 	waitersHead->m_awaiter.resume();
 }
 
-bool cppcoro::async_mutex_lock_operation::await_suspend(std::experimental::coroutine_handle<> awaiter) noexcept
+bool cppcoro::async_mutex_lock_operation::await_suspend(std::coroutine_handle<> awaiter) noexcept
 {
 	m_awaiter = awaiter;
 

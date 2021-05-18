@@ -15,7 +15,7 @@ namespace cppcoro
 
 		inline_scheduler() noexcept = default;
 
-		std::experimental::suspend_never schedule() const noexcept
+		std::suspend_never schedule() const noexcept
 		{
 			return {};
 		}
