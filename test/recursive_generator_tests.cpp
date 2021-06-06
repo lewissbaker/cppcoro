@@ -54,6 +54,7 @@ TEST_CASE("throw before first yield")
 	try
 	{
 		auto iter = gen.begin();
+    (void) iter;
 		CHECK(false);
 	}
 	catch (MyException)
@@ -135,6 +136,7 @@ TEST_CASE("destroying generator before completion destructs objects on stack")
 		auto g = f();
 		auto it = g.begin();
 		auto itEnd = g.end();
+    (void) itEnd;
 		CHECK(*it == 1u);
 		CHECK(!destructed);
 	}
