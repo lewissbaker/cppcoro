@@ -356,7 +356,7 @@ std::string cppcoro::net::ipv6_address::to_string() const
 		}
 	}
 
-	assert((c - &buffer[0]) <= sizeof(buffer));
+	assert(static_cast <size_t>(c - &buffer[0]) <= sizeof(buffer));
 
 	return std::string{ &buffer[0], c };
 }
