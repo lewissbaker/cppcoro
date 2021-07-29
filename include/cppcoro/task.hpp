@@ -276,7 +276,7 @@ namespace cppcoro
 	/// and asynchronously.
 	///
 	/// When you call a coroutine that returns a task, the coroutine
-	/// simply captures any passed parameters and returns exeuction to the
+	/// simply captures any passed parameters and returns execution to the
 	/// caller. Execution of the coroutine body does not start until the
 	/// coroutine is first co_await'ed.
 	template<typename T = void>
