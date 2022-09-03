@@ -12,6 +12,7 @@
 #include <cassert>
 #include <mutex>
 #include <chrono>
+#include <utility>
 
 namespace
 {
