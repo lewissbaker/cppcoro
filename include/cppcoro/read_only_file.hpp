@@ -43,7 +43,7 @@ namespace cppcoro
 		[[nodiscard]]
 		static read_only_file open(
 			io_service& ioService,
-			const std::experimental::filesystem::path& path,
+			const std::filesystem::path& path,
 			file_share_mode shareMode = file_share_mode::read,
 			file_buffering_mode bufferingMode = file_buffering_mode::default_);
 

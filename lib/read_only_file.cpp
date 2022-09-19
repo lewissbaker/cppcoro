@@ -13,7 +13,7 @@
 
 cppcoro::read_only_file cppcoro::read_only_file::open(
 	io_service& ioService,
-	const std::experimental::filesystem::path& path,
+	const std::filesystem::path& path,
 	file_share_mode shareMode,
 	file_buffering_mode bufferingMode)
 {

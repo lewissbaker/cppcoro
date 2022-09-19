@@ -319,7 +319,7 @@ namespace cppcoro
 	};
 
 	void static_thread_pool::schedule_operation::await_suspend(
-		std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+		std::coroutine_handle<> awaitingCoroutine) noexcept
 	{
 		m_awaitingCoroutine = awaitingCoroutine;
 		m_threadPool->schedule_impl(this);
@@ -664,7 +664,7 @@ namespace cppcoro
 				return nullptr;
 			}
 
-			// Reverse the list 
+			// Reverse the list
 			do
 			{
 				auto* next = std::exchange(tail->m_next, head);

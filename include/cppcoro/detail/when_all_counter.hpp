@@ -29,7 +29,7 @@ namespace cppcoro
 				return static_cast<bool>(m_awaitingCoroutine);
 			}
 
-			bool try_await(std::experimental::coroutine_handle<> awaitingCoroutine) noexcept
+			bool try_await(std::coroutine_handle<> awaitingCoroutine) noexcept
 			{
 				m_awaitingCoroutine = awaitingCoroutine;
 				return m_count.fetch_sub(1, std::memory_order_acq_rel) > 1;
@@ -46,7 +46,7 @@ namespace cppcoro
 		protected:
 
 			std::atomic<std::size_t> m_count;
-			std::experimental::coroutine_handle<> m_awaitingCoroutine;
+			std::coroutine_handle<> m_awaitingCoroutine;
 
 		};
 	}
