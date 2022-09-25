@@ -420,7 +420,11 @@ extern "C" __declspec(dllimport) void __stdcall DebugBreak();
 // so the <iosfwd> header is used - also it is very light and doesn't drag a ton of stuff
 //#include <iosfwd>
 #include <ostream>
-#else // _LIBCPP_VERSION
+#elif (_MSC_VER >= 1920)
+// MSVC 2019 removes <iostream> from <string> 
+// https://developercommunity.visualstudio.com/content/problem/525532/visual-studio-2019-compilation-issue.html
+#include <ostream>
+#else
 #ifndef DOCTEST_CONFIG_USE_IOSFWD
 namespace std
 {
