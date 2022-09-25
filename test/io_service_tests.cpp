@@ -227,4 +227,40 @@ TEST_CASE_FIXTURE(io_service_fixture_with_threads<1>, "Many concurrent timers")
 		<< "ms");
 }
 
+TEST_CASE("io_service::process_events_until_complete(task<T>)")
+{
+	cppcoro::io_service ioService;
+
+	auto makeTask = [](cppcoro::io_service& io) -> cppcoro::task<std::string>
+	{
+		co_await io.schedule();
+		co_return "foo";
+	};
+
+	auto task = makeTask(ioService);
+
+	CHECK(ioService.process_events_until_complete(task) == "foo");
+	CHECK(task.is_ready());
+	CHECK(ioService.process_events_until_complete(task) == "foo");
+	CHECK(ioService.process_events_until_complete(makeTask(ioService)) == "foo");
+}
+
+TEST_CASE("io_service::process_events_until_complete(shared_task<T>)")
+{
+	cppcoro::io_service ioService;
+
+	auto makeTask = [](cppcoro::io_service& io) -> cppcoro::shared_task<std::string>
+	{
+		co_await io.schedule();
+		co_return "foo";
+	};
+
+	auto task = makeTask(ioService);
+
+	CHECK(ioService.process_events_until_complete(task) == "foo");
+	CHECK(task.is_ready());
+	CHECK(ioService.process_events_until_complete(task) == "foo");
+	CHECK(ioService.process_events_until_complete(makeTask(ioService)) == "foo");
+}
+
 TEST_SUITE_END();
