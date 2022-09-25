@@ -10,7 +10,7 @@
 #include <cppcoro/sync_wait.hpp>
 
 #include <ostream>
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("async_mutex");
 

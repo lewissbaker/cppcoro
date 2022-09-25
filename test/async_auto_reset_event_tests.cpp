@@ -18,7 +18,7 @@
 #include <vector>
 
 #include <ostream>
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("async_auto_reset_event");
 

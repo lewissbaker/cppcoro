@@ -18,7 +18,7 @@
 #include <vector>
 
 #include <ostream>
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 TEST_SUITE_BEGIN("io_service");
 

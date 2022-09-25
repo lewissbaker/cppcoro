@@ -5,7 +5,7 @@
 
 #include <cppcoro/net/ipv4_address.hpp>
 
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 
 TEST_SUITE_BEGIN("ipv4_address");

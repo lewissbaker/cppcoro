@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <thread>
 
-#include "doctest/doctest.h"
+#include "doctest/cppcoro_doctest.h"
 
 DOCTEST_TEST_SUITE_BEGIN("sequence_barrier");
 
