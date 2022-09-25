@@ -9,7 +9,7 @@
 #include <cppcoro/file_share_mode.hpp>
 #include <cppcoro/file_buffering_mode.hpp>
 
-#include <experimental/filesystem>
+#include <cppcoro/filesystem.hpp>
 
 namespace cppcoro
 {
@@ -43,7 +43,7 @@ namespace cppcoro
 		[[nodiscard]]
 		static read_only_file open(
 			io_service& ioService,
-			const std::experimental::filesystem::path& path,
+			const cppcoro::filesystem::path& path,
 			file_share_mode shareMode = file_share_mode::read,
 			file_buffering_mode bufferingMode = file_buffering_mode::default_);
 
