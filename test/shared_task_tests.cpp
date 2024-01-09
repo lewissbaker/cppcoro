@@ -132,7 +132,7 @@ TEST_CASE("make_shared_task")
 
 	auto f = [&]() -> cppcoro::task<std::string>
 	{
-		startedExecution = false;
+		startedExecution = true;
 		co_return "test";
 	};
 
